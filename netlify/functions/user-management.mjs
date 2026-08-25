@@ -19,8 +19,17 @@ function primaryEmailOf(user) {
   return String(primary?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || '').trim().toLowerCase();
 }
 
-function isAdminUser(user) {
+function isOwnerUser(user) {
   return emailsOf(user).includes(ADMIN_EMAIL);
+}
+
+function roleOf(user) {
+  if (isOwnerUser(user)) return 'beheerder';
+  return String(user?.publicMetadata?.role || '').trim().toLowerCase() === 'beheerder' ? 'beheerder' : 'gebruiker';
+}
+
+function isAdminUser(user) {
+  return roleOf(user) === 'beheerder';
 }
 
 async function authenticateAdmin(req) {
@@ -47,7 +56,7 @@ async function authenticateAdmin(req) {
   const clerk = createClerkClient({ secretKey });
   const currentUser = await clerk.users.getUser(verified.sub);
   if (!isAdminUser(currentUser)) {
-    throw Object.assign(new Error('Alleen de beheerder heeft toegang tot gebruikersbeheer.'), { status: 403 });
+    throw Object.assign(new Error('Alleen een beheerder heeft toegang tot gebruikersbeheer.'), { status: 403 });
   }
 
   return { clerk, currentUser, verified };
@@ -82,7 +91,8 @@ function serializeUser(user) {
     firstName: user.firstName || '',
     lastName: user.lastName || '',
     fullName: [user.firstName, user.lastName].filter(Boolean).join(' '),
-    role: email === ADMIN_EMAIL ? 'beheerder' : 'gebruiker',
+    role: roleOf(user),
+    isOwner: isOwnerUser(user),
     imageUrl: user.imageUrl || '',
     lastSignInAt: user.lastSignInAt || null,
     createdAt: user.createdAt || null,
@@ -106,6 +116,7 @@ export default async (req) => {
       return json({
         adminEmail: ADMIN_EMAIL,
         currentUserId: currentUser.id,
+        currentUserRole: roleOf(currentUser),
         users: (userResult.data || []).map(serializeUser),
         invitations: (invitationResult.data || []).map((inv) => ({
           id: inv.id,
@@ -123,7 +134,7 @@ export default async (req) => {
       if (action === 'invite') {
         const email = String(body?.email || '').trim().toLowerCase();
         if (!/^\S+@\S+\.\S+$/.test(email)) return json({ error: 'Vul een geldig e-mailadres in.' }, 400);
-        if (email === ADMIN_EMAIL) return json({ error: 'Dit e-mailadres is al ingesteld als beheerder.' }, 400);
+        if (email === ADMIN_EMAIL) return json({ error: 'Dit e-mailadres is al ingesteld als hoofdbeheerder.' }, 400);
 
         const invitation = await clerk.invitations.createInvitation({
           emailAddress: email,
@@ -140,18 +151,24 @@ export default async (req) => {
         if (!userId) return json({ error: 'Gebruiker ontbreekt.' }, 400);
         const firstName = String(body?.firstName || '').trim();
         const lastName = String(body?.lastName || '').trim();
+        let role = String(body?.role || 'gebruiker').trim().toLowerCase();
+        if (!['beheerder', 'gebruiker'].includes(role)) return json({ error: 'Ongeldige gebruikersrol.' }, 400);
         if (firstName.length > 100 || lastName.length > 100) return json({ error: 'Naam is te lang.' }, 400);
 
         const target = await clerk.users.getUser(userId);
         const beforeFirst = target.firstName || '';
         const beforeLast = target.lastName || '';
+        const beforeRole = roleOf(target);
         const targetEmail = primaryEmailOf(target) || userId;
 
-        const updated = await clerk.users.updateUser(userId, { firstName, lastName });
+        if (isOwnerUser(target)) role = 'beheerder';
+        const metadata = { ...(target.publicMetadata || {}), role };
+        const updated = await clerk.users.updateUser(userId, { firstName, lastName, publicMetadata: metadata });
 
         const fields = [];
         if (beforeFirst !== firstName) fields.push({ field: 'Voornaam', before: beforeFirst || '—', after: firstName || '—' });
         if (beforeLast !== lastName) fields.push({ field: 'Achternaam', before: beforeLast || '—', after: lastName || '—' });
+        if (beforeRole !== role) fields.push({ field: 'Rol', before: beforeRole === 'beheerder' ? 'Beheerder' : 'Gebruiker', after: role === 'beheerder' ? 'Beheerder' : 'Gebruiker' });
         if (fields.length) await writeAdminAudit(currentUser, verified, 'aangepast', targetEmail, fields);
 
         return json({ ok: true, user: serializeUser(updated) });
@@ -173,14 +190,14 @@ export default async (req) => {
       const body = await req.json().catch(() => ({}));
       const userId = String(body?.userId || '').trim();
       if (!userId) return json({ error: 'Gebruiker ontbreekt.' }, 400);
-      if (userId === currentUser.id) return json({ error: 'Je kunt je eigen beheerderaccount niet verwijderen.' }, 400);
+      if (userId === currentUser.id) return json({ error: 'Je kunt je eigen account niet verwijderen.' }, 400);
 
       const target = await clerk.users.getUser(userId);
-      if (isAdminUser(target)) return json({ error: 'Het beheerderaccount kan niet worden verwijderd.' }, 400);
+      if (isOwnerUser(target)) return json({ error: 'Het vaste hoofdbeheerderaccount kan niet worden verwijderd.' }, 400);
       const targetEmail = primaryEmailOf(target) || userId;
 
       await clerk.users.deleteUser(userId);
-      await writeAdminAudit(currentUser, verified, 'verwijderd', targetEmail);
+      await writeAdminAudit(currentUser, verified, 'verwijderd', targetEmail, [{ field: 'Rol', before: roleOf(target) === 'beheerder' ? 'Beheerder' : 'Gebruiker', after: '—' }]);
       return json({ ok: true });
     }
 
