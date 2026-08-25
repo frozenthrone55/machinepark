@@ -1,7 +1,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyToken } from '@clerk/backend';
 
-const STORE_NAME = 'machinepark-central';
+const STORE_NAME = 'machinepark-development';
 const STATE_KEY = 'state-v1';
 const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
 
