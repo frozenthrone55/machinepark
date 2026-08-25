@@ -4,6 +4,7 @@ import { createClerkClient, verifyToken } from '@clerk/backend';
 const STORE_NAME = 'machinepark-central';
 const STATE_KEY = 'state-v1';
 const AUDIT_PREFIX = 'audit/';
+const CLEAR_SERVICE_DATES_MIGRATION_KEY = 'migration/clear-service-dates-2026-08-25-v1';
 const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
 
 function json(data, status = 200, headers = {}) {
@@ -159,6 +160,66 @@ async function writeAudit(store, auth, before, after) {
   await store.setJSON(`${AUDIT_PREFIX}${Date.now()}-${id}`, entry, { metadata: { at, userId: auth.sub, userEmail: auth.email || '' } });
 }
 
+async function clearServiceDatesOnce(store, auth) {
+  const marker = await store.getWithMetadata(CLEAR_SERVICE_DATES_MIGRATION_KEY, {
+    type: 'json',
+    consistency: 'strong',
+  });
+  if (marker) return;
+
+  const current = await store.getWithMetadata(STATE_KEY, { type: 'json', consistency: 'strong' });
+  if (!current?.data || !Array.isArray(current.data.devices)) return;
+
+  const before = current.data;
+  let changedDevices = 0;
+  const devices = before.devices.map((device) => {
+    if (!device?.nextHalf && !device?.nextAnnual) return device;
+    changedDevices += 1;
+    return { ...device, nextHalf: '', nextAnnual: '', updatedAt: new Date().toISOString() };
+  });
+
+  if (!changedDevices) {
+    await store.setJSON(CLEAR_SERVICE_DATES_MIGRATION_KEY, {
+      done: true,
+      at: new Date().toISOString(),
+      changedDevices: 0,
+    });
+    return;
+  }
+
+  const after = {
+    ...before,
+    devices,
+    updatedAt: new Date().toISOString(),
+    updatedBy: auth.sub,
+    updatedByEmail: auth.email || '',
+  };
+
+  const result = await store.setJSON(STATE_KEY, after, {
+    onlyIfMatch: current.etag,
+    metadata: {
+      updatedAt: after.updatedAt,
+      updatedBy: auth.sub,
+      updatedByEmail: auth.email || '',
+    },
+  });
+
+  if (!result.modified) return;
+
+  try {
+    await writeAudit(store, auth, before, after);
+  } catch (auditError) {
+    console.error('machinepark migration audit logging', auditError);
+  }
+
+  await store.setJSON(CLEAR_SERVICE_DATES_MIGRATION_KEY, {
+    done: true,
+    at: after.updatedAt,
+    changedDevices,
+    performedBy: auth.email || auth.sub,
+  });
+}
+
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: NO_STORE });
 
@@ -167,6 +228,8 @@ export default async (req) => {
     const store = getStore({ name: STORE_NAME, consistency: 'strong' });
 
     if (req.method === 'GET') {
+      await clearServiceDatesOnce(store, auth);
+
       const cachedEtag = req.headers.get('if-none-match') || undefined;
       const entry = await store.getWithMetadata(STATE_KEY, {
         type: 'json',
