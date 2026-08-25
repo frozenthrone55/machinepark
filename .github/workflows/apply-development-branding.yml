@@ -1,0 +1,101 @@
+name: Apply development branding
+
+on:
+  push:
+    branches: [development]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-ui:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Apply Machinepark logo, favicon and single profile button
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('index.html')
+          s = path.read_text(encoding='utf-8')
+
+          manifest = '<link rel="manifest" href="manifest.webmanifest" />'
+          favicon = manifest + '\n<link rel="icon" type="image/svg+xml" href="/machinepark-logo.svg" />\n<link rel="shortcut icon" href="/machinepark-logo.svg" />'
+          if '<link rel="icon" type="image/svg+xml" href="/machinepark-logo.svg" />' not in s:
+              s = s.replace(manifest, favicon, 1)
+
+          s = re.sub(
+              r'\.brand-mark\{width:44px;height:44px;border-radius:14px;[^}]*\}',
+              '.brand-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}',
+              s,
+              count=1,
+          )
+          if '.brand-mark img{width:100%;height:100%;display:block}' not in s:
+              s = s.replace('.brand-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}', '.brand-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}.brand-mark img{width:100%;height:100%;display:block}', 1)
+
+          s = re.sub(
+              r'\.auth-brand \.auth-logo-mark\{width:54px;height:54px;border-radius:17px;[^}]*\}',
+              '.auth-brand .auth-logo-mark{width:54px;height:54px;border-radius:17px;display:grid;place-items:center;overflow:hidden}',
+              s,
+              count=1,
+          )
+          if '.auth-brand .auth-logo-mark img{width:100%;height:100%;display:block}' not in s:
+              s = s.replace('.auth-brand .auth-logo-mark{width:54px;height:54px;border-radius:17px;display:grid;place-items:center;overflow:hidden}', '.auth-brand .auth-logo-mark{width:54px;height:54px;border-radius:17px;display:grid;place-items:center;overflow:hidden}.auth-brand .auth-logo-mark img{width:100%;height:100%;display:block}', 1)
+
+          s = s.replace(
+              '.clerk-user-slot{display:flex;align-items:center;justify-content:center;min-width:34px;min-height:34px}.clerk-user-floating{display:none}',
+              '.clerk-user-slot{display:flex;align-items:center;justify-content:center;min-width:34px;min-height:34px}.clerk-user-single{flex:0 0 auto}'
+          )
+          s = s.replace('@media(max-width:700px){.clerk-user-floating{display:flex}.auth-shell', '@media(max-width:700px){.auth-shell')
+          s = s.replace('.clerk-user-floating{position:fixed;', '.clerk-user-single{position:fixed;')
+
+          s = s.replace(
+              '<div class="auth-logo"><div class="auth-logo-mark">☕</div>',
+              '<div class="auth-logo"><div class="auth-logo-mark"><img src="/machinepark-logo.svg" alt="" /></div>'
+          )
+          s = s.replace(
+              '<div class="brand"><div class="brand-mark">☕</div>',
+              '<div class="brand"><div class="brand-mark"><img src="/machinepark-logo.svg" alt="Machinepark logo" /></div>'
+          )
+
+          old_header = '<div class="top-actions"><div class="search"><span>⌕</span><input id="globalSearch" placeholder="Zoek toestel, locatie, onderdeel…" /></div><button class="btn primary" id="quickAdd">+ Nieuw</button><div id="clerkUserButton" class="clerk-user-slot"></div></div><div id="clerkUserMobile" class="clerk-user-slot clerk-user-floating"></div>'
+          new_header = '<div class="top-actions"><div class="search"><span>⌕</span><input id="globalSearch" placeholder="Zoek toestel, locatie, onderdeel…" /></div><button class="btn primary" id="quickAdd">+ Nieuw</button></div><div id="clerkUserButton" class="clerk-user-slot clerk-user-single"></div>'
+          s = s.replace(old_header, new_header)
+
+          s = s.replace("    const mobileUser=document.getElementById('clerkUserMobile');\n", '')
+          s = s.replace(
+              "      if(!userButtonsMounted){\n        if(desktopUser)Clerk.mountUserButton(desktopUser,{afterSignOutUrl:'/'});\n        if(mobileUser)Clerk.mountUserButton(mobileUser,{afterSignOutUrl:'/'});\n        userButtonsMounted=true;\n      }",
+              "      if(!userButtonsMounted){\n        if(desktopUser)Clerk.mountUserButton(desktopUser,{afterSignOutUrl:'/'});\n        userButtonsMounted=true;\n      }"
+          )
+          s = s.replace("        if(mobileUser){try{Clerk.unmountUserButton(mobileUser)}catch(_){}}\n", '')
+
+          if 'clerkUserMobile' in s:
+              raise SystemExit('Dubbele mobiele Clerk-profielcontainer is nog aanwezig.')
+          if s.count('id="clerkUserButton"') != 1:
+              raise SystemExit('Er moet exact één Clerk-profielcontainer zijn.')
+          if s.count('/machinepark-logo.svg') < 4:
+              raise SystemExit('Machinepark-logo is niet overal toegepast.')
+
+          path.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit patched development UI
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "Geen HTML-wijziging nodig."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Apply Machinepark logo favicon and single profile button"
+          git push origin HEAD:development
