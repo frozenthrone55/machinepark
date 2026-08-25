@@ -1,6 +1,9 @@
+import { getStore } from '@netlify/blobs';
 import { createClerkClient, verifyToken } from '@clerk/backend';
 
 const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
+const STORE_NAME = 'machinepark-central';
+const AUDIT_PREFIX = 'audit/';
 const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
 
 function json(data, status = 200, headers = {}) {
@@ -47,7 +50,28 @@ async function authenticateAdmin(req) {
     throw Object.assign(new Error('Alleen de beheerder heeft toegang tot gebruikersbeheer.'), { status: 403 });
   }
 
-  return { clerk, currentUser };
+  return { clerk, currentUser, verified };
+}
+
+async function writeAdminAudit(currentUser, verified, action, label, fields = []) {
+  try {
+    const store = getStore({ name: STORE_NAME, consistency: 'strong' });
+    const at = new Date().toISOString();
+    const id = crypto.randomUUID();
+    const email = primaryEmailOf(currentUser) || verified.sub;
+    await store.setJSON(`${AUDIT_PREFIX}${Date.now()}-${id}`, {
+      id,
+      at,
+      userId: verified.sub,
+      userEmail: email,
+      userName: [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' '),
+      changeCount: 1,
+      changes: [{ entityType: 'Gebruikersbeheer', entityId: label, entityLabel: label, action, fields }],
+      truncated: false,
+    }, { metadata: { at, userId: verified.sub, userEmail: email } });
+  } catch (error) {
+    console.error('gebruikersbeheer audit', error);
+  }
 }
 
 function serializeUser(user) {
@@ -71,12 +95,12 @@ export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: NO_STORE });
 
   try {
-    const { clerk, currentUser } = await authenticateAdmin(req);
+    const { clerk, currentUser, verified } = await authenticateAdmin(req);
 
     if (req.method === 'GET') {
       const [userResult, invitationResult] = await Promise.all([
         clerk.users.getUserList({ limit: 100, orderBy: '-created_at' }),
-        clerk.invitations.getInvitationList({ status: 'pending', limit: 100 }),
+        clerk.invitations.getInvitationList({ status: 'pending', limit: 100, orderBy: '-created_at' }),
       ]);
 
       return json({
@@ -107,13 +131,16 @@ export default async (req) => {
           redirectUrl: new URL(req.url).origin,
           publicMetadata: { role: 'gebruiker' },
         });
+        await writeAdminAudit(currentUser, verified, 'uitgenodigd', email, [{ field: 'Rol', before: '—', after: 'Gebruiker' }]);
         return json({ ok: true, invitation: { id: invitation.id, email, status: invitation.status } }, 201);
       }
 
       if (action === 'revoke-invitation') {
         const invitationId = String(body?.invitationId || '').trim();
         if (!invitationId) return json({ error: 'Uitnodiging ontbreekt.' }, 400);
-        await clerk.invitations.revokeInvitation(invitationId);
+        const invitation = await clerk.invitations.revokeInvitation({ invitationId });
+        const email = String(invitation?.emailAddress || invitationId).toLowerCase();
+        await writeAdminAudit(currentUser, verified, 'uitnodiging ingetrokken', email);
         return json({ ok: true });
       }
 
@@ -128,8 +155,10 @@ export default async (req) => {
 
       const target = await clerk.users.getUser(userId);
       if (isAdminUser(target)) return json({ error: 'Het beheerderaccount kan niet worden verwijderd.' }, 400);
+      const targetEmail = primaryEmailOf(target) || userId;
 
       await clerk.users.deleteUser(userId);
+      await writeAdminAudit(currentUser, verified, 'verwijderd', targetEmail);
       return json({ ok: true });
     }
 
