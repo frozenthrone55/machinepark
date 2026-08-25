@@ -14,6 +14,11 @@ function emailsOf(user) {
   return (user?.emailAddresses || []).map((x) => String(x.emailAddress || '').trim().toLowerCase()).filter(Boolean);
 }
 
+function isAdminUser(user) {
+  if (emailsOf(user).includes(ADMIN_EMAIL)) return true;
+  return String(user?.publicMetadata?.role || '').trim().toLowerCase() === 'beheerder';
+}
+
 async function authenticateAdmin(req) {
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) throw Object.assign(new Error('CLERK_SECRET_KEY is niet ingesteld in Netlify.'), { status: 500 });
@@ -37,8 +42,8 @@ async function authenticateAdmin(req) {
 
   const clerk = createClerkClient({ secretKey });
   const currentUser = await clerk.users.getUser(verified.sub);
-  if (!emailsOf(currentUser).includes(ADMIN_EMAIL)) {
-    throw Object.assign(new Error('Alleen de beheerder heeft toegang tot het logboek.'), { status: 403 });
+  if (!isAdminUser(currentUser)) {
+    throw Object.assign(new Error('Alleen een beheerder heeft toegang tot het logboek.'), { status: 403 });
   }
 }
 
