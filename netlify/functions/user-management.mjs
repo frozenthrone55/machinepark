@@ -135,6 +135,31 @@ export default async (req) => {
         return json({ ok: true, invitation: { id: invitation.id, email, status: invitation.status } }, 201);
       }
 
+      if (action === 'update-user') {
+        const userId = String(body?.userId || '').trim();
+        if (!userId) return json({ error: 'Gebruiker ontbreekt.' }, 400);
+        const firstName = String(body?.firstName || '').trim();
+        const lastName = String(body?.lastName || '').trim();
+        if (firstName.length > 100 || lastName.length > 100) return json({ error: 'Naam is te lang.' }, 400);
+
+        const target = await clerk.users.getUser(userId);
+        const beforeFirst = target.firstName || '';
+        const beforeLast = target.lastName || '';
+        const targetEmail = primaryEmailOf(target) || userId;
+
+        const updated = await clerk.users.updateUser(userId, {
+          firstName: firstName || null,
+          lastName: lastName || null,
+        });
+
+        const fields = [];
+        if (beforeFirst !== firstName) fields.push({ field: 'Voornaam', before: beforeFirst || '—', after: firstName || '—' });
+        if (beforeLast !== lastName) fields.push({ field: 'Achternaam', before: beforeLast || '—', after: lastName || '—' });
+        if (fields.length) await writeAdminAudit(currentUser, verified, 'aangepast', targetEmail, fields);
+
+        return json({ ok: true, user: serializeUser(updated) });
+      }
+
       if (action === 'revoke-invitation') {
         const invitationId = String(body?.invitationId || '').trim();
         if (!invitationId) return json({ error: 'Uitnodiging ontbreekt.' }, 400);
