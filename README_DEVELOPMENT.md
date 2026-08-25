@@ -1,23 +1,25 @@
-# Machinepark DEVELOPMENT — zero Netlify credits
+# Machinepark DEVELOPMENT
 
-Deze branch is bedoeld voor veilig testen zonder production deploys.
-
-## Lokaal testen zonder Netlify cloud-usage
-1. Installeer Node.js LTS.
-2. Clone/download deze `development` branch.
-3. Kopieer `.env.example` naar `.env` en vul alleen Clerk Development keys in (`pk_test_...` en `sk_test_...`).
-4. Start `start-development.bat`.
-5. Open `http://127.0.0.1:8888`.
-
-De developmentversie gebruikt een kleine lokale Node-server. De routes `/.netlify/functions/...` worden lokaal nagebootst en de testdata wordt opgeslagen in `.dev-data/machinepark-state.json`. Tijdens deze lokale test worden dus geen Netlify production deploys, Netlify Functions of Netlify Blobs in de cloud gebruikt.
-
-## Opnieuw schoon beginnen
-Stop de server en verwijder de map `.dev-data`. Start daarna opnieuw.
+Deze branch is bedoeld voor online testen via de Netlify branch deploy `development`, zonder production deploys op `main`.
 
 ## Online development
-Een Netlify Deploy Preview/branch deploy kost 0 deploy-credits, maar requests, bandbreedte en function compute kunnen nog wel metered usage geven. Gebruik daarom de lokale testmodus als je Netlify-credits helemaal niet wilt laten dalen.
+- Branch: `development`
+- Verwachte Netlify-URL: `https://development--machinepark.netlify.app`
+- Branch deploys kosten geen production deploy-credits.
+- Webrequests, bandbreedte en Functions kunnen nog wel beperkt metered usage veroorzaken.
 
-## Belangrijk
-- Commit `.env` nooit naar GitHub.
-- Gebruik hier nooit `pk_live_...` of `sk_live_...`.
-- Merge pas naar `main` wanneer de test geslaagd is.
+## Gedeelde centrale gegevens
+Development en production gebruiken bewust dezelfde centrale Netlify Blobs-store: `machinepark-central`.
+Daardoor zijn wijzigingen in development ook zichtbaar in production en omgekeerd.
+
+## Clerk Development
+Gebruik voor deze omgeving alleen Clerk Development keys:
+- `CLERK_PUBLISHABLE_KEY` = `pk_test_...`
+- `CLERK_SECRET_KEY` = `sk_test_...`
+
+Zet secrets alleen in Netlify Environment Variables en nooit in GitHub.
+
+## Werkwijze
+1. Ontwikkel en test eerst op `development`.
+2. Controleer de development-site op pc en iPhone.
+3. Merge pas naar `main` wanneer de versie goed werkt.
