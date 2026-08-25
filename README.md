@@ -1,32 +1,18 @@
-# Machinepark v1.22 — Development
+# Machinepark v1.23 — centrale synchronisatie
 
-Machinepark is de webapp voor toestellen, onderhoud, depannages en onderdelen.
-Deze Development-versie gebruikt GitHub voor de broncode, Netlify voor hosting en Clerk voor aanmelden.
+Machinepark wordt gehost via Netlify, gebruikt Clerk voor aanmelden en gebruikt Netlify Blobs als centrale opslag.
 
-## GitHub
-Repository: `machinepark`
+## Vereiste Netlify environment variables
 
-Netlify wordt straks rechtstreeks gekoppeld aan deze GitHub-repository. Nieuwe commits op `main` kunnen daardoor automatisch opnieuw worden gedeployed.
+- `CLERK_PUBLISHABLE_KEY` = Clerk Development Publishable Key (`pk_test_...`)
+- `CLERK_SECRET_KEY` = Clerk Development Secret Key (`sk_test_...`)
 
-## Clerk Development
-1. Maak/open in Clerk de application **Machinepark**.
-2. Blijf voorlopig in **Development**.
-3. Kopieer bij **API Keys** de Publishable Key die begint met `pk_test_`.
-4. Zet nooit een Clerk Secret Key (`sk_test_...`) in GitHub.
+De Secret Key hoort uitsluitend in Netlify Environment Variables en **nooit** in GitHub of `index.html`.
 
-## Netlify Development
-1. Kies **Add new project → Import an existing project → GitHub**.
-2. Selecteer repository `machinepark`.
-3. Gebruik `main` als production branch.
-4. Voeg bij Environment variables toe:
-   - Key: `CLERK_PUBLISHABLE_KEY`
-   - Value: jouw Clerk Development Publishable Key (`pk_test_...`)
-5. Deploy de site.
+## Synchronisatie
 
-## iPhone
-Open altijd het Netlify HTTPS-adres in Safari of Chrome. Open `index.html` niet rechtstreeks vanuit de Bestanden-app.
+Na aanmelden haalt de app de centrale gegevens op. Als de centrale opslag nog leeg is, wordt de bestaande lokale Machinepark-data van het eerste toestel als startsnapshot opgeslagen. Elke wijziging wordt daarna automatisch naar Netlify Blobs geschreven. Andere geopende toestellen controleren periodiek op wijzigingen.
 
-## Gegevens
-Clerk verzorgt in v1.22 alleen de gebruikerslogin. De Machinepark-gegevens worden nog lokaal in IndexedDB van de browser bewaard. Daardoor delen pc en iPhone de gegevens nog niet automatisch.
+De browser bewaart nog steeds een lokale IndexedDB-cache zodat de bestaande appstructuur behouden blijft. De centrale Netlify-opslag is vanaf v1.23 de gedeelde bron tussen pc, iPhone en andere aangemelde toestellen.
 
-Voor centrale gedeelde data is later een centrale database/API nodig met Clerk-authenticatie.
+Bij twee exact gelijktijdige wijzigingen op dezelfde centrale versie gebruikt de app ETag-controle om stil overschrijven te voorkomen; de nieuwere centrale versie wordt dan opnieuw geladen.
