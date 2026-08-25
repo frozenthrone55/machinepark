@@ -1,11 +1,11 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title Machinepark DEVELOPMENT - lokaal
+title Machinepark DEVELOPMENT - ZERO NETLIFY CREDITS
 
 echo ================================================
 echo   Machinepark DEVELOPMENT - LOKAAL TESTEN
-echo   Geen production deploy nodig
+echo   ZERO NETLIFY CLOUD CREDITS
 echo ================================================
 echo.
 
@@ -20,9 +20,10 @@ if errorlevel 1 (
 if not exist ".env" (
   copy /Y ".env.example" ".env" >nul
   echo Een lokaal .env-bestand is aangemaakt.
-  echo Vul daarin je Clerk DEVELOPMENT keys in: pk_test_... en sk_test_...
+  echo Vul daarin ALLEEN Clerk DEVELOPMENT keys in: pk_test_... en sk_test_...
+  echo.
   start "" notepad ".env"
-  echo Sla .env op en kom daarna terug naar dit venster.
+  echo Sla .env op in Kladblok en kom daarna terug naar dit venster.
   pause
 )
 
@@ -35,9 +36,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo Netlify Dev wordt lokaal gestart op http://localhost:8888
-echo Sluit dit venster of druk Ctrl+C om te stoppen.
-echo.
-call npx netlify-cli dev --offline --port 8888
-
+echo Start lokale Machinepark DEVELOPMENT server...
+start "" "http://127.0.0.1:8888"
+node --env-file=.env dev-server.mjs
 pause
