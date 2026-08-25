@@ -17,8 +17,8 @@ jobs:
         with:
           ref: development
       - name: Patch globale zoekfunctie
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
@@ -34,20 +34,7 @@ jobs:
               s = s.replace(old_html, new_html, 1)
 
           marker = "function pageMeta(view){return {"
-          search_js = r'''function renderGlobalSearchResults(){
- const box=$('#globalSearchResults'),input=$('#globalSearch');if(!box||!input)return;
- const q=String(state.query||'').trim().toLowerCase();
- if(!q){box.classList.remove('show');box.innerHTML='';return}
- const deviceMatches=state.devices.filter(d=>{const fields=[d.assetCode,d.brand,d.model,d.serial,d.notes];return fields.some(v=>String(v||'').toLowerCase().includes(q))||locationEvents(d).some(e=>String(e.location||'').toLowerCase().includes(q))}).slice(0,8);
- const partMatches=state.parts.filter(p=>[p.artNr,p.description,p.deviceBrand,p.supplierCode,p.warehouse].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,8);
- let html='';
- if(deviceMatches.length){html+='<div class="global-search-head">Toestellen & locaties</div>'+deviceMatches.map(d=>`<button type="button" class="global-search-result" data-global-device="${d.id}"><strong>☕ ${esc(d.assetCode||d.model||'Toestel')}</strong><small>${esc(deviceLocationAt(d)||'Geen locatie')} · ${esc([d.brand,d.model].filter(Boolean).join(' ')||'Geen toesteltype')}</small></button>`).join('')}
- if(partMatches.length){html+='<div class="global-search-head">Onderdelen</div>'+partMatches.map(p=>`<button type="button" class="global-search-result" data-global-part="${p.id}"><strong>▣ ${esc(p.artNr||'—')} · ${esc(p.description||'Onderdeel')}</strong><small>${esc(p.deviceBrand||'Geen merk')} · voorraad ${Number(p.stock||0)}</small></button>`).join('')}
- if(!html)html='<div class="global-search-empty">Geen toestellen, locaties of onderdelen gevonden.</div>';
- box.innerHTML=html;box.classList.add('show');
-}
-function closeGlobalSearch(){const box=$('#globalSearchResults');if(box)box.classList.remove('show')}
-'''
+          search_js = '''function renderGlobalSearchResults(){\n const box=$('#globalSearchResults'),input=$('#globalSearch');if(!box||!input)return;\n const q=String(state.query||'').trim().toLowerCase();\n if(!q){box.classList.remove('show');box.innerHTML='';return}\n const deviceMatches=state.devices.filter(d=>{const fields=[d.assetCode,d.brand,d.model,d.serial,d.notes];return fields.some(v=>String(v||'').toLowerCase().includes(q))||locationEvents(d).some(e=>String(e.location||'').toLowerCase().includes(q))}).slice(0,8);\n const partMatches=state.parts.filter(p=>[p.artNr,p.description,p.deviceBrand,p.supplierCode,p.warehouse].some(v=>String(v||'').toLowerCase().includes(q))).slice(0,8);\n let html='';\n if(deviceMatches.length){html+='<div class="global-search-head">Toestellen & locaties</div>'+deviceMatches.map(d=>`<button type="button" class="global-search-result" data-global-device="${d.id}"><strong>☕ ${esc(d.assetCode||d.model||'Toestel')}</strong><small>${esc(deviceLocationAt(d)||'Geen locatie')} · ${esc([d.brand,d.model].filter(Boolean).join(' ')||'Geen toesteltype')}</small></button>`).join('')}\n if(partMatches.length){html+='<div class="global-search-head">Onderdelen</div>'+partMatches.map(p=>`<button type="button" class="global-search-result" data-global-part="${p.id}"><strong>▣ ${esc(p.artNr||'—')} · ${esc(p.description||'Onderdeel')}</strong><small>${esc(p.deviceBrand||'Geen merk')} · voorraad ${Number(p.stock||0)}</small></button>`).join('')}\n if(!html)html='<div class="global-search-empty">Geen toestellen, locaties of onderdelen gevonden.</div>';\n box.innerHTML=html;box.classList.add('show');\n}\nfunction closeGlobalSearch(){const box=$('#globalSearchResults');if(box)box.classList.remove('show')}\n'''
           if marker in s and 'function renderGlobalSearchResults()' not in s:
               s = s.replace(marker, search_js + marker, 1)
 
@@ -66,6 +53,7 @@ function closeGlobalSearch(){const box=$('#globalSearchResults');if(box)box.clas
           if missing:
               raise SystemExit('Patch onvolledig: '+', '.join(missing))
           p.write_text(s,encoding='utf-8')
+          PY
       - name: Commit zoekfix
         run: |
           git config user.name "github-actions[bot]"
