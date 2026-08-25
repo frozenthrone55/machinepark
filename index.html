@@ -241,15 +241,16 @@ function searchIncludes(text){const q=normalizeSearch(state.query);return !q||no
 function linkedDeviceSearchText(deviceId,moment=''){const d=state.devices.find(x=>x.id===deviceId);if(!d)return '';const locs=locationEvents(d).map(x=>x.location||'').join(' ');const current=deviceLocationAt(d,moment)||'';return [d.assetCode,d.brand,d.model,d.serial,d.status,d.notes,d.installDate,dateFmt(d.installDate),d.nextHalf,dateFmt(d.nextHalf),d.nextAnnual,dateFmt(d.nextAnnual),current,locs].join(' ')}
 function linkedPartsSearchText(items=[]){return (items||[]).map(i=>{const p=state.parts.find(x=>x.id===i.partId);return p?[p.artNr,p.description,p.deviceBrand,p.supplierCode,p.warehouse,i.qty].join(' '):i.partId||''}).join(' ')}
 function deviceMatchesQuery(d){if(!state.query)return true;const locs=locationEvents(d).map(x=>x.location||'').join(' ');return searchIncludes([d.assetCode,d.brand,d.model,d.serial,d.status,d.notes,d.installDate,dateFmt(d.installDate),d.nextHalf,dateFmt(d.nextHalf),d.nextAnnual,dateFmt(d.nextAnnual),deviceLocationAt(d)||'',locs].join(' '))}
-function maintenanceMatchesQuery(m){if(!state.query)return true;const moment=recordMoment(m);return searchIncludes([m.type,m.date,m.time,recordDateTimeFmt(m),m.technician,m.notes,linkedDeviceSearchText(m.deviceId,moment),linkedPartsSearchText(m.usedParts)].join(' '))}
-function breakdownMatchesQuery(b){if(!state.query)return true;const moment=recordMoment(b);return searchIncludes([b.date,b.time,recordDateTimeFmt(b),b.issue,b.diagnosis,b.solution,b.technician,b.priority,b.status,linkedDeviceSearchText(b.deviceId,moment),linkedPartsSearchText(b.usedParts)].join(' '))}
+function searchDeviceIsActive(deviceId){const d=state.devices.find(x=>x.id===deviceId);return !d||d.status!=='Buiten dienst'}
+function maintenanceMatchesQuery(m){if(!state.query)return true;if(!searchDeviceIsActive(m.deviceId))return false;const moment=recordMoment(m);return searchIncludes([m.type,m.date,m.time,recordDateTimeFmt(m),m.technician,m.notes,linkedDeviceSearchText(m.deviceId,moment),linkedPartsSearchText(m.usedParts)].join(' '))}
+function breakdownMatchesQuery(b){if(!state.query)return true;if(!searchDeviceIsActive(b.deviceId))return false;const moment=recordMoment(b);return searchIncludes([b.date,b.time,recordDateTimeFmt(b),b.issue,b.diagnosis,b.solution,b.technician,b.priority,b.status,linkedDeviceSearchText(b.deviceId,moment),linkedPartsSearchText(b.usedParts)].join(' '))}
 function partMatchesQuery(p){if(!state.query)return true;return searchIncludes([p.artNr,p.description,p.deviceBrand,p.supplierCode,p.warehouse,p.stock,p.minStock,p.price].join(' '))}
 
 function renderGlobalSearchResults(){
  const box=$('#globalSearchResults'),input=$('#globalSearch');if(!box||!input)return;
  const q=normalizeSearch(state.query);
  if(!q){box.classList.remove('show');box.innerHTML='';return}
- const deviceMatches=state.devices.filter(deviceMatchesQuery).slice(0,7);
+ const deviceMatches=state.devices.filter(d=>(state.view==='devices'||d.status!=='Buiten dienst')&&deviceMatchesQuery(d)).slice(0,7);
  const maintenanceMatches=state.maintenance.filter(maintenanceMatchesQuery).sort((a,b)=>recordMoment(b).localeCompare(recordMoment(a))).slice(0,6);
  const breakdownMatches=state.breakdowns.filter(breakdownMatchesQuery).sort((a,b)=>recordMoment(b).localeCompare(recordMoment(a))).slice(0,6);
  const partMatches=state.parts.filter(partMatchesQuery).slice(0,7);
