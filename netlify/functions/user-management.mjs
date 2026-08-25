@@ -147,10 +147,7 @@ export default async (req) => {
         const beforeLast = target.lastName || '';
         const targetEmail = primaryEmailOf(target) || userId;
 
-        const updated = await clerk.users.updateUser(userId, {
-          firstName: firstName || null,
-          lastName: lastName || null,
-        });
+        const updated = await clerk.users.updateUser(userId, { firstName, lastName });
 
         const fields = [];
         if (beforeFirst !== firstName) fields.push({ field: 'Voornaam', before: beforeFirst || '—', after: firstName || '—' });
