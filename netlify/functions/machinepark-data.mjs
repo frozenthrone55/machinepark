@@ -5,6 +5,7 @@ const STORE_NAME = 'machinepark-central';
 const STATE_KEY = 'state-v1';
 const AUDIT_PREFIX = 'audit/';
 const CLEAR_SERVICE_DATES_MIGRATION_KEY = 'migration/clear-service-dates-2026-08-25-v1';
+const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
 const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
 
 function json(data, status = 200, headers = {}) {
@@ -161,6 +162,7 @@ async function writeAudit(store, auth, before, after) {
 }
 
 async function clearServiceDatesOnce(store, auth) {
+  if (String(auth?.email || '').toLowerCase() !== ADMIN_EMAIL) return;
   const marker = await store.getWithMetadata(CLEAR_SERVICE_DATES_MIGRATION_KEY, {
     type: 'json',
     consistency: 'strong',
