@@ -1,0 +1,29 @@
+name: Add admin management and audit UI
+
+on:
+  push:
+    branches:
+      - development
+    paths:
+      - '.github/workflows/add-admin-management.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+      - name: Apply admin UI patch
+        run: python scripts/add-admin-management.py
+      - name: Commit admin UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html sw.js
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Voeg beheerder-only gebruikersbeheer en logboek toe"
+          git push origin development
