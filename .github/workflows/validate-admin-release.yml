@@ -1,0 +1,39 @@
+name: Validate admin release
+
+on:
+  push:
+    branches:
+      - development
+    paths:
+      - '.github/workflows/validate-admin-release.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+      - name: Extract inline scripts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('index.html').read_text(encoding='utf-8')
+          scripts=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>',html,re.S|re.I)
+          if not scripts:
+              raise SystemExit('Geen inline scripts gevonden')
+          for i,code in enumerate(scripts,1):
+              Path(f'/tmp/machinepark-inline-{i}.js').write_text(code,encoding='utf-8')
+          required=['adminNavSettings','userManagementCard','auditLogCard','loadUserManagement','loadAuditLog','MACHINEPARK_ADMIN_EMAIL']
+          missing=[x for x in required if x not in html]
+          if missing:
+              raise SystemExit('Ontbrekende admin onderdelen: '+', '.join(missing))
+          print(f'{len(scripts)} inline scripts geëxtraheerd')
+          PY
+      - name: Check JavaScript syntax
+        run: |
+          for f in /tmp/machinepark-inline-*.js; do node --check "$f"; done
+          node --check netlify/functions/machinepark-data.mjs
+          node --check netlify/functions/user-management.mjs
+          node --check netlify/functions/audit-log.mjs
