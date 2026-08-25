@@ -3,4 +3,5 @@
 !.env.example
 node_modules/
 .netlify/
+.dev-data/
 .DS_Store
