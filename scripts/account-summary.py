@@ -24,6 +24,9 @@ if old_role in s and "accountDisplayName" not in s[s.find(old_role):s.find(old_r
 elif "accountRole.textContent=window.machineparkIsAdmin?'Beheerder':'Gebruiker'" not in s:
     raise SystemExit('Clerk rollogica niet gevonden')
 
+user_note='<p style="min-height:0;margin-bottom:10px">Alleen zichtbaar voor beheerders. <strong>kriskoffieapp@telenet.be</strong> blijft de vaste hoofdbeheerder. Andere accounts kunnen de rol <strong>Gebruiker</strong> of <strong>Beheerder</strong> krijgen.</p>'
+s=s.replace(user_note,'',1)
+
 for old_version in ['v1.37 • Extra onderhoudstypes','v1.36 • Mobiel & fotovergroting','v1.35 • Zoeken per tabblad','v1.34 • Onderdelenmerken apart']:
     s=s.replace(old_version,'v1.38 • Accountnaam & rol',1)
 p.write_text(s,encoding='utf-8')
