@@ -27,6 +27,7 @@ Zet secrets alleen in Netlify Environment Variables en nooit in GitHub.
 - gebruikers uitnodigen, bewerken en verwijderen
 - scrollbaar wijzigingslogboek voor beheerder
 - manuele halfjaarlijkse en jaarlijkse onderhoudsplanning
+- bij Onderdelen een machine kiezen uit bestaande toestellen of een nieuwe machinebenaming toevoegen
 
 ## Werkwijze
 1. Ontwikkel en test eerst op `development`.
