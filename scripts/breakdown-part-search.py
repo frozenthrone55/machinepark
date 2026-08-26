@@ -30,10 +30,10 @@ elif 'function usagePartDisplay(' not in s:
 
 # Overschrijf de bestaande toestelzoeker met één autocompleteveld.
 device_autocomplete = r'''function deviceAutocompleteDisplay(d){if(!d)return '';return [d.assetCode,deviceLocationAt(d),d.brand,d.model].filter(Boolean).join(' · ')}
-function deviceAutocompleteMatches(query){const q=normalizeSearch(query);if(!q)return [];return state.devices.filter(d=>normalizeSearch([d.assetCode,d.serial,deviceLocationAt(d),d.location,d.brand,d.model,d.status].filter(Boolean).join(' ')).includes(q)).sort((a,b)=>{const aa=normalizeSearch(a.assetCode),ba=normalizeSearch(b.assetCode),aq=aa.startsWith(q)?0:1,bq=ba.startsWith(q)?0:1;return aq-bq||String(a.assetCode||'').localeCompare(String(b.assetCode||''),'nl',{numeric:true,sensitivity:'base'})}).slice(0,10)}
-function deviceAutocompleteSuggestionsHtml(query){const matches=deviceAutocompleteMatches(query);if(!matches.length)return '<div class="device-no-result">Geen toestel gevonden.</div>';return matches.map(d=>`<button type="button" class="device-suggestion" data-device-id="${esc(d.id)}"><strong>${esc(d.assetCode||d.model||'Toestel')}</strong><small>${esc([deviceLocationAt(d),d.brand,d.model,d.serial&&'S/N '+d.serial,d.status].filter(Boolean).join(' · '))}</small></button>`).join('')}
-function deviceSearchField(selectedId=''){const selected=state.devices.find(d=>d.id===selectedId);return `<div class="field full"><label>Toestel *</label><div class="device-autocomplete"><input type="search" class="device-search" required placeholder="Typ WCL, locatie, merk of serienummer…" autocomplete="off" value="${esc(deviceAutocompleteDisplay(selected))}"><input type="hidden" name="deviceId" class="device-select" value="${esc(selectedId||'')}"><div class="device-suggestions"></div></div><div class="muted" style="font-size:11px;margin-top:4px">Typ in het vak en tik daarna het juiste toestel aan.</div></div>`}
-function initDeviceSearch(selectedId=''){const input=$('.device-search'),hidden=$('.device-select'),box=$('.device-suggestions');if(!input||!hidden||!box)return;const selected=state.devices.find(d=>d.id===(selectedId||hidden.value));if(selected){hidden.value=selected.id;if(!input.value)input.value=deviceAutocompleteDisplay(selected);input.setCustomValidity('')}else if(!hidden.value){input.setCustomValidity('Kies een toestel uit de lijst.')}const hide=()=>box.classList.remove('show');const show=()=>{const q=input.value.trim();if(!q){box.innerHTML='';hide();return}box.innerHTML=deviceAutocompleteSuggestionsHtml(q);box.classList.add('show')};input.oninput=()=>{hidden.value='';input.setCustomValidity('Kies een toestel uit de lijst.');show()};input.onfocus=()=>{if(input.value.trim()&&!hidden.value)show()};input.onkeydown=e=>{if(e.key==='Escape'){hide();return}if(e.key==='Enter'&&box.classList.contains('show')){const first=box.querySelector('.device-suggestion');if(first){e.preventDefault();first.click()}}};box.onclick=e=>{const choice=e.target.closest('.device-suggestion');if(!choice)return;const d=state.devices.find(x=>x.id===choice.dataset.deviceId);if(!d)return;hidden.value=d.id;input.value=deviceAutocompleteDisplay(d);input.setCustomValidity('');hide()};input.onfocusout=()=>setTimeout(hide,140)}
+function deviceAutocompleteMatches(query){const q=normalizeSearch(query);if(!q)return [];return state.devices.filter(d=>String(d.status||'Actief').trim().toLowerCase()==='actief'&&normalizeSearch([d.assetCode,d.serial,deviceLocationAt(d),d.location,d.brand,d.model].filter(Boolean).join(' ')).includes(q)).sort((a,b)=>{const aa=normalizeSearch(a.assetCode),ba=normalizeSearch(b.assetCode),aq=aa.startsWith(q)?0:1,bq=ba.startsWith(q)?0:1;return aq-bq||String(a.assetCode||'').localeCompare(String(b.assetCode||''),'nl',{numeric:true,sensitivity:'base'})}).slice(0,10)}
+function deviceAutocompleteSuggestionsHtml(query){const matches=deviceAutocompleteMatches(query);if(!matches.length)return '<div class="device-no-result">Geen actief toestel gevonden.</div>';return matches.map(d=>`<button type="button" class="device-suggestion" data-device-id="${esc(d.id)}"><strong>${esc(d.assetCode||d.model||'Toestel')}</strong><small>${esc([deviceLocationAt(d),d.brand,d.model,d.serial&&'S/N '+d.serial].filter(Boolean).join(' · '))}</small></button>`).join('')}
+function deviceSearchField(selectedId=''){const selected=state.devices.find(d=>d.id===selectedId);return `<div class="field full"><label>Toestel *</label><div class="device-autocomplete"><input type="search" class="device-search" required placeholder="Typ WCL, locatie, merk of serienummer…" autocomplete="off" value="${esc(deviceAutocompleteDisplay(selected))}"><input type="hidden" name="deviceId" class="device-select" value="${esc(selectedId||'')}"><div class="device-suggestions"></div></div><div class="muted" style="font-size:11px;margin-top:4px">Alleen actieve toestellen worden aangeboden. Typ in het vak en tik daarna het juiste toestel aan.</div></div>`}
+function initDeviceSearch(selectedId=''){const input=$('.device-search'),hidden=$('.device-select'),box=$('.device-suggestions');if(!input||!hidden||!box)return;const selected=state.devices.find(d=>d.id===(selectedId||hidden.value));if(selected){hidden.value=selected.id;if(!input.value)input.value=deviceAutocompleteDisplay(selected);input.setCustomValidity('')}else if(!hidden.value){input.setCustomValidity('Kies een actief toestel uit de lijst.')}const hide=()=>box.classList.remove('show');const show=()=>{const q=input.value.trim();if(!q){box.innerHTML='';hide();return}box.innerHTML=deviceAutocompleteSuggestionsHtml(q);box.classList.add('show')};input.oninput=()=>{hidden.value='';input.setCustomValidity('Kies een actief toestel uit de lijst.');show()};input.onfocus=()=>{if(input.value.trim()&&!hidden.value)show()};input.onkeydown=e=>{if(e.key==='Escape'){hide();return}if(e.key==='Enter'&&box.classList.contains('show')){const first=box.querySelector('.device-suggestion');if(first){e.preventDefault();first.click()}}};box.onclick=e=>{const choice=e.target.closest('.device-suggestion');if(!choice)return;const d=state.devices.find(x=>x.id===choice.dataset.deviceId);if(!d||String(d.status||'Actief').trim().toLowerCase()!=='actief')return;hidden.value=d.id;input.value=deviceAutocompleteDisplay(d);input.setCustomValidity('');hide()};input.onfocusout=()=>setTimeout(hide,140)}
 '''
 if 'function deviceAutocompleteDisplay(' not in s:
     marker='async function startKoffieServiceApp()'
@@ -42,24 +42,26 @@ if 'function deviceAutocompleteDisplay(' not in s:
     s=s.replace(marker,device_autocomplete+'\n'+marker,1)
 
 for old_version in [
+    'v1.45 • Toestellen autocomplete',
     'v1.44 • Onderdelen autocomplete',
     'v1.43 • Onderdeel zoeken bij onderhoud',
     'v1.42 • Onderdeel zoeken bij depannage',
     'v1.41 • Beheer opgeruimd',
     'v1.40 • Back-up samengevoegd'
 ]:
-    s = s.replace(old_version, 'v1.45 • Toestellen autocomplete', 1)
+    s = s.replace(old_version, 'v1.46 • Alleen actieve toestellen', 1)
 
 p.write_text(s, encoding='utf-8')
 
 sw = Path('sw.js')
 ws = sw.read_text(encoding='utf-8')
 for old_cache in [
+    'machinepark-v1.45-device-autocomplete',
     'machinepark-v1.44-parts-autocomplete',
     'machinepark-v1.43-maintenance-part-search',
     'machinepark-v1.42-breakdown-part-search',
     'machinepark-v1.41-admin-cleanup',
     'machinepark-v1.40-backup-card'
 ]:
-    ws = ws.replace(old_cache, 'machinepark-v1.45-device-autocomplete')
+    ws = ws.replace(old_cache, 'machinepark-v1.46-active-devices-only')
 sw.write_text(ws, encoding='utf-8')
