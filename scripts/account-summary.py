@@ -41,12 +41,18 @@ clear_fn="async function clearAll(){if(!confirm('Alle toestellen, onderdelen, on
 s=s.replace(clear_fn,'',1)
 s=s.replace("$('#clearAll').onclick=clearAll;",'',1)
 
-for old_version in ['v1.39 • Veiliger beheer','v1.38 • Accountnaam & rol','v1.37 • Extra onderhoudstypes','v1.36 • Mobiel & fotovergroting','v1.35 • Zoeken per tabblad','v1.34 • Onderdelenmerken apart']:
-    s=s.replace(old_version,'v1.40 • Back-up samengevoegd',1)
+maintenance_logic_card='<div class="settings-card"><h4>Onderhoudslogica</h4><p>Een toestel heeft elk jaar één halfjaarlijks en één jaarlijks onderhoud, idealiter ongeveer zes maanden uit elkaar.</p><span class="badge blue">2 servicebeurten / jaar</span></div>'
+s=s.replace(maintenance_logic_card,'',1)
+
+inventory_card='<div class="settings-card"><h4>Toestelinventaris 2025</h4><p>De oorspronkelijke inventaris blijft als startbron geïntegreerd. Via <strong>Toestellen synchroniseren</strong> kun je voortaan een nieuwere Excelversie verwerken zonder de bestaande historiek te verliezen.</p><span class="badge blue">686 WCL-toestellen in startbron</span></div>'
+s=s.replace(inventory_card,'',1)
+
+for old_version in ['v1.40 • Back-up samengevoegd','v1.39 • Veiliger beheer','v1.38 • Accountnaam & rol','v1.37 • Extra onderhoudstypes','v1.36 • Mobiel & fotovergroting','v1.35 • Zoeken per tabblad','v1.34 • Onderdelenmerken apart']:
+    s=s.replace(old_version,'v1.41 • Beheer opgeruimd',1)
 p.write_text(s,encoding='utf-8')
 
 sw=Path('sw.js')
 ws=sw.read_text(encoding='utf-8')
-for old_cache in ['machinepark-v1.39-safer-admin','machinepark-v1.38-account-summary','machinepark-v1.37-maintenance-types','machinepark-v1.36-mobile-photo','machinepark-v1.35-search-per-view','machinepark-v1.34-parts-machine-separate']:
-    ws=ws.replace(old_cache,'machinepark-v1.40-backup-card')
+for old_cache in ['machinepark-v1.40-backup-card','machinepark-v1.39-safer-admin','machinepark-v1.38-account-summary','machinepark-v1.37-maintenance-types','machinepark-v1.36-mobile-photo','machinepark-v1.35-search-per-view','machinepark-v1.34-parts-machine-separate']:
+    ws=ws.replace(old_cache,'machinepark-v1.41-admin-cleanup')
 sw.write_text(ws,encoding='utf-8')
