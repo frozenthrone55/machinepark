@@ -1,4 +1,5 @@
 [build]
+  command = "python3 scripts/part-machine-picker.py"
   publish = "."
   functions = "netlify/functions"
 
