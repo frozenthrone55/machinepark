@@ -39,13 +39,41 @@ if old_bind not in s:
     raise SystemExit('globalSearch binding niet gevonden voor zoekscope-patch')
 s=s.replace(old_bind,new_bind,1)
 
-s=s.replace('v1.32 • Vereenvoudigde acties','v1.35 • Zoeken per tabblad',1)
-s=s.replace('v1.33 • Machinekeuze onderdelen','v1.35 • Zoeken per tabblad',1)
-s=s.replace('v1.34 • Onderdelenmerken apart','v1.35 • Zoeken per tabblad',1)
+# Mobiel: invoervensters moeten boven de vaste onderste navigatie liggen.
+mobile_css="""
+@media(max-width:700px){
+  .modal-backdrop{z-index:2000;padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+  .modal{max-height:calc(100dvh - 16px - env(safe-area-inset-bottom))}
+  .modal-foot{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+}
+#partsBody .thumb{cursor:zoom-in}
+"""
+if '#partsBody .thumb{cursor:zoom-in}' not in s:
+    s=s.replace('</style>',mobile_css+'\n</style>',1)
+
+# Foto van een onderdeel groot tonen in hetzelfde modal-systeem.
+photo_fn=r'''function openPartPhoto(part){if(!part||!part.photo)return;$('#modal').innerHTML=`<div class="modal-head"><h3>${esc(part.artNr||'Onderdeel')} · ${esc(part.description||'Foto')}</h3><button class="close" type="button">×</button></div><div class="modal-body" style="padding:14px;text-align:center;background:#f4f6f5"><img src="${part.photo}" alt="${esc(part.description||part.artNr||'Onderdeel')}" style="display:block;max-width:100%;max-height:78dvh;width:auto;height:auto;object-fit:contain;margin:auto;border-radius:12px;background:white"></div>`;$('#modalBackdrop').classList.add('show');$('.close').onclick=closeModal}
+'''
+if 'function openPartPhoto(part)' not in s:
+    marker='function showModal(title,body,saveLabel,onSave){'
+    if marker not in s:
+        raise SystemExit('showModal niet gevonden voor fotovergroting')
+    s=s.replace(marker,photo_fn+marker,1)
+
+# Klik op een miniatuur in Onderdelen opent de grote foto.
+photo_click="const partPhoto=e.target.closest('#partsBody img.thumb');if(partPhoto){const edit=partPhoto.closest('tr')?.querySelector('[data-edit-part]');const part=edit?state.parts.find(x=>x.id===edit.dataset.editPart):null;if(part?.photo){openPartPhoto(part);return}}"
+if photo_click not in s:
+    marker="const p=e.target.closest('[data-edit-part]');if(p)openPart(p.dataset.editPart);"
+    if marker not in s:
+        raise SystemExit('Onderdeel klikhandler niet gevonden voor fotovergroting')
+    s=s.replace(marker,photo_click+marker,1)
+
+for old in ['v1.32 • Vereenvoudigde acties','v1.33 • Machinekeuze onderdelen','v1.34 • Onderdelenmerken apart','v1.35 • Zoeken per tabblad']:
+    s=s.replace(old,'v1.36 • Mobiel & fotovergroting',1)
 p.write_text(s,encoding='utf-8')
 
 sw=Path('sw.js')
 ws=sw.read_text(encoding='utf-8')
-for old in ['machinepark-v1.32-simplified-actions','machinepark-v1.33-part-machine-picker','machinepark-v1.34-parts-machine-separate']:
-    ws=ws.replace(old,'machinepark-v1.35-search-per-view')
+for old in ['machinepark-v1.32-simplified-actions','machinepark-v1.33-part-machine-picker','machinepark-v1.34-parts-machine-separate','machinepark-v1.35-search-per-view']:
+    ws=ws.replace(old,'machinepark-v1.36-mobile-photo')
 sw.write_text(ws,encoding='utf-8')
