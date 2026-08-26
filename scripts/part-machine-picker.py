@@ -3,7 +3,9 @@ from pathlib import Path
 p=Path('index.html')
 s=p.read_text(encoding='utf-8')
 
-start=s.find('function partForm(p={}){')
+start=s.find('function partMachineChoices(){')
+if start < 0:
+    start=s.find('function partForm(p={}){')
 end=s.find('\nfunction deviceForm(d={}){', start)
 if start < 0 or end < 0:
     raise SystemExit('Onderdeelformulier niet gevonden')
@@ -20,4 +22,5 @@ p.write_text(s,encoding='utf-8')
 sw=Path('sw.js')
 ws=sw.read_text(encoding='utf-8')
 ws=ws.replace('machinepark-v1.32-simplified-actions','machinepark-v1.33-part-machine-picker')
+ws=ws.replace('machinepark-v1.33-part-machine-picker','machinepark-v1.33-part-machine-picker')
 sw.write_text(ws,encoding='utf-8')
