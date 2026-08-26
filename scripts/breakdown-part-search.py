@@ -4,7 +4,8 @@ import re
 p = Path('index.html')
 s = p.read_text(encoding='utf-8')
 
-# Alleen depannages krijgen de zoekbare onderdelenkiezer.
+# Onderhoud en depannages krijgen dezelfde zoekbare onderdelenkiezer.
+s = s.replace("${usageBuilder(m.usedParts||[])}", "${usageBuilder(m.usedParts||[],true)}", 1)
 s = s.replace("${usageBuilder(b.usedParts||[])}", "${usageBuilder(b.usedParts||[],true)}", 1)
 
 pattern = re.compile(r"function usageBuilder\(existing=\[\]\)\{.*?\}\nfunction initUsageControls\(\)\{.*?\}\nfunction collectUsage\(\)", re.S)
@@ -17,25 +18,27 @@ function collectUsage()'''
 if pattern.search(s):
     s = pattern.sub(replacement, s, count=1)
 elif 'function usagePartOptions(' not in s:
-    raise SystemExit('Onderdelenkiezer voor depannage kon niet worden aangepast')
+    raise SystemExit('Onderdelenkiezer kon niet worden aangepast')
 
 for old_version in [
+    'v1.42 • Onderdeel zoeken bij depannage',
     'v1.41 • Beheer opgeruimd',
     'v1.40 • Back-up samengevoegd',
     'v1.39 • Veiliger beheer',
     'v1.38 • Accountnaam & rol'
 ]:
-    s = s.replace(old_version, 'v1.42 • Onderdeel zoeken bij depannage', 1)
+    s = s.replace(old_version, 'v1.43 • Onderdeel zoeken bij onderhoud', 1)
 
 p.write_text(s, encoding='utf-8')
 
 sw = Path('sw.js')
 ws = sw.read_text(encoding='utf-8')
 for old_cache in [
+    'machinepark-v1.42-breakdown-part-search',
     'machinepark-v1.41-admin-cleanup',
     'machinepark-v1.40-backup-card',
     'machinepark-v1.39-safer-admin',
     'machinepark-v1.38-account-summary'
 ]:
-    ws = ws.replace(old_cache, 'machinepark-v1.42-breakdown-part-search')
+    ws = ws.replace(old_cache, 'machinepark-v1.43-maintenance-part-search')
 sw.write_text(ws, encoding='utf-8')
