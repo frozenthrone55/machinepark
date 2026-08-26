@@ -16,12 +16,36 @@ function initPartMachinePicker(){const select=$('#partMachineChoice'),field=$('#
 function openPart(id){const old=state.parts.find(p=>p.id===id)||{};showModal(id?'Onderdeel bewerken':'Onderdeel toevoegen',partForm(old),'Opslaan',async fd=>{const file=fd.get('photoFile');let photo=old.photo||'';if(file&&file.size)photo=await compressImage(file);const machineChoice=val(fd,'deviceBrandChoice');const deviceBrand=machineChoice==='__new__'?val(fd,'deviceBrandNew'):machineChoice;if(machineChoice==='__new__'&&!deviceBrand){alert('Vul het nieuwe merk of de nieuwe machine in.');return}const obj={...old,id:old.id||uid('part'),artNr:val(fd,'artNr'),description:val(fd,'description'),deviceBrand,price:Number(fd.get('price')||0),stock:Number(fd.get('stock')||0),minStock:Number(fd.get('minStock')||0),supplierCode:val(fd,'supplierCode'),warehouse:val(fd,'warehouse'),photo,updatedAt:new Date().toISOString()};await put('parts',obj);closeModal();await refresh();toast('Onderdeel opgeslagen')});setTimeout(()=>{initPartMachinePicker();const f=$('#photoFile');if(f)f.onchange=async()=>{if(f.files[0])$('#photoPreview').innerHTML=`<img src="${await compressImage(f.files[0])}">`}},0)}'''
 
 s=s[:start]+new_block+s[end:]
-s=s.replace('v1.32 • Vereenvoudigde acties','v1.34 • Onderdelenmerken apart',1)
-s=s.replace('v1.33 • Machinekeuze onderdelen','v1.34 • Onderdelenmerken apart',1)
+
+# Zoekfunctie: alleen Dashboard zoekt globaal. De andere tabbladen gebruiken
+# dezelfde zoekbalk uitsluitend als filter binnen hun eigen gegevens.
+s=s.replace(
+    "function renderGlobalSearchResults(){\n const box=$('#globalSearchResults'),input=$('#globalSearch');if(!box||!input)return;",
+    "function renderGlobalSearchResults(){\n if(state.view!=='dashboard'){closeGlobalSearch();return}\n const box=$('#globalSearchResults'),input=$('#globalSearch');if(!box||!input)return;",
+    1
+)
+
+old_switch="function switchView(view){if(view==='settings'&&!window.machineparkIsAdmin)view='dashboard';state.view=view;$$('.view').forEach(v=>v.classList.remove('active'));$('#view-'+view).classList.add('active');$$('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));const [t,s]=pageMeta(view);$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;renderAll();if(view==='settings'&&window.machineparkIsAdmin)loadAdminPanels()}"
+new_switch="""const machineparkViewQueries={dashboard:'',devices:'',maintenance:'',breakdowns:'',parts:''};
+function configureSearchForView(view){const input=$('#globalSearch'),actions=document.querySelector('.top-actions');if(!input||!actions)return;if(view==='settings'){state.query='';input.value='';actions.style.display='none';closeGlobalSearch();return}actions.style.display='';state.query=machineparkViewQueries[view]||'';input.value=state.query;input.placeholder=({dashboard:'Zoek overal in Machinepark…',devices:'Zoek in toestellen…',maintenance:'Zoek in onderhoud…',breakdowns:'Zoek in depannages…',parts:'Zoek in onderdelen…'})[view]||'Zoeken…';if(view!=='dashboard')closeGlobalSearch()}
+function switchView(view){if(view==='settings'&&!window.machineparkIsAdmin)view='dashboard';state.view=view;$$('.view').forEach(v=>v.classList.remove('active'));$('#view-'+view).classList.add('active');$$('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));const [t,s]=pageMeta(view);$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;configureSearchForView(view);renderAll();if(view==='settings'&&window.machineparkIsAdmin)loadAdminPanels()}"""
+if old_switch not in s:
+    raise SystemExit('switchView niet gevonden voor zoekscope-patch')
+s=s.replace(old_switch,new_switch,1)
+
+old_bind="$('#globalSearch').oninput=e=>{state.query=e.target.value.trim();renderAll();renderGlobalSearchResults()};$('#globalSearch').onfocus=()=>{if(state.query)renderGlobalSearchResults()};$('#globalSearch').onkeydown=e=>{if(e.key==='Escape'){closeGlobalSearch();e.target.blur()}else if(e.key==='Enter'){const first=$('#globalSearchResults .global-search-result');if(first){e.preventDefault();first.click()}}};"
+new_bind="$('#globalSearch').oninput=e=>{state.query=e.target.value.trim();if(state.view!=='settings')machineparkViewQueries[state.view]=state.query;renderAll();if(state.view==='dashboard')renderGlobalSearchResults();else closeGlobalSearch()};$('#globalSearch').onfocus=()=>{if(state.view==='dashboard'&&state.query)renderGlobalSearchResults()};$('#globalSearch').onkeydown=e=>{if(e.key==='Escape'){closeGlobalSearch();e.target.blur()}else if(e.key==='Enter'&&state.view==='dashboard'){const first=$('#globalSearchResults .global-search-result');if(first){e.preventDefault();first.click()}}};"
+if old_bind not in s:
+    raise SystemExit('globalSearch binding niet gevonden voor zoekscope-patch')
+s=s.replace(old_bind,new_bind,1)
+
+s=s.replace('v1.32 • Vereenvoudigde acties','v1.35 • Zoeken per tabblad',1)
+s=s.replace('v1.33 • Machinekeuze onderdelen','v1.35 • Zoeken per tabblad',1)
+s=s.replace('v1.34 • Onderdelenmerken apart','v1.35 • Zoeken per tabblad',1)
 p.write_text(s,encoding='utf-8')
 
 sw=Path('sw.js')
 ws=sw.read_text(encoding='utf-8')
-ws=ws.replace('machinepark-v1.32-simplified-actions','machinepark-v1.34-parts-machine-separate')
-ws=ws.replace('machinepark-v1.33-part-machine-picker','machinepark-v1.34-parts-machine-separate')
+for old in ['machinepark-v1.32-simplified-actions','machinepark-v1.33-part-machine-picker','machinepark-v1.34-parts-machine-separate']:
+    ws=ws.replace(old,'machinepark-v1.35-search-per-view')
 sw.write_text(ws,encoding='utf-8')
