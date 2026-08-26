@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 p=Path('index.html')
 s=p.read_text(encoding='utf-8')
@@ -27,18 +28,25 @@ elif "accountRole.textContent=window.machineparkIsAdmin?'Beheerder':'Gebruiker'"
 user_note='<p style="min-height:0;margin-bottom:10px">Alleen zichtbaar voor beheerders. <strong>kriskoffieapp@telenet.be</strong> blijft de vaste hoofdbeheerder. Andere accounts kunnen de rol <strong>Gebruiker</strong> of <strong>Beheerder</strong> krijgen.</p>'
 s=s.replace(user_note,'',1)
 
+backup_pattern=re.compile(r'<div class="settings-card"><h4>[^<]*Back-up[^<]*</h4>.*?id="exportBackup".*?</div>\s*<div class="settings-card"><h4>[^<]*Back-up[^<]*</h4>.*?id="importBackup".*?</div>',re.S)
+backup_card='''<div class="settings-card"><h4>Back-up</h4><p>Maak een back-up van alle Machinepark-gegevens of zet een eerder gemaakte back-up terug.</p><input type="file" id="importBackupFile" accept="application/json" style="display:none"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="exportBackup">Back-up maken</button><button class="btn" id="importBackup">Back-up importeren</button></div></div>'''
+if backup_pattern.search(s):
+    s=backup_pattern.sub(backup_card,s,count=1)
+elif '<h4>Back-up</h4>' not in s:
+    raise SystemExit('Back-upkaarten niet gevonden')
+
 clear_card='<div class="settings-card danger-zone"><h4>Alle data wissen</h4><p>Verwijder alle lokale gegevens van deze app op deze computer. Deze actie kan niet ongedaan worden gemaakt.</p><button class="btn danger" id="clearAll">Alles wissen</button></div>'
 s=s.replace(clear_card,'',1)
 clear_fn="async function clearAll(){if(!confirm('Alle toestellen, onderdelen, onderhoud, depannages én foto’s definitief wissen?'))return;if(!confirm('Zeker? Dit kan niet ongedaan worden gemaakt.'))return;for(const s of stores)await clearStore(s);await refresh();toast('Alle data gewist')}\n"
 s=s.replace(clear_fn,'',1)
 s=s.replace("$('#clearAll').onclick=clearAll;",'',1)
 
-for old_version in ['v1.38 • Accountnaam & rol','v1.37 • Extra onderhoudstypes','v1.36 • Mobiel & fotovergroting','v1.35 • Zoeken per tabblad','v1.34 • Onderdelenmerken apart']:
-    s=s.replace(old_version,'v1.39 • Veiliger beheer',1)
+for old_version in ['v1.39 • Veiliger beheer','v1.38 • Accountnaam & rol','v1.37 • Extra onderhoudstypes','v1.36 • Mobiel & fotovergroting','v1.35 • Zoeken per tabblad','v1.34 • Onderdelenmerken apart']:
+    s=s.replace(old_version,'v1.40 • Back-up samengevoegd',1)
 p.write_text(s,encoding='utf-8')
 
 sw=Path('sw.js')
 ws=sw.read_text(encoding='utf-8')
-for old_cache in ['machinepark-v1.38-account-summary','machinepark-v1.37-maintenance-types','machinepark-v1.36-mobile-photo','machinepark-v1.35-search-per-view','machinepark-v1.34-parts-machine-separate']:
-    ws=ws.replace(old_cache,'machinepark-v1.39-safer-admin')
+for old_cache in ['machinepark-v1.39-safer-admin','machinepark-v1.38-account-summary','machinepark-v1.37-maintenance-types','machinepark-v1.36-mobile-photo','machinepark-v1.35-search-per-view','machinepark-v1.34-parts-machine-separate']:
+    ws=ws.replace(old_cache,'machinepark-v1.40-backup-card')
 sw.write_text(ws,encoding='utf-8')
