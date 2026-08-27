@@ -9,6 +9,7 @@ STEPS = [
     'breakdown-part-search.py',
     'stock-price-update.py',
     'audit-undo.py',
+    'professionalize.py',
 ]
 
 for name in STEPS:
@@ -30,6 +31,11 @@ required = {
     'Prijs excl. BTW import': 'Prijs excl. BTW',
     'Categorie import': "['categorie','category','Merk toestel','merk']",
     'Extra onderhoudstypes': 'Op afroep',
+    'Operationeel dashboard': 'dashboardProfessional',
+    'Veiligheidsbackup': 'Machinepark_Veiligheidsbackup_',
+    'Importverslag': 'downloadStockImportReport',
+    'Technieker rol': 'technieker',
+    'Magazijnier rol': 'magazijnier',
 }
 for label, needle in required.items():
     if needle not in index:
