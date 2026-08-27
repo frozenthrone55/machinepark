@@ -15,6 +15,8 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'usage-autocomplete',
     'device-autocomplete',
     'data-undo-audit',
+    'id="auditPartsLogBody"',
+    'Overige wijzigingen',
     'dashboardProfessional',
     'downloadStockImportReport',
     'Machinepark_Veiligheidsbackup_',
@@ -43,8 +45,8 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
-test('service worker forceert nieuwe cache na navigatieherstel', () => {
-  assert.ok(sw.includes('machinepark-v1.53-navigation-fix'));
+test('service worker forceert nieuwe cache na gesplitst wijzigingslogboek', () => {
+  assert.ok(sw.includes('machinepark-v1.54-audit-parts-split'));
 });
 
 test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {

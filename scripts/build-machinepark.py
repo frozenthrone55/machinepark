@@ -9,6 +9,7 @@ required = {
     "onderdeel autocomplete": "usage-autocomplete",
     "toestel autocomplete": "device-autocomplete",
     "audit undo": "data-undo-audit",
+    "apart onderdelenlogboek": "id=\"auditPartsLogBody\"",
     "operationeel dashboard": "dashboardProfessional",
     "veiligheidsbackup": "Machinepark_Veiligheidsbackup_",
     "importverslag": "downloadStockImportReport",
@@ -26,6 +27,6 @@ if index.count("id=\"clerkUserButton\"") != 1:
     raise SystemExit("Buildvalidatie mislukt: Clerk-profielknop is niet uniek")
 if "id=\"clearAll\"" in index:
     raise SystemExit("Buildvalidatie mislukt: Alles wissen is teruggekeerd")
-if "machinepark-v1.53-navigation-fix" not in sw:
+if "machinepark-v1.54-audit-parts-split" not in sw:
     raise SystemExit("Buildvalidatie mislukt: verkeerde service-worker cache")
 print("[Machinepark] broncodevalidatie geslaagd")
