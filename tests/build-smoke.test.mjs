@@ -9,6 +9,9 @@ const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 test('kritieke UI bouwstenen zijn aanwezig', () => {
   for (const needle of [
     '<title>Machinepark</title>',
+    'data-view="maintenance"',
+    'data-view="breakdowns"',
+    'data-view="parts"',
     'usage-autocomplete',
     'device-autocomplete',
     'data-undo-audit',
@@ -40,8 +43,8 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
-test('service worker heeft de professionele cacheversie', () => {
-  assert.ok(sw.includes('machinepark-v1.52-professional-foundation'));
+test('service worker forceert nieuwe cache na navigatieherstel', () => {
+  assert.ok(sw.includes('machinepark-v1.53-navigation-fix'));
 });
 
 test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {
