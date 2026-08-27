@@ -15,6 +15,9 @@ required = {
     "prijsimport": "Prijs excl. BTW",
     "technieker rol": "technieker",
     "magazijnier rol": "magazijnier",
+    "onderhoud navigatie": "data-view=\"maintenance\"",
+    "depannage navigatie": "data-view=\"breakdowns\"",
+    "onderdelen navigatie": "data-view=\"parts\"",
 }
 for label, needle in required.items():
     if needle not in index:
@@ -23,6 +26,6 @@ if index.count("id=\"clerkUserButton\"") != 1:
     raise SystemExit("Buildvalidatie mislukt: Clerk-profielknop is niet uniek")
 if "id=\"clearAll\"" in index:
     raise SystemExit("Buildvalidatie mislukt: Alles wissen is teruggekeerd")
-if "machinepark-v1.52-professional-foundation" not in sw:
+if "machinepark-v1.53-navigation-fix" not in sw:
     raise SystemExit("Buildvalidatie mislukt: verkeerde service-worker cache")
 print("[Machinepark] broncodevalidatie geslaagd")
