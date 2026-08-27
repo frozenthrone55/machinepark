@@ -137,27 +137,48 @@ function applyUndoToSnapshot(snapshot, change) {
   return { ...snapshot, [undo.storeName]: list };
 }
 
-async function writeUndoAudit(store, auth, originalEntry, change, changeIndex) {
+function isStockOnlyPartChange(change) {
+  return change?.undo?.storeName === 'parts' &&
+    change?.undo?.kind === 'restore-fields' &&
+    (change.undo.fields || []).some((field) => field.key === 'stock') &&
+    (change.undo.fields || []).every((field) => ['stock', 'updatedAt'].includes(field.key));
+}
+
+function linkedUndoIndexes(entry, selectedIndex) {
+  const changes = entry?.changes || [];
+  const selected = changes[selectedIndex];
+  const storeName = selected?.undo?.storeName;
+  const indexes = [selectedIndex];
+
+  // Onderhoud/depannage en het daaruit voortvloeiende onderdelenverbruik vormen één operationele handeling.
+  if (storeName === 'maintenance' || storeName === 'breakdowns') {
+    changes.forEach((change, index) => {
+      if (index !== selectedIndex && isStockOnlyPartChange(change)) indexes.push(index);
+    });
+  }
+  return [...new Set(indexes)].sort((a, b) => a - b);
+}
+
+async function writeUndoAudit(store, auth, originalEntry, undoItems) {
   const at = new Date().toISOString();
   const id = crypto.randomUUID();
-  const inverseUndo = inverseUndoPayload(change.undo);
-  const undoChange = {
+  const undoChanges = undoItems.map(({ change, changeIndex }) => ({
     entityType: change.entityType,
     entityId: change.entityId,
     entityLabel: change.entityLabel,
     action: 'ongedaan gemaakt',
     fields: reverseFieldsForDisplay(change),
-    undo: inverseUndo,
+    undo: inverseUndoPayload(change.undo),
     undoOf: { entryId: originalEntry.id, changeIndex },
-  };
+  }));
   const entry = {
     id,
     at,
     userId: auth.sub,
     userEmail: auth.email || auth.sub,
     userName: auth.name || '',
-    changeCount: 1,
-    changes: [undoChange],
+    changeCount: undoChanges.length,
+    changes: undoChanges,
     reversibleSchema: 1,
     operation: 'undo',
   };
@@ -205,6 +226,9 @@ export default async (req) => {
                 ...safeChange,
                 reversible: Boolean(undo) && !undone.has(markerId),
                 undone: undone.has(markerId),
+                linkedUndoCount: undo && (undo.storeName === 'maintenance' || undo.storeName === 'breakdowns')
+                  ? linkedUndoIndexes(data, index).length - 1
+                  : 0,
               };
             }),
           };
@@ -225,19 +249,30 @@ export default async (req) => {
 
       const auditEntry = await getAuditEntry(store, auditKey);
       const originalEntry = auditEntry.data;
-      const change = originalEntry?.changes?.[changeIndex];
-      if (!change) return json({ error: 'Wijziging niet gevonden in deze logboekregel.' }, 404);
-      if (!change.undo) return json({ error: 'Deze oudere logboekregel bevat geen volledige hersteldata.' }, 409);
+      const selectedChange = originalEntry?.changes?.[changeIndex];
+      if (!selectedChange) return json({ error: 'Wijziging niet gevonden in deze logboekregel.' }, 404);
+      if (!selectedChange.undo) return json({ error: 'Deze oudere logboekregel bevat geen volledige hersteldata.' }, 409);
 
-      const markerKey = `${UNDO_PREFIX}${originalEntry.id}/${changeIndex}`;
-      const marker = await store.getWithMetadata(markerKey, { type: 'json', consistency: 'strong' });
-      if (marker) return json({ error: 'Deze wijziging is al ongedaan gemaakt.' }, 409);
+      const undoIndexes = linkedUndoIndexes(originalEntry, changeIndex);
+      const undoItems = undoIndexes.map((index) => ({ changeIndex: index, change: originalEntry.changes[index] }));
+      if (undoItems.some((item) => !item.change?.undo)) {
+        return json({ error: 'Een gekoppelde wijziging bevat onvoldoende hersteldata. Ongedaan maken is geblokkeerd.' }, 409);
+      }
+
+      for (const item of undoItems) {
+        const markerKey = `${UNDO_PREFIX}${originalEntry.id}/${item.changeIndex}`;
+        const marker = await store.getWithMetadata(markerKey, { type: 'json', consistency: 'strong' });
+        if (marker) {
+          return json({ error: item.changeIndex === changeIndex ? 'Deze wijziging is al ongedaan gemaakt.' : 'Een gekoppelde voorraadwijziging is al apart ongedaan gemaakt. De volledige handeling kan daarom niet meer automatisch worden teruggedraaid.' }, 409);
+        }
+      }
 
       const current = await store.getWithMetadata(STATE_KEY, { type: 'json', consistency: 'strong' });
       if (!current?.data) return json({ error: 'Centrale Machinepark-gegevens niet gevonden.' }, 404);
 
       const before = current.data;
-      const after = applyUndoToSnapshot(before, change);
+      let after = before;
+      for (const item of undoItems) after = applyUndoToSnapshot(after, item.change);
       after.updatedAt = new Date().toISOString();
       after.updatedBy = auth.sub;
       after.updatedByEmail = auth.email || '';
@@ -248,21 +283,31 @@ export default async (req) => {
       });
       if (!result.modified) return json({ error: 'De centrale gegevens zijn intussen gewijzigd. Vernieuw en probeer opnieuw.' }, 409);
 
-      await store.setJSON(markerKey, {
-        at: after.updatedAt,
-        by: auth.email || auth.sub,
-        auditEntryId: originalEntry.id,
-        changeIndex,
-      });
+      for (const item of undoItems) {
+        const markerKey = `${UNDO_PREFIX}${originalEntry.id}/${item.changeIndex}`;
+        await store.setJSON(markerKey, {
+          at: after.updatedAt,
+          by: auth.email || auth.sub,
+          auditEntryId: originalEntry.id,
+          changeIndex: item.changeIndex,
+          selectedChangeIndex: changeIndex,
+        });
+      }
 
       try {
-        await writeUndoAudit(store, auth, originalEntry, change, changeIndex);
+        await writeUndoAudit(store, auth, originalEntry, undoItems);
       } catch (auditError) {
         console.error('undo audit logging', auditError);
       }
 
       const latest = await store.getMetadata(STATE_KEY, { consistency: 'strong' });
-      return json({ ok: true, etag: latest?.etag || null, updatedAt: after.updatedAt });
+      return json({
+        ok: true,
+        etag: latest?.etag || null,
+        updatedAt: after.updatedAt,
+        revertedCount: undoItems.length,
+        linkedCount: Math.max(0, undoItems.length - 1),
+      });
     }
 
     return json({ error: 'Methode niet toegestaan.' }, 405, { allow: 'GET, POST, OPTIONS' });
