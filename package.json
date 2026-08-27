@@ -1,8 +1,13 @@
 {
   "name": "machinepark",
-  "version": "1.23.0",
+  "version": "1.52.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "python3 scripts/build-machinepark.py",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "check:functions": "node --check netlify/functions/machinepark-data.mjs && node --check netlify/functions/audit-log.mjs && node --check netlify/functions/user-management.mjs"
+  },
   "engines": {
     "node": ">=20.9.0"
   },
