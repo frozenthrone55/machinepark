@@ -1,5 +1,6 @@
 import { getStore } from '@netlify/blobs';
 import { createClerkClient, verifyToken } from '@clerk/backend';
+import { normalizeRole, ROLE_VALUES, roleLabel } from './_shared/permissions.mjs';
 
 const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
 const STORE_NAME = 'machinepark-central';
@@ -24,8 +25,7 @@ function isOwnerUser(user) {
 }
 
 function roleOf(user) {
-  if (isOwnerUser(user)) return 'beheerder';
-  return String(user?.publicMetadata?.role || '').trim().toLowerCase() === 'beheerder' ? 'beheerder' : 'gebruiker';
+  return normalizeRole(user?.publicMetadata?.role, { owner: isOwnerUser(user) });
 }
 
 function isAdminUser(user) {
@@ -92,6 +92,7 @@ function serializeUser(user) {
     lastName: user.lastName || '',
     fullName: [user.firstName, user.lastName].filter(Boolean).join(' '),
     role: roleOf(user),
+    roleLabel: roleLabel(roleOf(user)),
     isOwner: isOwnerUser(user),
     imageUrl: user.imageUrl || '',
     lastSignInAt: user.lastSignInAt || null,
@@ -117,6 +118,7 @@ export default async (req) => {
         adminEmail: ADMIN_EMAIL,
         currentUserId: currentUser.id,
         currentUserRole: roleOf(currentUser),
+        roles: ROLE_VALUES.map((value) => ({ value, label: roleLabel(value) })),
         users: (userResult.data || []).map(serializeUser),
         invitations: (invitationResult.data || []).map((inv) => ({
           id: inv.id,
@@ -151,8 +153,8 @@ export default async (req) => {
         if (!userId) return json({ error: 'Gebruiker ontbreekt.' }, 400);
         const firstName = String(body?.firstName || '').trim();
         const lastName = String(body?.lastName || '').trim();
-        let role = String(body?.role || 'gebruiker').trim().toLowerCase();
-        if (!['beheerder', 'gebruiker'].includes(role)) return json({ error: 'Ongeldige gebruikersrol.' }, 400);
+        let role = normalizeRole(body?.role);
+        if (!ROLE_VALUES.includes(role)) return json({ error: 'Ongeldige gebruikersrol.' }, 400);
         if (firstName.length > 100 || lastName.length > 100) return json({ error: 'Naam is te lang.' }, 400);
 
         const target = await clerk.users.getUser(userId);
@@ -168,7 +170,7 @@ export default async (req) => {
         const fields = [];
         if (beforeFirst !== firstName) fields.push({ field: 'Voornaam', before: beforeFirst || '—', after: firstName || '—' });
         if (beforeLast !== lastName) fields.push({ field: 'Achternaam', before: beforeLast || '—', after: lastName || '—' });
-        if (beforeRole !== role) fields.push({ field: 'Rol', before: beforeRole === 'beheerder' ? 'Beheerder' : 'Gebruiker', after: role === 'beheerder' ? 'Beheerder' : 'Gebruiker' });
+        if (beforeRole !== role) fields.push({ field: 'Rol', before: roleLabel(beforeRole), after: roleLabel(role) });
         if (fields.length) await writeAdminAudit(currentUser, verified, 'aangepast', targetEmail, fields);
 
         return json({ ok: true, user: serializeUser(updated) });
@@ -197,7 +199,7 @@ export default async (req) => {
       const targetEmail = primaryEmailOf(target) || userId;
 
       await clerk.users.deleteUser(userId);
-      await writeAdminAudit(currentUser, verified, 'verwijderd', targetEmail, [{ field: 'Rol', before: roleOf(target) === 'beheerder' ? 'Beheerder' : 'Gebruiker', after: '—' }]);
+      await writeAdminAudit(currentUser, verified, 'verwijderd', targetEmail, [{ field: 'Rol', before: roleLabel(roleOf(target)), after: '—' }]);
       return json({ ok: true });
     }
 
