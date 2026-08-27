@@ -41,6 +41,35 @@ if 'function deviceAutocompleteDisplay(' not in s:
         raise SystemExit('Plaats voor toestel-autocomplete niet gevonden')
     s=s.replace(marker,device_autocomplete+'\n'+marker,1)
 
+# Stocktelling: Excel-kolom "categorie" hoort uitsluitend bij Onderdelen -> Merk toestel.
+old_brand_index="deviceBrand:findHeaderIndex(headers,['Merk toestel','merk']),"
+new_brand_index="deviceBrand:findHeaderIndex(headers,['categorie','category','Merk toestel','merk']),"
+if old_brand_index in s:
+    s=s.replace(old_brand_index,new_brand_index,1)
+elif new_brand_index not in s:
+    raise SystemExit('Kolomkoppeling Merk toestel bij stocktelling niet gevonden')
+
+old_existing="if(old){records.push({artNr,key,action:'update',old,newStock:stock})}"
+new_existing="if(old){const importedDeviceBrand=get('deviceBrand');records.push({artNr,key,action:'update',old,newStock:stock,newDeviceBrand:importedDeviceBrand||old.deviceBrand||''})}"
+if old_existing in s:
+    s=s.replace(old_existing,new_existing,1)
+elif 'newDeviceBrand:importedDeviceBrand||old.deviceBrand' not in s:
+    raise SystemExit('Update van bestaande onderdelen bij stocktelling niet gevonden')
+
+old_apply="for(const r of updates)await put('parts',{...r.old,stock:r.newStock,updatedAt:new Date().toISOString()});"
+new_apply="for(const r of updates)await put('parts',{...r.old,stock:r.newStock,deviceBrand:r.newDeviceBrand??r.old.deviceBrand??'',updatedAt:new Date().toISOString()});"
+if old_apply in s:
+    s=s.replace(old_apply,new_apply,1)
+elif "deviceBrand:r.newDeviceBrand??r.old.deviceBrand" not in s:
+    raise SystemExit('Verwerking van stockupdates niet gevonden')
+
+old_help='Ondersteunde kolommen: Art nr, omschrijving, Merk toestel, prijs, Voorraad locatie 1, Code leverancier, Magazijnlocatie en Minimumvoorraad. Alleen Art nr en Voorraad locatie 1 zijn vereist voor een stockupdate.'
+new_help='Ondersteunde kolommen: Art nr, omschrijving, categorie, Merk toestel, prijs, Voorraad locatie 1, Code leverancier, Magazijnlocatie en Minimumvoorraad. De kolom categorie wordt opgeslagen als Merk toestel bij Onderdelen en staat volledig los van het merk bij Toestellen. Alleen Art nr en Voorraad locatie 1 zijn vereist voor een stockupdate.'
+if old_help in s:
+    s=s.replace(old_help,new_help,1)
+elif new_help not in s:
+    raise SystemExit('Toelichting bij stocktelling niet gevonden')
+
 for old_version in [
     'v1.45 • Toestellen autocomplete',
     'v1.44 • Onderdelen autocomplete',
@@ -49,7 +78,7 @@ for old_version in [
     'v1.41 • Beheer opgeruimd',
     'v1.40 • Back-up samengevoegd'
 ]:
-    s = s.replace(old_version, 'v1.46 • Alleen actieve toestellen', 1)
+    s = s.replace(old_version, 'v1.47 • Categorie bij stocktelling', 1)
 
 p.write_text(s, encoding='utf-8')
 
@@ -63,5 +92,5 @@ for old_cache in [
     'machinepark-v1.41-admin-cleanup',
     'machinepark-v1.40-backup-card'
 ]:
-    ws = ws.replace(old_cache, 'machinepark-v1.46-active-devices-only')
+    ws = ws.replace(old_cache, 'machinepark-v1.47-stock-category')
 sw.write_text(ws, encoding='utf-8')
