@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
@@ -11,10 +11,15 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'usage-autocomplete',
     'device-autocomplete',
     'data-undo-audit',
+    'dashboardProfessional',
+    'downloadStockImportReport',
+    'Machinepark_Veiligheidsbackup_',
     'Prijs excl. BTW',
     'Op afroep',
     'Maandelijks',
-  ]) assert.ok(html.includes(needle), `Ontbreekt in build: ${needle}`);
+    'technieker',
+    'magazijnier',
+  ]) assert.ok(html.includes(needle), `Ontbreekt in broncode: ${needle}`);
 });
 
 test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () => {
@@ -22,6 +27,11 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
-test('service worker heeft een versiegebonden cache', () => {
-  assert.match(sw, /machinepark-v1\./);
+test('service worker heeft de professionele cacheversie', () => {
+  assert.ok(sw.includes('machinepark-v1.52-professional-foundation'));
+});
+
+test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {
+  const scripts = readdirSync(new URL('../scripts/', import.meta.url)).sort();
+  assert.deepEqual(scripts, ['build-machinepark.py']);
 });
