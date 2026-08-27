@@ -83,13 +83,20 @@ function changedFields(before, after) {
   const result = [];
   for (const key of keys) {
     if (IGNORED_FIELDS.has(key)) continue;
+    const beforeExists = Object.prototype.hasOwnProperty.call(before || {}, key);
+    const afterExists = Object.prototype.hasOwnProperty.call(after || {}, key);
     const a = before?.[key];
     const b = after?.[key];
-    if (JSON.stringify(a) === JSON.stringify(b)) continue;
+    if (JSON.stringify(a) === JSON.stringify(b) && beforeExists === afterExists) continue;
     result.push({
+      key,
       field: FIELD_LABELS[key] || key,
       before: shortValue(a),
       after: shortValue(b),
+      beforeExists,
+      afterExists,
+      beforeRaw: a === undefined ? null : a,
+      afterRaw: b === undefined ? null : b,
     });
   }
   return result;
@@ -125,18 +132,44 @@ function diffSnapshots(before, after) {
 
     for (const [id, item] of newMap) {
       if (!oldMap.has(id)) {
-        changes.push({ entityType: ENTITY_NAMES[storeName], entityId: id, entityLabel: entityLabel(storeName, item, after), action: 'toegevoegd', fields: [] });
+        changes.push({
+          entityType: ENTITY_NAMES[storeName],
+          entityId: id,
+          entityLabel: entityLabel(storeName, item, after),
+          action: 'toegevoegd',
+          fields: [],
+          undo: { kind: 'remove-added', storeName, entityId: id, expectedAfter: item },
+        });
         continue;
       }
       const fields = changedFields(oldMap.get(id), item);
       if (fields.length) {
-        changes.push({ entityType: ENTITY_NAMES[storeName], entityId: id, entityLabel: entityLabel(storeName, item, after), action: 'gewijzigd', fields });
+        changes.push({
+          entityType: ENTITY_NAMES[storeName],
+          entityId: id,
+          entityLabel: entityLabel(storeName, item, after),
+          action: 'gewijzigd',
+          fields: fields.map(({ key, beforeExists, afterExists, beforeRaw, afterRaw, ...display }) => display),
+          undo: {
+            kind: 'restore-fields',
+            storeName,
+            entityId: id,
+            fields: fields.map(({ key, beforeExists, afterExists, beforeRaw, afterRaw }) => ({ key, beforeExists, afterExists, beforeRaw, afterRaw })),
+          },
+        });
       }
     }
 
     for (const [id, item] of oldMap) {
       if (!newMap.has(id)) {
-        changes.push({ entityType: ENTITY_NAMES[storeName], entityId: id, entityLabel: entityLabel(storeName, item, before), action: 'verwijderd', fields: [] });
+        changes.push({
+          entityType: ENTITY_NAMES[storeName],
+          entityId: id,
+          entityLabel: entityLabel(storeName, item, before),
+          action: 'verwijderd',
+          fields: [],
+          undo: { kind: 'restore-deleted', storeName, entityId: id, beforeItem: item },
+        });
       }
     }
   }
@@ -157,6 +190,7 @@ async function writeAudit(store, auth, before, after) {
     changeCount: changes.length,
     changes: changes.slice(0, 500),
     truncated: changes.length > 500,
+    reversibleSchema: 1,
   };
   await store.setJSON(`${AUDIT_PREFIX}${Date.now()}-${id}`, entry, { metadata: { at, userId: auth.sub, userEmail: auth.email || '' } });
 }
