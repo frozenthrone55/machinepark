@@ -1,5 +1,6 @@
 import { getStore } from '@netlify/blobs';
 import { createClerkClient, verifyToken } from '@clerk/backend';
+import { assertSnapshotWriteAllowed, normalizeRole, validSnapshot } from './_shared/permissions.mjs';
 
 const STORE_NAME = 'machinepark-central';
 const STATE_KEY = 'state-v1';
@@ -38,23 +39,13 @@ async function authenticate(req) {
     const primary = (user.emailAddresses || []).find((x) => x.id === user.primaryEmailAddressId);
     const email = String(primary?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '').trim().toLowerCase();
     const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-    return { ...verified, email, name };
+    const owner = (user.emailAddresses || []).some((x) => String(x.emailAddress || '').trim().toLowerCase() === ADMIN_EMAIL);
+    const role = normalizeRole(user?.publicMetadata?.role, { owner });
+    return { ...verified, email, name, role };
   } catch (error) {
     if (error?.status) throw error;
     throw Object.assign(new Error('Clerk-sessie kon niet worden geverifieerd.'), { status: 401 });
   }
-}
-
-function validSnapshot(data) {
-  return Boolean(
-    data &&
-    data.app === 'Machinepark' &&
-    Number(data.schema) === 1 &&
-    Array.isArray(data.parts) &&
-    Array.isArray(data.devices) &&
-    Array.isArray(data.maintenance) &&
-    Array.isArray(data.breakdowns)
-  );
 }
 
 const FIELD_LABELS = {
@@ -187,6 +178,7 @@ async function writeAudit(store, auth, before, after) {
     userId: auth.sub,
     userEmail: auth.email || auth.sub,
     userName: auth.name || '',
+    userRole: auth.role || 'gebruiker',
     changeCount: changes.length,
     changes: changes.slice(0, 500),
     truncated: changes.length > 500,
@@ -273,13 +265,13 @@ export default async (req) => {
         etag: cachedEtag,
       });
 
-      if (!entry) return json({ exists: false, etag: null });
+      if (!entry) return json({ exists: false, etag: null, role: auth.role });
       if (cachedEtag && entry.etag === cachedEtag && entry.data === null) {
         return new Response(null, { status: 304, headers: { ...NO_STORE, etag: entry.etag } });
       }
 
       return json(
-        { exists: true, etag: entry.etag, data: entry.data },
+        { exists: true, etag: entry.etag, data: entry.data, role: auth.role },
         200,
         { etag: entry.etag }
       );
@@ -293,6 +285,7 @@ export default async (req) => {
 
       const previousEntry = await store.getWithMetadata(STATE_KEY, { type: 'json', consistency: 'strong' });
       const previousData = previousEntry?.data || null;
+      assertSnapshotWriteAllowed(previousData, data, auth.role);
 
       data.updatedAt = new Date().toISOString();
       data.updatedBy = auth.sub;
@@ -319,7 +312,7 @@ export default async (req) => {
       }
 
       const current = await store.getMetadata(STATE_KEY, { consistency: 'strong' });
-      return json({ ok: true, etag: current?.etag || null, updatedAt: data.updatedAt });
+      return json({ ok: true, etag: current?.etag || null, updatedAt: data.updatedAt, role: auth.role });
     }
 
     return json({ error: 'Methode niet toegestaan.' }, 405, { allow: 'GET, PUT, OPTIONS' });
