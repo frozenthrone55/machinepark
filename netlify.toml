@@ -1,5 +1,5 @@
 [build]
-  command = "python3 scripts/part-machine-picker.py && python3 scripts/maintenance-types.py && python3 scripts/account-summary.py && python3 scripts/breakdown-part-search.py"
+  command = "python3 scripts/part-machine-picker.py && python3 scripts/maintenance-types.py && python3 scripts/account-summary.py && python3 scripts/breakdown-part-search.py && python3 scripts/stock-price-update.py"
   publish = "."
   functions = "netlify/functions"
 
