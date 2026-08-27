@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import vm from 'node:vm';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
@@ -20,6 +21,18 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'technieker',
     'magazijnier',
   ]) assert.ok(html.includes(needle), `Ontbreekt in broncode: ${needle}`);
+});
+
+test('inline app-JavaScript bevat geen syntaxfouten', () => {
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+  assert.ok(scripts.length > 0, 'Geen inline scripts gevonden');
+  scripts.forEach((code, index) => {
+    try {
+      new vm.Script(code, { filename: `index-inline-${index + 1}.js` });
+    } catch (error) {
+      assert.fail(`Syntaxfout in inline script ${index + 1}: ${error.message}`);
+    }
+  });
 });
 
 test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () => {
