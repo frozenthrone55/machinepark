@@ -30,7 +30,7 @@ test('inline app-JavaScript bevat geen syntaxfouten', () => {
     try {
       new vm.Script(code, { filename: `index-inline-${index + 1}.js` });
     } catch (error) {
-      assert.fail(`Syntaxfout in inline script ${index + 1}: ${error.message}`);
+      assert.fail(`Syntaxfout in inline script ${index + 1}:\n${error.stack || error.message}`);
     }
   });
 });
