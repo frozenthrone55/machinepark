@@ -9,8 +9,8 @@ s = s.replace('<div id="centralSyncStatus" class="sync-status">', '<div id="cent
 s = s.replace('<div class="toast" id="toast"></div>', '<div class="toast" id="toast" role="status" aria-live="polite"></div>', 1)
 
 # Extra operationeel dashboard onder de bestaande twee panelen.
-old_dashboard = '<div id="dashboardAlerts" class="panel-body"></div></div></div>\n      </div>\n    </section>'
-new_dashboard = '<div id="dashboardAlerts" class="panel-body"></div></div></div>\n      </div>\n      <div class="panel" style="margin-top:18px"><div class="panel-head"><h3>Operationele prioriteiten</h3><span class="muted" style="font-size:12px">vandaag</span></div><div id="dashboardProfessional" class="panel-body"></div></div>\n    </section>'
+old_dashboard = '<div id="dashboardAlerts" class="panel-body"></div></div>\n      </div>\n    </section>'
+new_dashboard = '<div id="dashboardAlerts" class="panel-body"></div></div>\n      </div>\n      <div class="panel" style="margin-top:18px"><div class="panel-head"><h3>Operationele prioriteiten</h3><span class="muted" style="font-size:12px">vandaag</span></div><div id="dashboardProfessional" class="panel-body"></div></div>\n    </section>'
 if old_dashboard in s:
     s = s.replace(old_dashboard, new_dashboard, 1)
 elif 'id="dashboardProfessional"' not in s:
