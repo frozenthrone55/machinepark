@@ -9,8 +9,8 @@ const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 test('kritieke UI bouwstenen zijn aanwezig', () => {
   for (const needle of [
     '<title>Machinepark</title>',
-    'machinepark-coffee-device-icon.png',
-    'class="device-nav-icon"',
+    'class="device-nav-icon-svg"',
+    'stroke:#fff',
     '<span class="dot"></span><div class="label">Actieve toestellen</div>',
     'data-view="maintenance"',
     "$('#addMaintenance').onclick=()=>openMaintenance();",
