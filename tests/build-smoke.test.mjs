@@ -21,6 +21,10 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'id="breakdownLocationSuggestions"',
     'breakdownLocationMatches',
     'breakdownBatchSelectedItems',
+    'deleteServiceRecordAtomic',
+    "deleteServiceRecord('maintenance',id)",
+    "deleteServiceRecord('breakdowns',old.id)",
+    'Alle gebruikte onderdelen van deze registratie worden automatisch terug op voorraad gezet.',
     'data-view="parts"',
     'usage-autocomplete',
     'device-autocomplete',
@@ -56,7 +60,7 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
 });
 
 test('service worker forceert nieuwe cache na herstel onderhoudsknop', () => {
-  assert.ok(sw.includes('machinepark-v1.58-breakdown-location-search'));
+  assert.ok(sw.includes('machinepark-v1.59-delete-service-records'));
 });
 
 test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {
