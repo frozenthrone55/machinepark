@@ -199,7 +199,7 @@ if MARKER not in index:
 
 if MARKER not in index:
     raise SystemExit("Buildvalidatie mislukt: vier aparte fotovakken ontbreken")
-if "service-photo-slot-file" not in index or "Foto'}} ${{i}}" not in index:
+if "service-photo-slot-file" not in index or "service-photo-slot-title" not in index or "REPORT_PHOTO_LIMIT = 4" not in index:
     raise SystemExit("Buildvalidatie mislukt: fotovakken zijn onvolledig")
 
 print("[Machinepark] vier aparte fotovakken actief")
