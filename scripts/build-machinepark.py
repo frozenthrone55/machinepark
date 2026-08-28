@@ -21,6 +21,8 @@ required = {
     "locatiegericht onderhoud": "id=\"maintenanceLocationSearch\"",
     "onderhoud per toestel": "maintenance-machine-card",
     "depannage navigatie": "data-view=\"breakdowns\"",
+    "locatiegerichte depannage": "id=\"breakdownLocationSearch\"",
+    "depannage per toestel": "breakdown-machine-card",
     "onderdelen navigatie": "data-view=\"parts\"",
 }
 for label, needle in required.items():
@@ -30,6 +32,6 @@ if index.count("id=\"clerkUserButton\"") != 1:
     raise SystemExit("Buildvalidatie mislukt: Clerk-profielknop is niet uniek")
 if "id=\"clearAll\"" in index:
     raise SystemExit("Buildvalidatie mislukt: Alles wissen is teruggekeerd")
-if "machinepark-v1.57-maintenance-location-search" not in sw:
+if "machinepark-v1.58-breakdown-location-search" not in sw:
     raise SystemExit("Buildvalidatie mislukt: verkeerde service-worker cache")
 print("[Machinepark] broncodevalidatie geslaagd")

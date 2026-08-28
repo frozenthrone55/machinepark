@@ -17,6 +17,10 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'maintenance-machine-card',
     'maintenanceBatchSelectedItems',
     'data-view="breakdowns"',
+    'id="breakdownLocationSearch"',
+    'id="breakdownLocationSuggestions"',
+    'breakdownLocationMatches',
+    'breakdownBatchSelectedItems',
     'data-view="parts"',
     'usage-autocomplete',
     'device-autocomplete',
@@ -52,7 +56,7 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
 });
 
 test('service worker forceert nieuwe cache na herstel onderhoudsknop', () => {
-  assert.ok(sw.includes('machinepark-v1.57-maintenance-location-search'));
+  assert.ok(sw.includes('machinepark-v1.58-breakdown-location-search'));
 });
 
 test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {
