@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/one-time-maintenance-location-search.yml'
       - 'scripts/maintenance-location-search.py'
+      - 'scripts/maintenance-location-validator.py'
 
 permissions:
   contents: write
@@ -22,14 +23,17 @@ jobs:
         with:
           node-version: 22
       - name: Pas locatiezoekveld toe
-        run: python3 scripts/maintenance-location-search.py
+        run: |
+          python3 scripts/maintenance-location-search.py
+          python3 scripts/maintenance-location-validator.py
+      - name: Verwijder tijdelijke patchbestanden
+        run: git rm .github/workflows/one-time-maintenance-location-search.yml scripts/maintenance-location-search.py scripts/maintenance-location-validator.py
       - name: Test Machinepark
         run: npm test
       - name: Commit wijziging
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/one-time-maintenance-location-search.yml scripts/maintenance-location-search.py
-          git add index.html sw.js tests/build-smoke.test.mjs
+          git add index.html sw.js tests/build-smoke.test.mjs scripts/build-machinepark.py
           git commit -m 'Maak onderhoudslocatie doorzoekbaar'
           git push origin HEAD:development
