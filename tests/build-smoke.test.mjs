@@ -65,8 +65,8 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
-test('service worker forceert nieuwe cache na herstel onderhoudsknop', () => {
-  assert.ok(sw.includes('machinepark-v1.62-nav-coffee-icon'));
+test('service worker forceert nieuwe cache voor het nieuwe toestelicoon', () => {
+  assert.ok(sw.includes('machinepark-v1.63-thin-coffee-icon'));
 });
 
 test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {
