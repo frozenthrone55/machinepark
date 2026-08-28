@@ -1,0 +1,38 @@
+name: Eenmalig veilig verwijderen registraties
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - '.github/workflows/one-time-delete-service-records.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pas veilig verwijderen toe
+        run: python3 .github/tmp-delete-service-records.py
+      - name: Verwijder tijdelijke patchbestanden
+        run: |
+          rm .github/tmp-delete-service-records.py
+          rm .github/workflows/one-time-delete-service-records.yml
+      - name: Test Machinepark
+        run: npm test
+      - name: Controleer serverfuncties
+        run: npm run check:functions
+      - name: Commit wijziging
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Maak onderhoud en depannages veilig verwijderbaar'
+          git push origin HEAD:development
