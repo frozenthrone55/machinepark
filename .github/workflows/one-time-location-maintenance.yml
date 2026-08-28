@@ -1,0 +1,37 @@
+name: Eenmalig locatiegericht onderhoud
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - 'scripts/one-time-location-maintenance.py'
+      - '.github/workflows/one-time-location-maintenance.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pas locatiegericht onderhoud toe
+        run: python3 scripts/one-time-location-maintenance.py
+      - name: Verwijder tijdelijk patchscript
+        run: rm scripts/one-time-location-maintenance.py
+      - name: Test Machinepark
+        run: npm test
+      - name: Verwijder eenmalige workflow en commit
+        run: |
+          rm .github/workflows/one-time-location-maintenance.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Maak onderhoud locatiegericht met registratie per toestel"
+          git push origin HEAD:development
