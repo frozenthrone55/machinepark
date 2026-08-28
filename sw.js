@@ -1,4 +1,4 @@
-const CACHE='machinepark-v1.59-delete-service-records';
+const CACHE='machinepark-v1.60-location-device-search';
 const ASSETS=['/','/index.html','/manifest.webmanifest','/machinepark-logo.svg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});

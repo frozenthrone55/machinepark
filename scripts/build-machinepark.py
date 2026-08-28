@@ -19,6 +19,8 @@ required = {
     "onderhoud navigatie": "data-view=\"maintenance\"",
     "onderhoud knop": "$('#addMaintenance').onclick=()=>openMaintenance();",
     "locatiegericht onderhoud": "id=\"maintenanceLocationSearch\"",
+    "zoeken op toestelnummer": "locationGroupMatches",
+    "zoekhint locatie of toestel": "Typ locatie of toestelnummer…",
     "onderhoud per toestel": "maintenance-machine-card",
     "depannage navigatie": "data-view=\"breakdowns\"",
     "locatiegerichte depannage": "id=\"breakdownLocationSearch\"",
@@ -35,6 +37,6 @@ if index.count("id=\"clerkUserButton\"") != 1:
     raise SystemExit("Buildvalidatie mislukt: Clerk-profielknop is niet uniek")
 if "id=\"clearAll\"" in index:
     raise SystemExit("Buildvalidatie mislukt: Alles wissen is teruggekeerd")
-if "machinepark-v1.59-delete-service-records" not in sw:
+if "machinepark-v1.60-location-device-search" not in sw:
     raise SystemExit("Buildvalidatie mislukt: verkeerde service-worker cache")
 print("[Machinepark] broncodevalidatie geslaagd")
