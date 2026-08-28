@@ -1,0 +1,70 @@
+name: Eenmalig zoekveld onderhoudslocatie
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - '.github/workflows/one-time-maintenance-location-search.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Maak locatie zoeken met autocomplete
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+
+          css = r'''
+.maintenance-location-autocomplete{position:relative}.maintenance-location-suggestions{position:absolute;z-index:1600;top:calc(100% + 6px);left:0;right:0;display:none;max-height:280px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 42px rgba(20,45,38,.18)}.maintenance-location-suggestions.show{display:block}.maintenance-location-suggestion{width:100%;border:0;border-bottom:1px solid #edf1ef;background:#fff;padding:11px 12px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;gap:12px;align-items:center;color:var(--text)}.maintenance-location-suggestion:last-child{border-bottom:0}.maintenance-location-suggestion:hover,.maintenance-location-suggestion:focus{background:#f3f7f5;outline:none}.maintenance-location-suggestion strong{font-size:13px}.maintenance-location-suggestion small{font-size:11px;color:var(--muted);white-space:nowrap}.maintenance-location-empty{padding:14px;text-align:center;color:var(--muted);font-size:12px}
+'''
+          if '.maintenance-location-autocomplete{' not in text:
+              text = text.replace('</style>', css + '</style>', 1)
+
+          new_batch = r'''function maintenanceBatchForm(){const groups=maintenanceLocationGroups(),t=nowLocalTime();return `<div class="form-grid"><div class="field full"><label>Locatie *</label><div class="maintenance-location-autocomplete"><input id="maintenanceLocationSearch" type="search" required placeholder="Typ een locatie…" autocomplete="off"><input id="maintenanceLocationKey" name="locationKey" type="hidden"><div id="maintenanceLocationSuggestions" class="maintenance-location-suggestions"></div></div><div id="maintenanceLocationCount" class="muted" style="font-size:11px;margin-top:4px">Typ een deel van de locatie. De zoeklijst wordt automatisch korter.</div></div><div class="field"><label>Datum *</label><input name="date" type="date" required value="${todayISO()}"></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${t}"></div><div class="field full"><label>Technieker</label><input name="technician" placeholder="Naam technieker"></div><div class="field full"><div class="maintenance-location-head"><div><div class="section-title" style="margin-bottom:3px">Toestellen op deze locatie</div><div class="muted" style="font-size:11px">Selecteer de toestellen waarop onderhoud is uitgevoerd. Type, werkzaamheden en onderdelen worden per toestel geregistreerd.</div></div><button type="button" class="btn small" id="maintenanceSelectAll" style="display:none">Alles selecteren</button></div><div id="maintenanceLocationDevices" class="maintenance-machine-list"><div class="empty" style="padding:24px">Zoek en kies eerst een locatie om de actieve toestellen te tonen.</div></div></div></div>`}'''
+          text, n = re.subn(r'function maintenanceBatchForm\(\)\{.*?\}\nfunction maintenanceMachineCardHtml', new_batch + '\nfunction maintenanceMachineCardHtml', text, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('maintenanceBatchForm niet gevonden')
+
+          new_init = r'''function maintenanceLocationMatches(query){const q=normalizeSearch(query);const groups=maintenanceLocationGroups();return groups.filter(g=>!q||normalizeSearch(g.label).includes(q)).slice(0,12)}
+function initMaintenanceLocationForm(){const input=$('#maintenanceLocationSearch'),hidden=$('#maintenanceLocationKey'),suggestions=$('#maintenanceLocationSuggestions'),box=$('#maintenanceLocationDevices'),count=$('#maintenanceLocationCount'),selectAll=$('#maintenanceSelectAll');if(!input||!hidden||!suggestions||!box)return;const hideLocations=()=>suggestions.classList.remove('show');const hidePartSuggestions=row=>{const menu=row?.querySelector('.usage-suggestions');if(menu)menu.classList.remove('show')};const renderDevices=group=>{if(!group){box.innerHTML='<div class="empty" style="padding:24px">Zoek en kies eerst een locatie om de actieve toestellen te tonen.</div>';if(count)count.textContent='Typ een deel van de locatie. De zoeklijst wordt automatisch korter.';if(selectAll)selectAll.style.display='none';return}box.innerHTML=group.devices.map(maintenanceMachineCardHtml).join('');box.querySelectorAll('.maintenance-machine-card').forEach(card=>setMaintenanceMachineEnabled(card,false));if(count)count.textContent=`${group.devices.length} actief toestel${group.devices.length===1?'':'len'} op ${group.label}`;if(selectAll){selectAll.style.display='';selectAll.textContent='Alles selecteren'}};const renderLocations=()=>{const matches=maintenanceLocationMatches(input.value);suggestions.innerHTML=matches.length?matches.map(g=>`<button type="button" class="maintenance-location-suggestion" data-location-key="${esc(g.key)}"><strong>${esc(g.label)}</strong><small>${g.devices.length} actief toestel${g.devices.length===1?'':'len'}</small></button>`).join(''):'<div class="maintenance-location-empty">Geen locatie gevonden.</div>';suggestions.classList.add('show')};input.oninput=()=>{hidden.value='';input.setCustomValidity('Kies een locatie uit de zoeklijst.');renderDevices(null);renderLocations()};input.onfocus=renderLocations;input.onkeydown=e=>{if(e.key==='Escape'){hideLocations();return}if(e.key==='Enter'&&suggestions.classList.contains('show')){const first=suggestions.querySelector('.maintenance-location-suggestion');if(first){e.preventDefault();first.click()}}};suggestions.onclick=e=>{const choice=e.target.closest('.maintenance-location-suggestion');if(!choice)return;const group=maintenanceLocationGroups().find(g=>g.key===choice.dataset.locationKey);if(!group)return;hidden.value=group.key;input.value=group.label;input.setCustomValidity('');hideLocations();renderDevices(group)};input.onfocusout=()=>setTimeout(hideLocations,140);if(selectAll)selectAll.onclick=()=>{const cards=[...box.querySelectorAll('.maintenance-machine-card')],allSelected=cards.length&&cards.every(c=>c.querySelector('.maintenance-machine-check')?.checked);cards.forEach(card=>{const check=card.querySelector('.maintenance-machine-check');if(check){check.checked=!allSelected;setMaintenanceMachineEnabled(card,!allSelected)}});selectAll.textContent=allSelected?'Alles selecteren':'Alles uitvinken'};box.onchange=e=>{if(e.target.classList.contains('maintenance-machine-check')){const card=e.target.closest('.maintenance-machine-card');setMaintenanceMachineEnabled(card,e.target.checked);if(selectAll){const cards=[...box.querySelectorAll('.maintenance-machine-card')];selectAll.textContent=cards.length&&cards.every(c=>c.querySelector('.maintenance-machine-check')?.checked)?'Alles uitvinken':'Alles selecteren'}}};box.onclick=e=>{const suggestion=e.target.closest('.usage-suggestion');if(suggestion){const row=suggestion.closest('.usage-row'),part=state.parts.find(p=>p.id===suggestion.dataset.partId),partInput=row?.querySelector('.usage-search'),partHidden=row?.querySelector('.usage-part');if(part&&partInput&&partHidden){partInput.value=usagePartDisplay(part);partHidden.value=part.id;hidePartSuggestions(row)}return}const add=e.target.closest('.maintenance-add-usage');if(add){const list=add.closest('.maintenance-machine-usage')?.querySelector('.maintenance-device-usage-list');if(list){const div=document.createElement('div');div.innerHTML=usageRowHtml({partId:'',qty:1},true);const row=div.firstElementChild;if(row){list.appendChild(row);row.querySelector('.usage-search')?.focus()}}return}if(e.target.classList.contains('remove-line'))e.target.closest('.usage-row')?.remove()};box.oninput=e=>{if(!e.target.classList.contains('usage-search'))return;const row=e.target.closest('.usage-row'),menu=row?.querySelector('.usage-suggestions'),partHidden=row?.querySelector('.usage-part');if(partHidden)partHidden.value='';const q=e.target.value.trim();if(!menu)return;if(!q){menu.classList.remove('show');menu.innerHTML='';return}menu.innerHTML=usageSuggestionsHtml(q);menu.classList.add('show')};box.onkeydown=e=>{if(!e.target.classList.contains('usage-search'))return;const row=e.target.closest('.usage-row'),menu=row?.querySelector('.usage-suggestions');if(e.key==='Escape'){hidePartSuggestions(row);return}if(e.key==='Enter'&&menu?.classList.contains('show')){const first=menu.querySelector('.usage-suggestion');if(first){e.preventDefault();first.click()}}};box.onfocusout=e=>{if(e.target.classList.contains('usage-search'))setTimeout(()=>hidePartSuggestions(e.target.closest('.usage-row')),140)};input.setCustomValidity('Kies een locatie uit de zoeklijst.');renderDevices(null)}'''
+          text, n = re.subn(r'function initMaintenanceLocationForm\(\)\{.*?\}\nfunction maintenanceBatchSelectedItems', new_init + '\nfunction maintenanceBatchSelectedItems', text, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('initMaintenanceLocationForm niet gevonden')
+
+          p.write_text(text, encoding='utf-8')
+
+          sw = Path('sw.js')
+          sw_text = sw.read_text(encoding='utf-8')
+          sw_text = re.sub(r"machinepark-v[0-9.]+-[^']+", 'machinepark-v1.57-maintenance-location-search', sw_text, count=1)
+          sw.write_text(sw_text, encoding='utf-8')
+
+          test = Path('tests/build-smoke.test.mjs')
+          t = test.read_text(encoding='utf-8')
+          t = t.replace("    'id=\"maintenanceLocation\"',\n", "    'id=\"maintenanceLocationSearch\"',\n    'id=\"maintenanceLocationSuggestions\"',\n    'maintenanceLocationMatches',\n")
+          t = re.sub(r"machinepark-v[0-9.]+-[^']+", 'machinepark-v1.57-maintenance-location-search', t)
+          test.write_text(t, encoding='utf-8')
+          PY
+      - name: Test Machinepark
+        run: npm test
+      - name: Commit wijziging
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-time-maintenance-location-search.yml
+          git add index.html sw.js tests/build-smoke.test.mjs
+          git commit -m 'Maak onderhoudslocatie doorzoekbaar'
+          git push origin HEAD:development
