@@ -17,6 +17,7 @@ required = {
     "technieker rol": "technieker",
     "magazijnier rol": "magazijnier",
     "onderhoud navigatie": "data-view=\"maintenance\"",
+    "onderhoud knop": "$('#addMaintenance').onclick=()=>openMaintenance();",
     "locatiegericht onderhoud": "id=\"maintenanceLocation\"",
     "onderhoud per toestel": "maintenance-machine-card",
     "depannage navigatie": "data-view=\"breakdowns\"",

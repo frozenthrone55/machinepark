@@ -10,6 +10,7 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
   for (const needle of [
     '<title>Machinepark</title>',
     'data-view="maintenance"',
+    "$('#addMaintenance').onclick=()=>openMaintenance();",
     'id="maintenanceLocation"',
     'maintenance-machine-card',
     'maintenanceBatchSelectedItems',
@@ -48,7 +49,7 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
-test('service worker forceert nieuwe cache na locatiegericht onderhoud', () => {
+test('service worker forceert nieuwe cache na herstel onderhoudsknop', () => {
   assert.ok(sw.includes('machinepark-v1.55-location-maintenance'));
 });
 
