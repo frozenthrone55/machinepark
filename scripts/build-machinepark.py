@@ -15,6 +15,9 @@ required = {
     "dashboard toestelbolletje": "<span class=\"dot\"></span><div class=\"label\">Actieve toestellen</div>",
     "veiligheidsbackup": "Machinepark_Veiligheidsbackup_",
     "importverslag": "downloadStockImportReport",
+    "onderdelenexport afbeeldingen": "makeStoreZip",
+    "afbeeldingskolom export": "Afbeelding bestand",
+    "back-up afbeeldingen": "includesImages:true",
     "prijsimport": "Prijs excl. BTW",
     "technieker rol": "technieker",
     "magazijnier rol": "magazijnier",
@@ -39,6 +42,6 @@ if index.count("id=\"clerkUserButton\"") != 1:
     raise SystemExit("Buildvalidatie mislukt: Clerk-profielknop is niet uniek")
 if "id=\"clearAll\"" in index:
     raise SystemExit("Buildvalidatie mislukt: Alles wissen is teruggekeerd")
-if "machinepark-v1.63-thin-coffee-icon" not in sw:
+if "machinepark-v1.64-export-images" not in sw:
     raise SystemExit("Buildvalidatie mislukt: verkeerde service-worker cache")
 print("[Machinepark] broncodevalidatie geslaagd")

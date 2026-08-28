@@ -39,6 +39,12 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'Overige wijzigingen',
     'dashboardProfessional',
     'downloadStockImportReport',
+    'makeStoreZip',
+    'Afbeelding bestand',
+    'afbeeldingen/',
+    'backupVersion:3',
+    'includesImages:true',
+    'countEmbeddedPartImages',
     'Machinepark_Veiligheidsbackup_',
     'Prijs excl. BTW',
     'Op afroep',
@@ -65,8 +71,8 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
-test('service worker forceert nieuwe cache voor het nieuwe toestelicoon', () => {
-  assert.ok(sw.includes('machinepark-v1.63-thin-coffee-icon'));
+test('service worker forceert nieuwe cache voor export met afbeeldingen', () => {
+  assert.ok(sw.includes('machinepark-v1.64-export-images'));
 });
 
 test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {
