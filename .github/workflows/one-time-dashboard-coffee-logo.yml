@@ -1,0 +1,39 @@
+name: Eenmalig koffietoestelicoon dashboard
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - '.github/workflows/one-time-dashboard-coffee-logo.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Plaats koffietoestelicoon op dashboard
+        run: python3 scripts/dashboard-coffee-logo.py
+      - name: Verwijder tijdelijke patchbestanden
+        run: |
+          rm scripts/dashboard-coffee-logo.py
+          rm .github/workflows/one-time-dashboard-coffee-logo.yml
+      - name: Test Machinepark
+        run: npm test
+      - name: Controleer serverfuncties
+        run: npm run check:functions
+      - name: Commit wijziging
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Gebruik koffietoestelicoon op dashboard'
+          git push origin HEAD:development
