@@ -10,7 +10,8 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
   for (const needle of [
     '<title>Machinepark</title>',
     'machinepark-coffee-device-icon.png',
-    'kpi-device-icon',
+    'class="device-nav-icon"',
+    '<span class="dot"></span><div class="label">Actieve toestellen</div>',
     'data-view="maintenance"',
     "$('#addMaintenance').onclick=()=>openMaintenance();",
     'id="maintenanceLocationSearch"',
@@ -65,7 +66,7 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
 });
 
 test('service worker forceert nieuwe cache na herstel onderhoudsknop', () => {
-  assert.ok(sw.includes('machinepark-v1.61-dashboard-coffee-icon'));
+  assert.ok(sw.includes('machinepark-v1.62-nav-coffee-icon'));
 });
 
 test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {
