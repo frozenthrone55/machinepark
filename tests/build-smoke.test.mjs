@@ -9,6 +9,8 @@ const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 test('kritieke UI bouwstenen zijn aanwezig', () => {
   for (const needle of [
     '<title>Machinepark</title>',
+    'machinepark-coffee-device-icon.png',
+    'kpi-device-icon',
     'data-view="maintenance"',
     "$('#addMaintenance').onclick=()=>openMaintenance();",
     'id="maintenanceLocationSearch"',
@@ -63,7 +65,7 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
 });
 
 test('service worker forceert nieuwe cache na herstel onderhoudsknop', () => {
-  assert.ok(sw.includes('machinepark-v1.60-location-device-search'));
+  assert.ok(sw.includes('machinepark-v1.61-dashboard-coffee-icon'));
 });
 
 test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {

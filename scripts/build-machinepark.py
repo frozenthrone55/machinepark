@@ -11,6 +11,7 @@ required = {
     "audit undo": "data-undo-audit",
     "apart onderdelenlogboek": "id=\"auditPartsLogBody\"",
     "operationeel dashboard": "dashboardProfessional",
+    "dashboard koffietoestelicoon": "machinepark-coffee-device-icon.png",
     "veiligheidsbackup": "Machinepark_Veiligheidsbackup_",
     "importverslag": "downloadStockImportReport",
     "prijsimport": "Prijs excl. BTW",
@@ -37,6 +38,6 @@ if index.count("id=\"clerkUserButton\"") != 1:
     raise SystemExit("Buildvalidatie mislukt: Clerk-profielknop is niet uniek")
 if "id=\"clearAll\"" in index:
     raise SystemExit("Buildvalidatie mislukt: Alles wissen is teruggekeerd")
-if "machinepark-v1.60-location-device-search" not in sw:
+if "machinepark-v1.61-dashboard-coffee-icon" not in sw:
     raise SystemExit("Buildvalidatie mislukt: verkeerde service-worker cache")
 print("[Machinepark] broncodevalidatie geslaagd")
