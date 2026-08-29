@@ -78,9 +78,28 @@ function diffList(beforeList = [], afterList = []) {
 }
 function deny(message) { throw Object.assign(new Error(message), { status: 403 }); }
 function requirePermission(permissions, key, message) { if (!permissions[key]) deny(message); }
+function validateDevicePhotos(devices = []) {
+  for (const device of devices) {
+    if (device?.devicePhotos !== undefined && !Array.isArray(device.devicePhotos)) {
+      throw Object.assign(new Error('Toestelfoto’s moeten als een geldige fotolijst worden opgeslagen.'), { status: 400 });
+    }
+    const photos = Array.isArray(device?.devicePhotos) ? device.devicePhotos : [];
+    if (photos.length > 3) throw Object.assign(new Error('Een toestel kan maximaal 3 foto’s bevatten.'), { status: 400 });
+    if (photos.some((src) => typeof src !== 'string' || !src.trim())) {
+      throw Object.assign(new Error('Een toestelfoto bevat ongeldige gegevens.'), { status: 400 });
+    }
+    if (photos.length) {
+      const index = Number(device?.deviceOverviewPhotoIndex ?? 0);
+      if (!Number.isInteger(index) || index < 0 || index >= photos.length) {
+        throw Object.assign(new Error('De gekozen overzichtsfoto van het toestel is ongeldig.'), { status: 400 });
+      }
+    }
+  }
+}
 
 export function assertSnapshotWriteAllowed(before, after, roleValue, config = null, { owner = false } = {}) {
   if (!validSnapshot(after)) throw Object.assign(new Error('Ongeldige Machinepark-gegevens.'), { status: 400 });
+  validateDevicePhotos(after.devices);
   const role = normalizeRole(roleValue, { owner, config }); const permissions = permissionsForRole(role, config, { owner });
   if (!before) { if (owner || role === 'beheerder') return true; deny('Alleen de hoofdbeheerder of een beheerder kan de centrale database initialiseren.'); }
   const devices = diffList(before.devices, after.devices); const maintenance = diffList(before.maintenance, after.maintenance); const breakdowns = diffList(before.breakdowns, after.breakdowns); const parts = diffList(before.parts, after.parts);
