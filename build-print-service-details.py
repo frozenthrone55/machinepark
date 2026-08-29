@@ -47,6 +47,12 @@ if MARKER not in index:
     return deviceName(record.deviceId, recordMoment(record));
   }}
 
+  function serviceRecordDate(record) {{
+    if (!record?.date) return '—';
+    const date = new Date(`${{record.date}}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? String(record.date) : date.toLocaleDateString('nl-BE');
+  }}
+
   function serviceRecordParts(record) {{
     return usedPartsText(record.usedParts || []) || '—';
   }}
@@ -72,7 +78,7 @@ if MARKER not in index:
     const title = isMaintenance ? 'Onderhoudsverslag' : 'Depannageverslag';
     const fields = isMaintenance
       ? [
-          servicePrintField('Datum en uur', recordDateTimeFmt(record)),
+          servicePrintField('Datum', serviceRecordDate(record)),
           servicePrintField('Type onderhoud', record.type || '—'),
           servicePrintField('Toestel', serviceRecordDevice(record), true),
           servicePrintField('Technieker', record.technician || '—'),
@@ -80,7 +86,7 @@ if MARKER not in index:
           servicePrintField('Uitgevoerde werkzaamheden / notitie', record.notes || '—', true),
         ].join('')
       : [
-          servicePrintField('Datum en uur', recordDateTimeFmt(record)),
+          servicePrintField('Datum', serviceRecordDate(record)),
           servicePrintField('Toestel', serviceRecordDevice(record)),
           servicePrintField('Prioriteit', record.priority || '—'),
           servicePrintField('Status', record.status || '—'),
@@ -92,7 +98,7 @@ if MARKER not in index:
           servicePrintField('Gebruikte onderdelen', serviceRecordParts(record), true),
         ].join('');
 
-    return `<div class="service-print-header"><div><h1>Machinepark · ${{title}}</h1><div class="service-print-subtitle">${{servicePrintEsc(serviceRecordDevice(record))}}</div></div><div class="service-print-subtitle">${{servicePrintEsc(recordDateTimeFmt(record))}}</div></div><div class="service-print-grid">${{fields}}${{servicePrintPhotos(record)}}</div><div class="service-print-footer">Afgedrukt vanuit Machinepark</div>`;
+    return `<div class="service-print-header"><div><h1>Machinepark · ${{title}}</h1><div class="service-print-subtitle">${{servicePrintEsc(serviceRecordDevice(record))}}</div></div><div class="service-print-subtitle">${{servicePrintEsc(serviceRecordDate(record))}}</div></div><div class="service-print-grid">${{fields}}${{servicePrintPhotos(record)}}</div><div class="service-print-footer">Afgedrukt vanuit Machinepark</div>`;
   }}
 
   function ensureServicePrintSheet() {{
@@ -171,6 +177,8 @@ required = [
     "Onderhoudsverslag",
     "Depannageverslag",
     "Foto’s bij verslag",
+    "servicePrintField('Datum'",
+    "serviceRecordDate",
     "previousShowMaintenanceDetails",
     "previousOpenBreakdown",
 ]
@@ -178,4 +186,4 @@ for needle in required:
     if needle not in index:
         raise SystemExit(f"Buildvalidatie mislukt: individuele verslagafdruk ontbreekt ({needle})")
 
-print("[Machinepark] individuele onderhouds- en depannageverslagen afdrukbaar")
+print("[Machinepark] individuele onderhouds- en depannageverslagen afdrukbaar zonder uur")
