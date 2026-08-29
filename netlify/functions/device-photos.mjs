@@ -10,6 +10,7 @@ import {
 
 const STORE_NAME = 'machinepark-central';
 const PHOTO_PREFIX = 'device-photos/';
+const THUMB_SUFFIX = '.thumb';
 const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
 const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
 
@@ -52,16 +53,23 @@ function safeDeviceId(value) {
   return String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 100);
 }
 
-function refForKey(key) {
-  return `/.netlify/functions/device-photos?key=${encodeURIComponent(key)}`;
+function thumbKey(key) {
+  return `${key}${THUMB_SUFFIX}`;
+}
+
+function refForKey(key, variant = '') {
+  const suffix = variant === 'thumb' ? '&variant=thumb' : '';
+  return `/.netlify/functions/device-photos?key=${encodeURIComponent(key)}${suffix}`;
 }
 
 function keyFromRef(value) {
-  const text = String(value || '');
-  if (!text.startsWith('/.netlify/functions/device-photos?key=')) return '';
+  const text = String(value || '').trim();
+  if (!text) return '';
   try {
-    const key = decodeURIComponent(text.slice('/.netlify/functions/device-photos?key='.length));
-    return key.startsWith(PHOTO_PREFIX) ? key : '';
+    const url = new URL(text, 'https://machinepark.local');
+    if (url.pathname !== '/.netlify/functions/device-photos') return '';
+    const key = decodeURIComponent(url.searchParams.get('key') || '');
+    return key.startsWith(PHOTO_PREFIX) && !key.endsWith(THUMB_SUFFIX) ? key : '';
   } catch (_) {
     return '';
   }
@@ -75,44 +83,94 @@ function parseDataImage(value) {
   return { contentType: match[1], bytes };
 }
 
+async function storeThumbnail(store, key, raw, auth) {
+  if (!raw) return false;
+  const parsed = parseDataImage(raw);
+  if (!parsed) throw Object.assign(new Error('De thumbnail bevat ongeldige afbeeldingsgegevens.'), { status: 400 });
+  if (parsed.bytes.length > 180_000) throw Object.assign(new Error('De thumbnail is te groot.'), { status: 413 });
+  await store.set(thumbKey(key), new Blob([parsed.bytes], { type: parsed.contentType }), {
+    metadata: { contentType: parsed.contentType, sourceKey: key, generatedAt: new Date().toISOString(), generatedBy: auth?.sub || '' },
+  });
+  return true;
+}
+
+async function imageResponse(store, key, variant, headOnly = false) {
+  if (!key.startsWith(PHOTO_PREFIX) || key.endsWith(THUMB_SUFFIX)) return new Response('Ongeldige fotoreferentie.', { status: 400, headers: NO_STORE });
+  if (variant === 'thumb') {
+    const thumbnail = await store.getWithMetadata(thumbKey(key), { type: 'arrayBuffer', consistency: 'strong' });
+    if (headOnly) return new Response(null, { status: thumbnail?.data ? 200 : 404, headers: { ...NO_STORE, 'x-machinepark-thumbnail': thumbnail?.data ? 'exact' : 'missing' } });
+    if (thumbnail?.data) {
+      return new Response(thumbnail.data, {
+        status: 200,
+        headers: {
+          'content-type': thumbnail.metadata?.contentType || 'image/jpeg',
+          'cache-control': 'private, max-age=604800',
+          'x-content-type-options': 'nosniff',
+          'x-machinepark-thumbnail': 'exact',
+        },
+      });
+    }
+  }
+  const entry = await store.getWithMetadata(key, { type: 'arrayBuffer', consistency: 'strong' });
+  if (!entry?.data) return new Response('Foto niet gevonden.', { status: 404, headers: NO_STORE });
+  if (headOnly) return new Response(null, { status: 200, headers: { ...NO_STORE, 'x-machinepark-thumbnail': variant === 'thumb' ? 'fallback' : 'full' } });
+  return new Response(entry.data, {
+    status: 200,
+    headers: {
+      'content-type': entry.metadata?.contentType || 'image/jpeg',
+      'cache-control': 'private, max-age=86400',
+      'x-content-type-options': 'nosniff',
+      'x-machinepark-thumbnail': variant === 'thumb' ? 'fallback' : 'full',
+    },
+  });
+}
+
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: NO_STORE });
   const store = getStore({ name: STORE_NAME, consistency: 'strong' });
   try {
-    if (req.method === 'GET') {
-      const key = new URL(req.url).searchParams.get('key') || '';
-      if (!key.startsWith(PHOTO_PREFIX)) return new Response('Ongeldige fotoreferentie.', { status: 400, headers: NO_STORE });
-      const entry = await store.getWithMetadata(key, { type: 'arrayBuffer', consistency: 'strong' });
-      if (!entry?.data) return new Response('Foto niet gevonden.', { status: 404, headers: NO_STORE });
-      return new Response(entry.data, {
-        status: 200,
-        headers: {
-          'content-type': entry.metadata?.contentType || 'image/jpeg',
-          'cache-control': 'private, max-age=86400',
-          'x-content-type-options': 'nosniff',
-        },
-      });
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      const url = new URL(req.url);
+      const key = url.searchParams.get('key') || '';
+      const variant = url.searchParams.get('variant') === 'thumb' ? 'thumb' : 'full';
+      return imageResponse(store, key, variant, req.method === 'HEAD');
     }
 
     if (req.method === 'POST') {
       const auth = await authenticate(req);
-      if (!(await canManageDevicePhotos(store, auth))) return json({ error: 'Deze rol mag toestelfoto’s niet wijzigen.' }, 403);
       const body = await req.json();
+      const action = String(body?.action || 'save');
       const deviceId = safeDeviceId(body?.deviceId);
-      const photos = Array.isArray(body?.photos) ? body.photos : [];
       if (!deviceId) return json({ error: 'Ongeldig toestel.' }, 400);
+      const prefix = `${PHOTO_PREFIX}${deviceId}/`;
+
+      if (action === 'thumbnail') {
+        const key = keyFromRef(body?.photoRef);
+        if (!key || !key.startsWith(prefix)) return json({ error: 'Een fotoreferentie hoort niet bij dit toestel.' }, 400);
+        const original = await store.getMetadata(key, { consistency: 'strong' });
+        if (!original) return json({ error: 'De originele toestelfoto bestaat niet meer.' }, 404);
+        await storeThumbnail(store, key, body?.thumbnail, auth);
+        return json({ ok: true, thumbnail: refForKey(key, 'thumb') });
+      }
+
+      if (!(await canManageDevicePhotos(store, auth))) return json({ error: 'Deze rol mag toestelfoto’s niet wijzigen.' }, 403);
+      const photos = Array.isArray(body?.photos) ? body.photos : [];
+      const thumbnails = Array.isArray(body?.thumbnails) ? body.thumbnails : [];
       if (photos.length > 5) return json({ error: 'Een toestel kan maximaal 5 foto’s bevatten.' }, 400);
 
-      const prefix = `${PHOTO_PREFIX}${deviceId}/`;
       const refs = [];
       const keepKeys = new Set();
       let totalBytes = 0;
 
-      for (const photo of photos) {
+      for (let index = 0; index < photos.length; index += 1) {
+        const photo = photos[index];
+        const thumbnail = thumbnails[index] || '';
         const existingKey = keyFromRef(photo);
         if (existingKey) {
           if (!existingKey.startsWith(prefix)) return json({ error: 'Een fotoreferentie hoort niet bij dit toestel.' }, 400);
           keepKeys.add(existingKey);
+          keepKeys.add(thumbKey(existingKey));
+          if (thumbnail) await storeThumbnail(store, existingKey, thumbnail, auth);
           refs.push(refForKey(existingKey));
           continue;
         }
@@ -126,6 +184,10 @@ export default async (req) => {
           metadata: { contentType: parsed.contentType, deviceId, uploadedAt: new Date().toISOString(), uploadedBy: auth.sub },
         });
         keepKeys.add(key);
+        if (thumbnail) {
+          await storeThumbnail(store, key, thumbnail, auth);
+          keepKeys.add(thumbKey(key));
+        }
         refs.push(refForKey(key));
       }
 
