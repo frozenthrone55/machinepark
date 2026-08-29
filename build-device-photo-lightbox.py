@@ -86,9 +86,10 @@ if MARKER not in index:
 '''
 
     if '</head>' not in index or '</body>' not in index:
-        raise SystemExit('Buildvalidatie mislukt: HTML-afsluiters ontbreken voor fotov vergroting')
+        raise SystemExit('Buildvalidatie mislukt: HTML-afsluiters ontbreken voor fotovergroting')
     index = index.replace('</head>', style + '</head>', 1)
-    index = index.replace('</body>', script + '</body>', 1)
+    body_pos = index.rfind('</body>')
+    index = index[:body_pos] + script + index[body_pos:]
     index_path.write_text(index, encoding='utf-8')
 
 required = [
