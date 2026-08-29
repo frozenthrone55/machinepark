@@ -4,11 +4,11 @@ ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 
-MARKER = 'data-machinepark-build-fix="lattiz-part-photos-v1"'
+MARKER = 'data-machinepark-build-fix="lattiz-part-photos-v2"'
 
 if MARKER not in index:
     script = r'''
-<script data-machinepark-build-fix="lattiz-part-photos-v1">
+<script data-machinepark-build-fix="lattiz-part-photos-v2">
 (() => {
   const LATTIZ_PHOTO_URL = '/.netlify/functions/lattiz-part-photo';
 
@@ -79,32 +79,37 @@ if MARKER not in index:
       productName: body.productName || '',
       productUrl: body.productUrl || '',
       lookupMethod: body.lookupMethod || '',
+      sourcePage: body.sourcePage || null,
     };
   }
 
   function resultLine(part, result) {
-    const code = String(part.supplierCode || '').trim() || 'geen code';
+    const code = String(part.supplierCode || '').trim();
+    const source = result.lookupMethod === 'technical-pdf' ? 'Coffee First techniekdocumentatie' : 'Coffee First webshop';
     const label = [part.artNr, part.description].filter(Boolean).join(' · ');
-    if (result.status === 'found') return `✓ ${label} (${code})`;
-    if (result.status === 'ambiguous') return `⚠ ${label} (${code}) — meerdere exacte resultaten`;
-    if (result.status === 'not-found') return `— ${label} (${code}) — niet gevonden`;
-    return `✕ ${label} (${code}) — ${result.error || 'fout'}`;
+    if (result.status === 'found') return `✓ ${label}${code ? ` (${code})` : ''} — ${source}`;
+    if (result.status === 'ambiguous') return `⚠ ${label}${code ? ` (${code})` : ''} — meerdere exacte resultaten`;
+    if (result.status === 'not-found') return `— ${label}${code ? ` (${code})` : ''} — niet gevonden`;
+    return `✕ ${label}${code ? ` (${code})` : ''} — ${result.error || 'fout'}`;
   }
 
   function showLattizPhotoResult(results, noCodeCount, updatedCount) {
-    const found = results.filter(x => x.result.status === 'found').length;
     const missing = results.filter(x => x.result.status === 'not-found').length;
     const ambiguous = results.filter(x => x.result.status === 'ambiguous').length;
     const errors = results.filter(x => x.result.status === 'error').length;
+    const docs = results.filter(x => x.result.status === 'found' && x.result.lookupMethod === 'technical-pdf').length;
+    const webshop = results.filter(x => x.result.status === 'found' && x.result.lookupMethod !== 'technical-pdf').length;
     const details = results.map(x => resultLine(x.part, x.result)).join('\n');
     alert(
       `Lattiz foto-aanvulling voltooid.\n\n` +
       `Toegevoegd: ${updatedCount}\n` +
+      `  via webshop: ${webshop}\n` +
+      `  via techniekdocumentatie: ${docs}\n` +
       `Niet gevonden: ${missing}\n` +
       `Meerdere resultaten: ${ambiguous}\n` +
-      `Zonder leverancierscode: ${noCodeCount}\n` +
+      `Zonder leverancierscode (toch op omschrijving gezocht): ${noCodeCount}\n` +
       `Fouten: ${errors}\n\n` +
-      (details || 'Er waren geen Lattiz-onderdelen met een bruikbare leverancierscode zonder foto.')
+      (details || 'Er waren geen Lattiz-onderdelen zonder foto.')
     );
   }
 
@@ -115,16 +120,11 @@ if MARKER not in index:
       return;
     }
 
-    const allMissing = state.parts.filter(part => isLattizPart(part) && missingPartPhoto(part));
-    const noCode = allMissing.filter(part => !String(part.supplierCode || '').trim());
-    const candidates = allMissing.filter(part => String(part.supplierCode || '').trim());
+    const candidates = state.parts.filter(part => isLattizPart(part) && missingPartPhoto(part));
+    const noCode = candidates.filter(part => !String(part.supplierCode || '').trim());
 
-    if (!allMissing.length) {
-      toast('Alle Lattiz-onderdelen hebben al een foto');
-      return;
-    }
     if (!candidates.length) {
-      alert(`${noCode.length} Lattiz-onderdeel(en) hebben nog geen foto, maar ook geen Code leverancier. Vul eerst de leverancierscode in.`);
+      toast('Alle Lattiz-onderdelen hebben al een foto');
       return;
     }
 
@@ -133,8 +133,8 @@ if MARKER not in index:
     const results = [];
 
     try {
-      for (let start = 0; start < candidates.length; start += 3) {
-        const batch = candidates.slice(start, start + 3);
+      for (let start = 0; start < candidates.length; start += 2) {
+        const batch = candidates.slice(start, start + 2);
         if (button) button.textContent = `Foto’s zoeken ${start + 1}-${Math.min(start + batch.length, candidates.length)}/${candidates.length}…`;
         const batchResults = await Promise.all(batch.map(async part => {
           try {
@@ -151,7 +151,6 @@ if MARKER not in index:
         if (item.result.status !== 'found') continue;
         const current = state.parts.find(p => p.id === item.part.id);
         if (!current || !missingPartPhoto(current) || !isLattizPart(current)) continue;
-        if (String(current.supplierCode || '').trim() !== String(item.part.supplierCode || '').trim()) continue;
         updates.push({ ...current, photo: item.result.photo, updatedAt: new Date().toISOString() });
       }
 
@@ -182,7 +181,7 @@ if MARKER not in index:
       button.id = 'fillLattizPhotos';
       button.className = 'btn';
       button.textContent = 'Lattiz foto’s aanvullen';
-      button.title = 'Vul ontbrekende Lattiz-onderdeelfoto’s aan via de exacte leverancierscode bij Coffee First';
+      button.title = 'Zoek ontbrekende Lattiz-foto’s via Coffee First webshop en officiële techniekdocumentatie';
       button.onclick = fillMissingLattizPartPhotos;
       exportButton.insertAdjacentElement('afterend', button);
     }
@@ -218,11 +217,11 @@ required = [
     "fillMissingLattizPartPhotos",
     "Lattiz foto’s aanvullen",
     "/.netlify/functions/lattiz-part-photo",
-    "supplierCode",
+    "technical-pdf",
     "putMany('parts', updates)",
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f"Buildvalidatie mislukt: Lattiz-foto-aanvuller ontbreekt ({needle})")
 
-print("[Machinepark] Lattiz onderdeelfoto-aanvuller via Coffee First actief")
+print("[Machinepark] Lattiz onderdeelfoto-aanvuller via Coffee First webshop + techniekdocumentatie actief")
