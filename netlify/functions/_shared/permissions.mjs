@@ -84,7 +84,7 @@ function validateDevicePhotos(devices = []) {
       throw Object.assign(new Error('Toestelfoto’s moeten als een geldige fotolijst worden opgeslagen.'), { status: 400 });
     }
     const photos = Array.isArray(device?.devicePhotos) ? device.devicePhotos : [];
-    if (photos.length > 3) throw Object.assign(new Error('Een toestel kan maximaal 3 foto’s bevatten.'), { status: 400 });
+    if (photos.length > 5) throw Object.assign(new Error('Een toestel kan maximaal 5 foto’s bevatten.'), { status: 400 });
     if (photos.some((src) => typeof src !== 'string' || !src.trim())) {
       throw Object.assign(new Error('Een toestelfoto bevat ongeldige gegevens.'), { status: 400 });
     }
