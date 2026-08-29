@@ -158,8 +158,9 @@ export default async (req) => {
       const thumbnails = Array.isArray(body?.thumbnails) ? body.thumbnails : [];
       if (photos.length > 5) return json({ error: 'Een toestel kan maximaal 5 foto’s bevatten.' }, 400);
 
-      const refs = [];
+      const refs = new Array(photos.length);
       const keepKeys = new Set();
+      const writes = [];
       let totalBytes = 0;
 
       for (let index = 0; index < photos.length; index += 1) {
@@ -170,27 +171,30 @@ export default async (req) => {
           if (!existingKey.startsWith(prefix)) return json({ error: 'Een fotoreferentie hoort niet bij dit toestel.' }, 400);
           keepKeys.add(existingKey);
           keepKeys.add(thumbKey(existingKey));
-          if (thumbnail) await storeThumbnail(store, existingKey, thumbnail, auth);
-          refs.push(refForKey(existingKey));
+          refs[index] = refForKey(existingKey);
+          if (thumbnail) writes.push(storeThumbnail(store, existingKey, thumbnail, auth));
           continue;
         }
+
         const parsed = parseDataImage(photo);
         if (!parsed) return json({ error: 'Een toestelfoto bevat ongeldige gegevens.' }, 400);
         if (parsed.bytes.length > 1_200_000) return json({ error: 'Een toestelfoto is te groot. Kies een kleinere foto.' }, 413);
         totalBytes += parsed.bytes.length;
         if (totalBytes > 4_000_000) return json({ error: 'De geselecteerde toestelfoto’s zijn samen te groot.' }, 413);
+
         const key = `${prefix}${crypto.randomUUID()}`;
-        await store.set(key, new Blob([parsed.bytes], { type: parsed.contentType }), {
-          metadata: { contentType: parsed.contentType, deviceId, uploadedAt: new Date().toISOString(), uploadedBy: auth.sub },
-        });
         keepKeys.add(key);
+        refs[index] = refForKey(key);
+        writes.push(store.set(key, new Blob([parsed.bytes], { type: parsed.contentType }), {
+          metadata: { contentType: parsed.contentType, deviceId, uploadedAt: new Date().toISOString(), uploadedBy: auth.sub },
+        }));
         if (thumbnail) {
-          await storeThumbnail(store, key, thumbnail, auth);
           keepKeys.add(thumbKey(key));
+          writes.push(storeThumbnail(store, key, thumbnail, auth));
         }
-        refs.push(refForKey(key));
       }
 
+      await Promise.all(writes);
       const listed = await store.list({ prefix });
       await Promise.all((listed.blobs || []).filter((item) => !keepKeys.has(item.key)).map((item) => store.delete(item.key)));
       return json({ ok: true, photos: refs });
