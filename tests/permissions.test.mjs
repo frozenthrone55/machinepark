@@ -72,3 +72,29 @@ test('technieker kan toestelstatus maar geen toestelcode wijzigen', () => {
   const codeAfter = snapshot({ devices: [{ ...before.devices[0], assetCode: 'WCL999' }] });
   assert.throws(() => assertSnapshotWriteAllowed(before, codeAfter, 'technieker'), /status en notities/i);
 });
+
+test('toestel ondersteunt maximaal drie fotos en een geldige overzichtsfoto', () => {
+  const before = snapshot();
+  const threePhotos = snapshot({
+    devices: [{ ...before.devices[0], devicePhotos: ['foto-1', 'foto-2', 'foto-3'], deviceOverviewPhotoIndex: 2 }],
+  });
+  assert.doesNotThrow(() => assertSnapshotWriteAllowed(before, threePhotos, 'gebruiker'));
+
+  const fourPhotos = snapshot({
+    devices: [{ ...before.devices[0], devicePhotos: ['foto-1', 'foto-2', 'foto-3', 'foto-4'], deviceOverviewPhotoIndex: 0 }],
+  });
+  assert.throws(() => assertSnapshotWriteAllowed(before, fourPhotos, 'gebruiker'), /maximaal 3 foto/i);
+
+  const invalidOverview = snapshot({
+    devices: [{ ...before.devices[0], devicePhotos: ['foto-1', 'foto-2'], deviceOverviewPhotoIndex: 2 }],
+  });
+  assert.throws(() => assertSnapshotWriteAllowed(before, invalidOverview, 'gebruiker'), /overzichtsfoto/i);
+});
+
+test('technieker met alleen status en notities kan toestelfotos niet wijzigen', () => {
+  const before = snapshot();
+  const after = snapshot({
+    devices: [{ ...before.devices[0], devicePhotos: ['foto-1'], deviceOverviewPhotoIndex: 0 }],
+  });
+  assert.throws(() => assertSnapshotWriteAllowed(before, after, 'technieker'), /status en notities/i);
+});
