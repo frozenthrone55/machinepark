@@ -73,7 +73,7 @@ function allowedCoffeeFirstUrl(value) {
   }
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5500) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -99,7 +99,6 @@ async function lookupMagentoGraphql(code) {
         sku
         name
         url_key
-        canonical_url
         image { url label }
         small_image { url label }
         thumbnail { url label }
@@ -111,7 +110,7 @@ async function lookupMagentoGraphql(code) {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ query, variables: { sku: code } }),
-    });
+    }, 5000);
     if (!response.ok) return null;
     const body = await response.json();
     const items = Array.isArray(body?.data?.products?.items) ? body.data.products.items : [];
@@ -121,9 +120,7 @@ async function lookupMagentoGraphql(code) {
     const imageCandidates = [item?.image?.url, item?.small_image?.url, item?.thumbnail?.url].filter(Boolean);
     const imageUrl = imageCandidates.map(allowedCoffeeFirstUrl).find(Boolean);
     if (!imageUrl || /placeholder|no[_-]?selection/i.test(imageUrl.pathname)) return null;
-    let productUrl = null;
-    if (item?.canonical_url) productUrl = allowedCoffeeFirstUrl(item.canonical_url);
-    if (!productUrl && item?.url_key) productUrl = allowedCoffeeFirstUrl(`${COFFEE_FIRST_ORIGIN}/${String(item.url_key).replace(/^\/+/, '')}.html`);
+    const productUrl = item?.url_key ? allowedCoffeeFirstUrl(`${COFFEE_FIRST_ORIGIN}/${String(item.url_key).replace(/^\/+/, '')}.html`) : null;
     return { code, name: String(item?.name || '').trim(), productUrl: productUrl?.href || '', imageUrl: imageUrl.href, method: 'graphql' };
   } catch (error) {
     console.warn('Coffee First GraphQL lookup', error?.message || error);
@@ -144,7 +141,7 @@ function extractProductLinks(html) {
       if (url && !links.includes(url.href)) links.push(url.href);
     }
   }
-  return links.slice(0, 12);
+  return links.slice(0, 6);
 }
 
 function extractMeta(html, key, value) {
@@ -179,6 +176,20 @@ function extractProductImage(html) {
   return candidates.map(allowedCoffeeFirstUrl).find((url) => url && !/placeholder|no[_-]?selection/i.test(url.pathname)) || null;
 }
 
+async function inspectProductPage(link, code) {
+  try {
+    const productResponse = await fetchWithTimeout(link, { headers: { accept: 'text/html,application/xhtml+xml' } }, 4500);
+    if (!productResponse.ok) return null;
+    const productHtml = await productResponse.text();
+    if (!exactCodeRegex(code).test(stripHtml(productHtml))) return null;
+    const imageUrl = extractProductImage(productHtml);
+    if (!imageUrl) return null;
+    return { code, name: extractProductName(productHtml), productUrl: link, imageUrl: imageUrl.href, method: 'html' };
+  } catch {
+    return null;
+  }
+}
+
 async function lookupHtml(code) {
   const searchUrls = [
     `${COFFEE_FIRST_ORIGIN}/catalogsearch/result/?q=${encodeURIComponent(code)}`,
@@ -186,27 +197,13 @@ async function lookupHtml(code) {
   ];
   for (const searchUrl of searchUrls) {
     try {
-      const response = await fetchWithTimeout(searchUrl, { headers: { accept: 'text/html,application/xhtml+xml' } });
+      const response = await fetchWithTimeout(searchUrl, { headers: { accept: 'text/html,application/xhtml+xml' } }, 4500);
       if (!response.ok) continue;
       const html = await response.text();
       const links = extractProductLinks(html);
-      const exactCandidates = [];
-      for (const link of links) {
-        const productResponse = await fetchWithTimeout(link, { headers: { accept: 'text/html,application/xhtml+xml' } });
-        if (!productResponse.ok) continue;
-        const productHtml = await productResponse.text();
-        const text = stripHtml(productHtml);
-        if (!exactCodeRegex(code).test(text)) continue;
-        const imageUrl = extractProductImage(productHtml);
-        if (!imageUrl) continue;
-        exactCandidates.push({
-          code,
-          name: extractProductName(productHtml),
-          productUrl: link,
-          imageUrl: imageUrl.href,
-          method: 'html',
-        });
-      }
+      if (!links.length) continue;
+      const checked = await Promise.all(links.map((link) => inspectProductPage(link, code)));
+      const exactCandidates = checked.filter(Boolean);
       const unique = [...new Map(exactCandidates.map((x) => [x.productUrl, x])).values()];
       if (unique.length === 1) return unique[0];
       if (unique.length > 1) return { ambiguous: true, count: unique.length };
@@ -220,7 +217,7 @@ async function lookupHtml(code) {
 async function imageAsDataUrl(imageUrl) {
   const safe = allowedCoffeeFirstUrl(imageUrl);
   if (!safe) throw Object.assign(new Error('De gevonden afbeelding staat niet bij Coffee First.'), { status: 422 });
-  const response = await fetchWithTimeout(safe.href, { headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/*' } }, 15000);
+  const response = await fetchWithTimeout(safe.href, { headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/*' } }, 7000);
   if (!response.ok) throw Object.assign(new Error(`Coffee First-afbeelding kon niet worden geladen (${response.status}).`), { status: 502 });
   const contentType = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
   if (!contentType.startsWith('image/')) throw Object.assign(new Error('De gevonden Coffee First-bron is geen afbeelding.'), { status: 422 });
