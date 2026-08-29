@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@clerk/backend": "3.16.10",
-    "@netlify/blobs": "11.0.1"
+    "@netlify/blobs": "11.0.1",
+    "pdfjs-dist": "4.7.76",
+    "pngjs": "7.0.0"
   }
 }
