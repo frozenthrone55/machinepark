@@ -37,46 +37,35 @@ function permissionSet(values = []) {
 }
 
 const DEFAULT_ROLES = [
-  {
-    id: 'beheerder', label: 'Beheerder', builtIn: true,
-    permissions: permissionSet('all'),
-  },
+  { id: 'beheerder', label: 'Beheerder', builtIn: true, permissions: permissionSet('all') },
   {
     id: 'gebruiker', label: 'Gebruiker', builtIn: true,
     permissions: permissionSet([
       'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.parts',
-      'devices.add','devices.edit','devices.delete',
-      'maintenance.add','maintenance.edit','maintenance.delete',
-      'breakdowns.add','breakdowns.edit','breakdowns.delete',
-      'parts.add','parts.edit','parts.stock','parts.delete','parts.export','print',
+      'devices.add','devices.edit','devices.delete','maintenance.add','maintenance.edit','maintenance.delete',
+      'breakdowns.add','breakdowns.edit','breakdowns.delete','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print',
     ]),
   },
   {
     id: 'technieker', label: 'Technieker', builtIn: true,
     permissions: permissionSet([
-      'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.parts',
-      'devices.statusNotes','maintenance.add','maintenance.edit','maintenance.delete',
-      'breakdowns.add','breakdowns.edit','breakdowns.delete','print',
+      'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.parts','devices.statusNotes',
+      'maintenance.add','maintenance.edit','maintenance.delete','breakdowns.add','breakdowns.edit','breakdowns.delete','print',
     ]),
   },
   {
     id: 'magazijnier', label: 'Magazijnier', builtIn: true,
-    permissions: permissionSet([
-      'view.dashboard','view.parts','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print',
-    ]),
+    permissions: permissionSet(['view.dashboard','view.parts','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print']),
   },
 ];
 
 export function defaultRoleConfig() {
   return { version: 1, roles: DEFAULT_ROLES.map((role) => ({ ...role, permissions: { ...role.permissions } })) };
 }
-
 export function sanitizeRoleId(value) {
-  return String(value || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
 }
-
 export function normalizeRoleConfig(config) {
   const fallback = defaultRoleConfig();
   const input = Array.isArray(config?.roles) ? config.roles : [];
@@ -92,37 +81,25 @@ export function normalizeRoleConfig(config) {
   }
   return { version: 1, roles: [...byId.values()] };
 }
-
 export function roleDefinition(roleValue, config) {
   const normalized = normalizeRoleConfig(config);
   const id = sanitizeRoleId(roleValue);
   return normalized.roles.find((role) => role.id === id) || normalized.roles.find((role) => role.id === 'gebruiker');
 }
-
 export function normalizeRole(value, { owner = false, config = null } = {}) {
   if (owner) return 'beheerder';
   return roleDefinition(value, config)?.id || 'gebruiker';
 }
-
-export function roleLabel(role, config = null) {
-  return roleDefinition(role, config)?.label || 'Gebruiker';
-}
-
+export function roleLabel(role, config = null) { return roleDefinition(role, config)?.label || 'Gebruiker'; }
 export function permissionsForRole(roleValue, config = null, { owner = false } = {}) {
   if (owner) return permissionSet('all');
   return { ...roleDefinition(roleValue, config).permissions };
 }
-
 export function hasPermission(roleValue, permission, config = null, { owner = false } = {}) {
   return Boolean(permissionsForRole(roleValue, config, { owner })[permission]);
 }
-
 export function validSnapshot(data) {
-  return Boolean(
-    data && data.app === 'Machinepark' && Number(data.schema) === 1 &&
-    Array.isArray(data.parts) && Array.isArray(data.devices) &&
-    Array.isArray(data.maintenance) && Array.isArray(data.breakdowns)
-  );
+  return Boolean(data && data.app === 'Machinepark' && Number(data.schema) === 1 && Array.isArray(data.parts) && Array.isArray(data.devices) && Array.isArray(data.maintenance) && Array.isArray(data.breakdowns));
 }
 
 function stable(value) { return JSON.stringify(value); }
@@ -130,7 +107,6 @@ function changedRecordKeys(before, after) {
   const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
   return [...keys].filter((key) => stable(before?.[key]) !== stable(after?.[key]));
 }
-
 function diffList(beforeList = [], afterList = []) {
   const before = new Map(beforeList.map((x) => [x.id, x]));
   const after = new Map(afterList.map((x) => [x.id, x]));
@@ -145,7 +121,6 @@ function diffList(beforeList = [], afterList = []) {
   for (const [id, item] of before) if (!after.has(id)) removed.push(item);
   return { added, removed, changed };
 }
-
 function deny(message) { throw Object.assign(new Error(message), { status: 403 }); }
 function requirePermission(permissions, key, message) { if (!permissions[key]) deny(message); }
 
@@ -163,18 +138,21 @@ export function assertSnapshotWriteAllowed(before, after, roleValue, config = nu
   const breakdowns = diffList(before.breakdowns, after.breakdowns);
   const parts = diffList(before.parts, after.parts);
 
-  if (devices.added.length) requirePermission(permissions, 'devices.add', 'Deze rol mag geen toestellen toevoegen.');
-  if (devices.removed.length) requirePermission(permissions, 'devices.delete', 'Deze rol mag geen toestellen verwijderen.');
+  if (devices.added.length) requirePermission(permissions, 'devices.add', role === 'magazijnier' ? 'Een magazijnier kan alleen onderdelen en voorraad wijzigen.' : 'Deze rol mag geen toestellen toevoegen.');
+  if (devices.removed.length) requirePermission(permissions, 'devices.delete', role === 'magazijnier' ? 'Een magazijnier kan alleen onderdelen en voorraad wijzigen.' : 'Deze rol mag geen toestellen verwijderen.');
   for (const change of devices.changed) {
     const statusNotesOnly = change.keys.every((key) => ['status', 'notes'].includes(key));
     if (statusNotesOnly && (permissions['devices.statusNotes'] || permissions['devices.edit'])) continue;
-    requirePermission(permissions, 'devices.edit', 'Deze rol mag toestelgegevens niet volledig wijzigen.');
+    if (!permissions['devices.edit']) {
+      if (role === 'magazijnier') deny('Een magazijnier kan alleen onderdelen en voorraad wijzigen.');
+      if (role === 'technieker') deny('Een technieker kan bij toestellen alleen status en notities wijzigen.');
+      deny('Deze rol mag toestelgegevens niet volledig wijzigen.');
+    }
   }
 
   if (maintenance.added.length) requirePermission(permissions, 'maintenance.add', 'Deze rol mag geen onderhoud registreren.');
   if (maintenance.removed.length) requirePermission(permissions, 'maintenance.delete', 'Deze rol mag geen onderhoud verwijderen.');
   if (maintenance.changed.length) requirePermission(permissions, 'maintenance.edit', 'Deze rol mag onderhoud niet wijzigen.');
-
   if (breakdowns.added.length) requirePermission(permissions, 'breakdowns.add', 'Deze rol mag geen depannages registreren.');
   if (breakdowns.removed.length) requirePermission(permissions, 'breakdowns.delete', 'Deze rol mag geen depannages verwijderen.');
   if (breakdowns.changed.length) requirePermission(permissions, 'breakdowns.edit', 'Deze rol mag depannages niet wijzigen.');
@@ -191,8 +169,10 @@ export function assertSnapshotWriteAllowed(before, after, roleValue, config = nu
   for (const change of parts.changed) {
     const stockOnly = change.keys.every((key) => key === 'stock');
     if (stockOnly && (permissions['parts.stock'] || permissions['parts.edit'] || serviceMutationAllowed)) continue;
-    requirePermission(permissions, 'parts.edit', 'Deze rol mag onderdeelgegevens niet wijzigen.');
+    if (!permissions['parts.edit']) {
+      if (role === 'technieker') deny('Een technieker kan bij onderdelen alleen de voorraad wijzigen via gebruikte onderdelen.');
+      deny('Deze rol mag onderdeelgegevens niet wijzigen.');
+    }
   }
-
   return true;
 }
