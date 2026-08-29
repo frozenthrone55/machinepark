@@ -73,17 +73,17 @@ test('technieker kan toestelstatus maar geen toestelcode wijzigen', () => {
   assert.throws(() => assertSnapshotWriteAllowed(before, codeAfter, 'technieker'), /status en notities/i);
 });
 
-test('toestel ondersteunt maximaal drie fotos en een geldige overzichtsfoto', () => {
+test('toestel ondersteunt maximaal vijf fotos en een geldige overzichtsfoto', () => {
   const before = snapshot();
-  const threePhotos = snapshot({
-    devices: [{ ...before.devices[0], devicePhotos: ['foto-1', 'foto-2', 'foto-3'], deviceOverviewPhotoIndex: 2 }],
+  const fivePhotos = snapshot({
+    devices: [{ ...before.devices[0], devicePhotos: ['foto-1', 'foto-2', 'foto-3', 'foto-4', 'foto-5'], deviceOverviewPhotoIndex: 4 }],
   });
-  assert.doesNotThrow(() => assertSnapshotWriteAllowed(before, threePhotos, 'gebruiker'));
+  assert.doesNotThrow(() => assertSnapshotWriteAllowed(before, fivePhotos, 'gebruiker'));
 
-  const fourPhotos = snapshot({
-    devices: [{ ...before.devices[0], devicePhotos: ['foto-1', 'foto-2', 'foto-3', 'foto-4'], deviceOverviewPhotoIndex: 0 }],
+  const sixPhotos = snapshot({
+    devices: [{ ...before.devices[0], devicePhotos: ['foto-1', 'foto-2', 'foto-3', 'foto-4', 'foto-5', 'foto-6'], deviceOverviewPhotoIndex: 0 }],
   });
-  assert.throws(() => assertSnapshotWriteAllowed(before, fourPhotos, 'gebruiker'), /maximaal 3 foto/i);
+  assert.throws(() => assertSnapshotWriteAllowed(before, sixPhotos, 'gebruiker'), /maximaal 5 foto/i);
 
   const invalidOverview = snapshot({
     devices: [{ ...before.devices[0], devicePhotos: ['foto-1', 'foto-2'], deviceOverviewPhotoIndex: 2 }],
