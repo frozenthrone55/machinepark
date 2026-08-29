@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 
-MARKER = 'data-machinepark-build-fix="print-every-page-v1"'
+MARKER = 'data-machinepark-build-fix="print-every-page-v2"'
 
 if MARKER not in index:
     style = f'''
@@ -38,6 +38,7 @@ if MARKER not in index:
   .table th{{position:static!important;background:#f1f1f1!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}}
   .kpis{{grid-template-columns:repeat(4,1fr)!important;gap:8px!important}}
   .grid2{{grid-template-columns:1.45fr 1fr!important;gap:10px!important}}
+  #view-parts img.thumb.parts-print-photo{{max-width:none!important;max-height:none!important;object-fit:contain!important}}
   a{{color:#000!important;text-decoration:none!important}}
 }}
 </style>
@@ -73,17 +74,46 @@ if MARKER not in index:
     return document.querySelector('.view.active') || document.querySelector('.view');
   }}
 
+  function enlargePartsPrintPhotos(view) {{
+    if (view?.id !== 'view-parts') return () => {{}};
+    const photos = [...view.querySelectorAll('img.thumb')];
+    const original = photos.map(img => ({{
+      img,
+      width: img.style.width,
+      height: img.style.height,
+    }}));
+    photos.forEach(img => {{
+      const rect = img.getBoundingClientRect();
+      if (rect.width > 0) img.style.width = `${{Math.round(rect.width * 1.5)}}px`;
+      if (rect.height > 0) img.style.height = `${{Math.round(rect.height * 1.5)}}px`;
+      img.classList.add('parts-print-photo');
+    }});
+    return () => original.forEach(({{img,width,height}}) => {{
+      img.style.width = width;
+      img.style.height = height;
+      img.classList.remove('parts-print-photo');
+    }});
+  }}
+
   function printMachineparkView(view = activeView()) {{
     if (!view) return;
     const name = viewName(view);
     const heading = view.querySelector(':scope > .page-print-row .page-print-heading');
     if (heading) heading.textContent = `Machinepark · ${{name}}`;
+    const restorePhotos = enlargePartsPrintPhotos(view);
     const oldTitle = document.title;
     document.title = `Machinepark - ${{name}}`;
-    const restore = () => {{ document.title = oldTitle; window.removeEventListener('afterprint', restore); }};
+    let restored = false;
+    const restore = () => {{
+      if (restored) return;
+      restored = true;
+      restorePhotos();
+      document.title = oldTitle;
+      window.removeEventListener('afterprint', restore);
+    }};
     window.addEventListener('afterprint', restore);
     window.print();
-    setTimeout(() => {{ if (document.title !== oldTitle) document.title = oldTitle; }}, 1500);
+    setTimeout(restore, 1800);
   }}
 
   window.printMachineparkView = printMachineparkView;
@@ -103,6 +133,10 @@ required = [
     "page-print-btn",
     "printMachineparkView",
     "window.print()",
+    "enlargePartsPrintPhotos",
+    "Math.round(rect.width * 1.5)",
+    "Math.round(rect.height * 1.5)",
+    "parts-print-photo",
     "dashboard: 'Dashboard'",
     "devices: 'Toestellen'",
     "maintenance: 'Onderhoud'",
@@ -114,4 +148,4 @@ for needle in required:
     if needle not in index:
         raise SystemExit(f"Buildvalidatie mislukt: afdrukfunctie ontbreekt ({needle})")
 
-print("[Machinepark] afdrukoptie op elke pagina actief")
+print("[Machinepark] afdrukoptie op elke pagina actief; onderdeelafbeeldingen 50% groter op print")
