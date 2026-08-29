@@ -33,7 +33,6 @@ if MARKER not in index:
         'onderdelenoverzicht thumbnail en lazy loading',
     )
 
-    # Detailfoto's blijven volledige kwaliteit gebruiken, maar laden pas wanneer nodig.
     index = index.replace(
         '<div class="device-detail-photo"><img src="${esc(src)}" alt="Toestelfoto ${index + 1}">',
         '<div class="device-detail-photo"><img src="${esc(src)}" loading="lazy" decoding="async" alt="Toestelfoto ${index + 1}">',
@@ -45,7 +44,6 @@ if MARKER not in index:
         'Excel export Blob-onderdeelfoto',
     )
 
-    # Bij printen gebruikt Onderdelen opnieuw de volledige foto, niet de kleine thumbnail.
     replace_once(
         "      width: img.style.width,\n      height: img.style.height,\n    }));",
         "      width: img.style.width,\n      height: img.style.height,\n      src: img.getAttribute('src'),\n      loading: img.getAttribute('loading'),\n    }));",
@@ -68,7 +66,9 @@ if MARKER not in index:
 .photo-optimization-note{{font-size:11px;color:var(--muted)}}
 </style>
 '''
-    replace_once('</head>', style + '</head>', 'foto-optimalisatie stylesheet')
+    if '</head>' not in index:
+        raise SystemExit('Buildvalidatie mislukt: echte </head> ontbreekt voor foto-optimalisatie')
+    index = index.replace('</head>', style + '</head>', 1)
 
     script = r'''
 <script data-machinepark-build-fix="photo-storage-optimization-v1">
