@@ -7,6 +7,30 @@ const COFFEE_FIRST_ORIGIN = 'https://www.coffeefirst.shop';
 const ALLOWED_ROLES = new Set(['beheerder', 'gebruiker', 'magazijnier']);
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
+const TECHNICAL_DOCS = [
+  {
+    id: 'lattiz-v12-training',
+    url: 'https://www.coffeefirst.shop/media/TECHNISCH/LATTIZ/TECHNICAL/Lattiz_Techniek_NL_volledig.pdf',
+    model: 'v1',
+  },
+  {
+    id: 'lattiz-v20-manual',
+    url: 'https://www.coffeefirst.shop/media/wysiwyg/Lattiz_2.0_Technische_handleiding.pdf',
+    model: 'v2',
+  },
+];
+
+const COMPONENT_MARKERS = [
+  'condensaatventiel', 'condensatordrainageklep', 'flowmeter', 'hall sensor', 'hall-sensor',
+  'luchtpomp', 'waterpomp', 'productmotor', 'produktmotor', 'waterinlaatventiel', 'waterinlaatklep',
+  'terugslagklep', 'melkkoppeling', 'melkbox', 'condensaatblok', 'rfid', 'antenne', 'ventiel boiler',
+];
+
+let pdfLibPromise = null;
+let pngLibPromise = null;
+const technicalDocCache = new Map();
+const technicalImageCache = new Map();
+
 function json(data, status = 200, headers = {}) {
   return Response.json(data, { status, headers: { ...NO_STORE, ...headers } });
 }
@@ -43,6 +67,16 @@ async function authenticate(req) {
 
 function cleanCode(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function exactCodeRegex(code) {
@@ -93,6 +127,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5500) {
 }
 
 async function lookupMagentoGraphql(code) {
+  if (!code) return null;
   const query = `query MachineparkPart($sku: String!) {
     products(filter: { sku: { eq: $sku } }) {
       items {
@@ -191,6 +226,7 @@ async function inspectProductPage(link, code) {
 }
 
 async function lookupHtml(code) {
+  if (!code) return null;
   const searchUrls = [
     `${COFFEE_FIRST_ORIGIN}/catalogsearch/result/?q=${encodeURIComponent(code)}`,
     `${COFFEE_FIRST_ORIGIN}/catalogsearch/result/index/?q=${encodeURIComponent(code)}`,
@@ -226,6 +262,230 @@ async function imageAsDataUrl(imageUrl) {
   return `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
 }
 
+function technicalProfile(description) {
+  const text = normalizeText(description);
+  const profiles = [
+    { test: /condensaatventiel|condensatordrainage/, label: 'Condensaatventiel', aliases: ['condensaatventiel', 'condensatordrainageklep'] },
+    { test: /flowmeter/, label: 'Flowmeter', aliases: ['flowmeter'] },
+    { test: /hall sensor/, label: 'Hall-sensor', aliases: ['hall sensor', 'hall-sensor'] },
+    { test: /luchtpomp/, label: 'Luchtpomp', aliases: ['luchtpomp'] },
+    { test: /waterpomp/, label: 'Waterpomp', aliases: ['waterpomp', 'water pump'] },
+    { test: /produktmotor|productmotor/, label: 'Productmotor', aliases: ['productmotor', 'produktmotor'] },
+    { test: /water inlaat ventiel|waterinlaatventiel/, label: 'Waterinlaatventiel', aliases: ['waterinlaatventiel', 'waterinlaatklep', 'inlaatklep'] },
+    { test: /terugslagklep/, label: 'Terugslagklep', aliases: ['terugslagklep'] },
+    { test: /koppeling melkbox|melkkoppeling/, label: 'Melkkoppeling', aliases: ['melkkoppeling', 'melkbox'] },
+    { test: /condensaatblok/, label: 'Condensaatblok', aliases: ['condensaatblok', 'condensatorblok'] },
+  ];
+  return profiles.find((profile) => profile.test.test(text)) || null;
+}
+
+function technicalDocsFor(description) {
+  const text = normalizeText(description);
+  if (/lattiz 2 0|\b2 0\b/.test(text)) return TECHNICAL_DOCS.filter((doc) => doc.model === 'v2');
+  if (/lattiz 1 0|lattiz v1|v1 x|v1 1|v1 2|\b1 0\b/.test(text)) return TECHNICAL_DOCS.filter((doc) => doc.model === 'v1');
+  return TECHNICAL_DOCS;
+}
+
+async function pdfLibrary() {
+  if (!pdfLibPromise) pdfLibPromise = import('pdfjs-dist/legacy/build/pdf.mjs');
+  return pdfLibPromise;
+}
+
+async function pngLibrary() {
+  if (!pngLibPromise) pngLibPromise = import('pngjs');
+  return pngLibPromise;
+}
+
+async function loadTechnicalDocument(definition) {
+  if (technicalDocCache.has(definition.id)) return technicalDocCache.get(definition.id);
+  const promise = (async () => {
+    const response = await fetchWithTimeout(definition.url, { headers: { accept: 'application/pdf' } }, 9000);
+    if (!response.ok) throw new Error(`Technische Coffee First-documentatie kon niet worden geladen (${response.status}).`);
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('pdf')) throw new Error('De Coffee First-techniekbron is geen PDF.');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const pdfjs = await pdfLibrary();
+    const loadingTask = pdfjs.getDocument({
+      data: bytes,
+      disableWorker: true,
+      isOffscreenCanvasSupported: false,
+      useSystemFonts: true,
+    });
+    const pdf = await loadingTask.promise;
+    return { definition, pdf };
+  })().catch((error) => {
+    technicalDocCache.delete(definition.id);
+    throw error;
+  });
+  technicalDocCache.set(definition.id, promise);
+  return promise;
+}
+
+function componentDensity(text) {
+  const normalized = normalizeText(text);
+  return COMPONENT_MARKERS.reduce((count, marker) => count + (normalized.includes(normalizeText(marker)) ? 1 : 0), 0);
+}
+
+async function findTechnicalPage(document, profile) {
+  let best = null;
+  let tied = false;
+  for (let pageNumber = 1; pageNumber <= document.pdf.numPages; pageNumber += 1) {
+    const page = await document.pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const text = normalizeText((content.items || []).map((item) => item?.str || '').join(' '));
+    const hits = profile.aliases.filter((alias) => text.includes(normalizeText(alias))).length;
+    if (!hits) continue;
+    const density = componentDensity(text);
+    const componentPage = text.includes('componenten');
+    const repairPage = text.includes('reparatie') || text.includes('vervangen') || text.includes('demontage') || text.includes('montage');
+    if (density > 3 && !componentPage) continue;
+    const score = hits * 10 + (componentPage ? 8 : 0) + (repairPage ? 5 : 0) - Math.max(0, density - 1) * 3;
+    if (!best || score > best.score) {
+      best = { pageNumber, page, text, score, density };
+      tied = false;
+    } else if (best && score === best.score) {
+      tied = true;
+    }
+  }
+  if (!best || tied || best.score < 10) return null;
+  return best;
+}
+
+function objectFromStore(store, name) {
+  if (!store || !name) return Promise.resolve(null);
+  try {
+    if (store.has(name)) return Promise.resolve(store.get(name));
+  } catch {}
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value || null);
+    };
+    const timer = setTimeout(() => finish(null), 1200);
+    try {
+      store.get(name, finish);
+    } catch {
+      finish(null);
+    }
+  });
+}
+
+function rgbaFromPdfImage(image) {
+  const width = Number(image?.width || 0);
+  const height = Number(image?.height || 0);
+  const raw = image?.data;
+  if (!width || !height || !raw) return null;
+  const src = Buffer.from(raw.buffer, raw.byteOffset || 0, raw.byteLength || raw.length || 0);
+  const pixels = width * height;
+  if (src.length === pixels * 4) return { width, height, data: Buffer.from(src) };
+  if (src.length === pixels * 3) {
+    const out = Buffer.allocUnsafe(pixels * 4);
+    for (let i = 0, j = 0; i < src.length; i += 3, j += 4) {
+      out[j] = src[i]; out[j + 1] = src[i + 1]; out[j + 2] = src[i + 2]; out[j + 3] = 255;
+    }
+    return { width, height, data: out };
+  }
+  if (src.length === pixels) {
+    const out = Buffer.allocUnsafe(pixels * 4);
+    for (let i = 0, j = 0; i < src.length; i += 1, j += 4) {
+      out[j] = src[i]; out[j + 1] = src[i]; out[j + 2] = src[i]; out[j + 3] = 255;
+    }
+    return { width, height, data: out };
+  }
+  return null;
+}
+
+async function technicalPageImage(document, pageInfo) {
+  const cacheKey = `${document.definition.id}:${pageInfo.pageNumber}`;
+  if (technicalImageCache.has(cacheKey)) return technicalImageCache.get(cacheKey);
+  const promise = (async () => {
+    const pdfjs = await pdfLibrary();
+    const page = pageInfo.page;
+    const operatorList = await page.getOperatorList();
+    const viewport = page.getViewport({ scale: 1 });
+    const pageRatio = viewport.width / Math.max(1, viewport.height);
+    const candidates = [];
+
+    for (let index = 0; index < operatorList.fnArray.length; index += 1) {
+      const fn = operatorList.fnArray[index];
+      const args = operatorList.argsArray[index];
+      let image = null;
+      if (fn === pdfjs.OPS.paintInlineImageXObject) {
+        image = args?.[0] || null;
+      } else if (fn === pdfjs.OPS.paintImageXObject) {
+        const name = args?.[0];
+        const store = String(name || '').startsWith('g_') ? page.commonObjs : page.objs;
+        image = await objectFromStore(store, name);
+      } else {
+        continue;
+      }
+      const rgba = rgbaFromPdfImage(image);
+      if (!rgba || rgba.width < 100 || rgba.height < 70) continue;
+      const area = rgba.width * rgba.height;
+      if (area < 12000) continue;
+      const ratio = rgba.width / Math.max(1, rgba.height);
+      if (ratio > 4.2 || ratio < 0.24) continue;
+      candidates.push({ ...rgba, area, ratio });
+    }
+
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => b.area - a.area);
+    if (candidates.length > 1) {
+      for (const candidate of candidates) {
+        const looksLikeFullPage = candidate.area > 700000 && Math.abs(candidate.ratio - pageRatio) < 0.18;
+        candidate.rank = candidate.area * (looksLikeFullPage ? 0.015 : 1);
+      }
+      candidates.sort((a, b) => b.rank - a.rank);
+    } else {
+      const only = candidates[0];
+      if (only.area > 700000 && Math.abs(only.ratio - pageRatio) < 0.18) return null;
+    }
+
+    const chosen = candidates[0];
+    const { PNG } = await pngLibrary();
+    const encoded = PNG.sync.write({ width: chosen.width, height: chosen.height, data: chosen.data }, { colorType: 6 });
+    if (!encoded.length || encoded.length > MAX_IMAGE_BYTES) return null;
+    return `data:image/png;base64,${encoded.toString('base64')}`;
+  })().catch((error) => {
+    console.warn('Coffee First PDF-afbeelding', cacheKey, error?.message || error);
+    return null;
+  });
+  technicalImageCache.set(cacheKey, promise);
+  return promise;
+}
+
+async function lookupTechnicalDocumentation(description) {
+  const profile = technicalProfile(description);
+  if (!profile) return null;
+  const docs = technicalDocsFor(description);
+  const matches = [];
+  for (const definition of docs) {
+    try {
+      const document = await loadTechnicalDocument(definition);
+      const pageInfo = await findTechnicalPage(document, profile);
+      if (!pageInfo) continue;
+      const imageDataUrl = await technicalPageImage(document, pageInfo);
+      if (!imageDataUrl) continue;
+      matches.push({
+        code: '',
+        name: `${profile.label} · Coffee First technische documentatie`,
+        productUrl: `${definition.url}#page=${pageInfo.pageNumber}`,
+        imageUrl: '',
+        imageDataUrl,
+        method: 'technical-pdf',
+        sourcePage: pageInfo.pageNumber,
+      });
+    } catch (error) {
+      console.warn('Coffee First technical documentation', definition.id, error?.message || error);
+    }
+  }
+  if (matches.length !== 1) return null;
+  return matches[0];
+}
+
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: NO_STORE });
   try {
@@ -234,24 +494,43 @@ export default async (req) => {
     const body = await req.json();
     const supplierCode = cleanCode(body?.supplierCode);
     const deviceBrand = String(body?.deviceBrand || '').trim();
-    if (!supplierCode) return json({ error: 'Code leverancier ontbreekt.' }, 400);
+    const description = String(body?.description || '').trim();
     if (supplierCode.length > 80) return json({ error: 'Code leverancier is ongeldig.' }, 400);
+    if (!description && !supplierCode) return json({ error: 'Leverancierscode en omschrijving ontbreken.' }, 400);
     if (deviceBrand && !/lattiz/i.test(deviceBrand)) return json({ error: 'Dit onderdeel is niet als Lattiz gemarkeerd.' }, 400);
 
-    let match = await lookupMagentoGraphql(supplierCode);
-    if (!match) match = await lookupHtml(supplierCode);
-    if (match?.ambiguous) return json({ found: false, reason: 'ambiguous', matches: match.count }, 409);
-    if (!match) return json({ found: false, reason: 'not-found' }, 404);
+    let match = null;
+    if (supplierCode) {
+      match = await lookupMagentoGraphql(supplierCode);
+      if (!match) match = await lookupHtml(supplierCode);
+      if (match?.ambiguous) return json({ found: false, reason: 'ambiguous', matches: match.count }, 409);
+    }
 
-    const imageDataUrl = await imageAsDataUrl(match.imageUrl);
+    if (match) {
+      const imageDataUrl = await imageAsDataUrl(match.imageUrl);
+      return json({
+        found: true,
+        supplierCode,
+        productName: match.name || '',
+        productUrl: match.productUrl || '',
+        imageUrl: match.imageUrl,
+        imageDataUrl,
+        lookupMethod: match.method,
+      });
+    }
+
+    const technical = await lookupTechnicalDocumentation(description);
+    if (!technical) return json({ found: false, reason: 'not-found' }, 404);
+
     return json({
       found: true,
       supplierCode,
-      productName: match.name || '',
-      productUrl: match.productUrl || '',
-      imageUrl: match.imageUrl,
-      imageDataUrl,
-      lookupMethod: match.method,
+      productName: technical.name,
+      productUrl: technical.productUrl,
+      imageUrl: '',
+      imageDataUrl: technical.imageDataUrl,
+      lookupMethod: technical.method,
+      sourcePage: technical.sourcePage,
     });
   } catch (error) {
     console.error('lattiz-part-photo', error);
