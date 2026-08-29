@@ -15,7 +15,7 @@ def replace_exact(old, new, expected, label):
 
 
 if MARKER not in index:
-    replace_exact('.slice(0,3)', '.slice(0,5)', 1, 'compacte limiet toestelfoto’s')
+    replace_exact('old.devicePhotos.slice(0,3)', 'old.devicePhotos.slice(0,5)', 1, 'opslaglimiet bestaande toestelfoto’s')
     replace_exact('.slice(0, 3)', '.slice(0, 5)', 3, 'limiet toestelfoto’s')
     replace_exact('Maximaal 3 foto’s.', 'Maximaal 5 foto’s.', 1, 'uitleg maximum foto’s')
     replace_exact('van maximaal 3 foto’s', 'van maximaal 5 foto’s', 1, 'status maximum foto’s')
