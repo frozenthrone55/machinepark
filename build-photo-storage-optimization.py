@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
-MARKER = 'data-machinepark-build-fix="photo-storage-optimization-v1"'
+MARKER = 'data-machinepark-build-fix="photo-storage-optimization-v2"'
 
 
 def replace_once(old, new, label):
@@ -71,11 +71,13 @@ if MARKER not in index:
     index = index.replace('</head>', style + '</head>', 1)
 
     script = r'''
-<script data-machinepark-build-fix="photo-storage-optimization-v1">
+<script data-machinepark-build-fix="photo-storage-optimization-v2">
 (() => {
   const DEVICE_PHOTO_URL = '/.netlify/functions/device-photos';
   const PART_PHOTO_URL = '/.netlify/functions/part-photos';
   const LEGACY_MIGRATION_KEY = 'machinepark-photo-thumbnails-v1';
+  let photoSaveBusy = 0;
+  let migrationTimer = null;
 
   function ownPhotoEndpoint(src) {
     const value = String(src || '');
@@ -130,22 +132,46 @@ if MARKER not in index:
     return Boolean(window.machineparkCanEdit?.parts);
   }
 
+  function afterUserWork(task, delay = 1400) {
+    const run = () => {
+      if (photoSaveBusy > 0) {
+        setTimeout(() => afterUserWork(task, 900), 900);
+        return;
+      }
+      Promise.resolve().then(task).catch((error) => console.warn('Foto-optimalisatie achtergrondtaak', error));
+    };
+    setTimeout(() => {
+      if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 4000 });
+      else run();
+    }, delay);
+  }
+
   window.machineparkPersistDevicePhotoList = async function(deviceId, photos, { force = false } = {}) {
     const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 5);
     if (!force && !list.some(isRawPhoto)) return list;
-    const thumbnails = await Promise.all(list.map((src) => isRawPhoto(src) ? thumbnailDataFromSource(src) : Promise.resolve('')));
-    const headers = await centralHeaders(true);
-    const res = await fetch(DEVICE_PHOTO_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ deviceId, photos: list, thumbnails }),
-      cache: 'no-store',
-    });
-    const text = await res.text();
-    let body = {};
-    try { body = text ? JSON.parse(text) : {}; } catch (_) {}
-    if (!res.ok) throw new Error(body.error || text || `Toestelfoto’s opslaan mislukt (${res.status})`);
-    return Array.isArray(body.photos) ? body.photos.slice(0, 5) : list;
+    const rawIndexes = list.map((src, index) => isRawPhoto(src) ? index : -1).filter((index) => index >= 0);
+    photoSaveBusy += 1;
+    try {
+      const headers = await centralHeaders(true);
+      const res = await fetch(DEVICE_PHOTO_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ deviceId, photos: list }),
+        cache: 'no-store',
+      });
+      const text = await res.text();
+      let body = {};
+      try { body = text ? JSON.parse(text) : {}; } catch (_) {}
+      if (!res.ok) throw new Error(body.error || text || `Toestelfoto’s opslaan mislukt (${res.status})`);
+      const refs = Array.isArray(body.photos) ? body.photos.slice(0, 5) : list;
+      rawIndexes.forEach((index) => {
+        const ref = refs[index];
+        if (ref) afterUserWork(() => ensureStoredThumbnail('device', deviceId, ref), 1800 + index * 300);
+      });
+      return refs;
+    } finally {
+      photoSaveBusy = Math.max(0, photoSaveBusy - 1);
+    }
   };
 
   window.machineparkPersistPartPhoto = async function(partId, photo) {
@@ -153,19 +179,25 @@ if MARKER not in index:
     if (!value) return '';
     if (value.includes('/.netlify/functions/part-photos?')) return value;
     if (!isRawPhoto(value)) return value;
-    const thumbnail = await thumbnailDataFromSource(value);
-    const headers = await centralHeaders(true);
-    const res = await fetch(PART_PHOTO_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ partId, photo: value, thumbnail }),
-      cache: 'no-store',
-    });
-    const text = await res.text();
-    let body = {};
-    try { body = text ? JSON.parse(text) : {}; } catch (_) {}
-    if (!res.ok) throw new Error(body.error || text || `Onderdeelfoto opslaan mislukt (${res.status})`);
-    return String(body.photo || value);
+    photoSaveBusy += 1;
+    try {
+      const headers = await centralHeaders(true);
+      const res = await fetch(PART_PHOTO_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ partId, photo: value }),
+        cache: 'no-store',
+      });
+      const text = await res.text();
+      let body = {};
+      try { body = text ? JSON.parse(text) : {}; } catch (_) {}
+      if (!res.ok) throw new Error(body.error || text || `Onderdeelfoto opslaan mislukt (${res.status})`);
+      const ref = String(body.photo || value);
+      if (ref) afterUserWork(() => ensureStoredThumbnail('part', partId, ref), 1800);
+      return ref;
+    } finally {
+      photoSaveBusy = Math.max(0, photoSaveBusy - 1);
+    }
   };
 
   function writePartDirect(part) {
@@ -182,7 +214,7 @@ if MARKER not in index:
   const baseLocalSnapshotForPartPhotos = localSnapshot;
   localSnapshot = async function() {
     const data = await baseLocalSnapshotForPartPhotos();
-    if (!Array.isArray(data.parts) || !canManagePartPhotosClient()) return data;
+    if (!Array.isArray(data.parts) || !canManagePartPhotosClient() || photoSaveBusy > 0) return data;
     for (let index = 0; index < data.parts.length; index += 1) {
       const part = data.parts[index];
       if (!isRawPhoto(part?.photo)) continue;
@@ -215,20 +247,22 @@ if MARKER not in index:
   }
 
   async function migrateExistingPartPhotos() {
-    if (!canManagePartPhotosClient() || !Array.isArray(state?.parts)) return 0;
+    if (photoSaveBusy > 0 || !canManagePartPhotosClient() || !Array.isArray(state?.parts)) return 0;
     let migrated = 0;
     for (const part of state.parts) {
+      if (photoSaveBusy > 0) break;
       if (!isRawPhoto(part?.photo)) continue;
       try {
         const photo = await window.machineparkPersistPartPhoto(part.id, part.photo);
         part.photo = photo;
         await writePartDirect(part);
         migrated += 1;
+        await new Promise((resolve) => setTimeout(resolve, 120));
       } catch (error) {
         console.warn('Bestaande onderdeelfoto kon niet worden gemigreerd', part?.artNr, error);
       }
     }
-    if (migrated) {
+    if (migrated && photoSaveBusy === 0) {
       renderParts();
       try {
         if (centralSync?.enabled) {
@@ -243,26 +277,50 @@ if MARKER not in index:
   }
 
   async function optimizeExistingThumbnailLibrary() {
+    if (photoSaveBusy > 0 || document.visibilityState !== 'visible') return false;
     const migratedParts = await migrateExistingPartPhotos();
     let optimized = 0;
     const shouldScanLegacy = localStorage.getItem(LEGACY_MIGRATION_KEY) !== 'done';
-    if (shouldScanLegacy) {
+    if (shouldScanLegacy && photoSaveBusy === 0) {
       for (const device of (Array.isArray(state?.devices) ? state.devices : [])) {
+        if (photoSaveBusy > 0) break;
         for (const photo of (Array.isArray(device?.devicePhotos) ? device.devicePhotos : []).slice(0, 5)) {
+          if (photoSaveBusy > 0) break;
           if (await ensureStoredThumbnail('device', device.id, photo)) optimized += 1;
+          await new Promise((resolve) => setTimeout(resolve, 120));
         }
       }
       for (const part of (Array.isArray(state?.parts) ? state.parts : [])) {
+        if (photoSaveBusy > 0) break;
         if (part?.photo && await ensureStoredThumbnail('part', part.id, part.photo)) optimized += 1;
+        await new Promise((resolve) => setTimeout(resolve, 120));
       }
-      localStorage.setItem(LEGACY_MIGRATION_KEY, 'done');
+      if (photoSaveBusy === 0) localStorage.setItem(LEGACY_MIGRATION_KEY, 'done');
     }
     if (migratedParts || optimized) console.info(`[Machinepark] foto-optimalisatie: ${migratedParts} onderdelen gemigreerd, ${optimized} thumbnails gecontroleerd`);
+    return true;
   }
 
-  const runWhenIdle = () => optimizeExistingThumbnailLibrary().catch((error) => console.warn('Foto-optimalisatie', error));
-  if ('requestIdleCallback' in window) requestIdleCallback(runWhenIdle, { timeout: 4500 });
-  else setTimeout(runWhenIdle, 2600);
+  function scheduleLibraryOptimization(delay = 15000) {
+    clearTimeout(migrationTimer);
+    migrationTimer = setTimeout(() => {
+      const run = async () => {
+        if (photoSaveBusy > 0) {
+          scheduleLibraryOptimization(8000);
+          return;
+        }
+        const completed = await optimizeExistingThumbnailLibrary().catch((error) => {
+          console.warn('Foto-optimalisatie', error);
+          return false;
+        });
+        if (!completed) scheduleLibraryOptimization(10000);
+      };
+      if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 6000 });
+      else run();
+    }, delay);
+  }
+
+  scheduleLibraryOptimization();
 })();
 </script>
 '''
@@ -284,9 +342,12 @@ required = [
     "method: 'HEAD'",
     'data-full-src',
     "const response = await fetch(String(dataUrl), { cache: 'no-store' });",
+    'photoSaveBusy',
+    'afterUserWork',
+    'scheduleLibraryOptimization',
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: foto-optimalisatie ontbreekt ({needle})')
 
-print('[Machinepark] thumbnails, lazy loading en bestaande foto-optimalisatie voor toestellen en onderdelen actief')
+print('[Machinepark] snelle foto-opslag met thumbnails op achtergrond, lazy loading en bestaande foto-optimalisatie actief')
