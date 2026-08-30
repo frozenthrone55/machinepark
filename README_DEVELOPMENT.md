@@ -12,6 +12,8 @@ Deze branch is bedoeld voor online testen via de Netlify Deploy Preview, zonder 
 Development en production gebruiken bewust dezelfde centrale Netlify Blobs-store: `machinepark-central`.
 Daardoor zijn wijzigingen aan echte Machinepark-data en Clerk-gebruikers in de preview ook echte gedeelde wijzigingen.
 
+Omdat `main` tijdens ontwikkeling een oudere frontend kan draaien, bevat de build een extra compatibiliteitsbeveiliging: Deploy Preview, `development--` en localhost zetten bestaande onderhouds-/depannagefoto’s niet automatisch om naar nieuwe Blob-referenties. Die migratie activeert vanzelf op een echte productiehost nadat de code ooit expliciet naar `main` is gebracht.
+
 ## Authenticatie en rollen
 - Clerk verzorgt de aanmelding.
 - Gedeelde serverauthenticatie en serverconfig staan in `netlify/functions/_shared/server-auth.mjs`.
@@ -24,8 +26,9 @@ Daardoor zijn wijzigingen aan echte Machinepark-data en Clerk-gebruikers in de p
 ## Foto-opslag
 - Toestellen: maximaal 5 foto’s, één selecteerbare overzichtsfoto.
 - Onderhoud en depannages: maximaal 5 foto’s per verslag.
-- Toestel-, onderdeel-, onderhouds- en depannagefoto’s gebruiken aparte Netlify Blob-opslag in plaats van zware afbeeldingsdata in de centrale JSON-snapshot.
-- Bestaande oude foto’s worden tijdens rustige momenten op de achtergrond naar de nieuwe opslag gemigreerd.
+- Toestel-, onderdeel-, onderhouds- en depannagefoto’s hebben een aparte Netlify Blob-architectuur zodat de centrale JSON-snapshot niet onbeperkt met afbeeldingen hoeft mee te groeien.
+- Voor onderhoud/depannage blijft de Deploy Preview bewust in compatibiliteitsmodus zolang `main` de nieuwe referenties nog niet kent.
+- Bestaande oude foto’s kunnen op de productieversie tijdens rustige momenten op de achtergrond naar de nieuwe opslag worden gemigreerd.
 - Overzichten gebruiken thumbnails en lazy loading; volledige foto’s blijven beschikbaar voor details, vergroten, afdrukken en export waar van toepassing.
 - Thumbnailgeneratie gebeurt buiten het kritieke opslagpad zodat foto’s opslaan vlot blijft.
 - Bij verwijderen van een foto of een volledige foto-eigenaar worden originele Blob-bestanden én thumbnails opgeruimd.
