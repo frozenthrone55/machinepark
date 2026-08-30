@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
-MARKER = 'data-machinepark-build-fix="photo-storage-optimization-v2"'
+MARKER = 'data-machinepark-build-fix="photo-storage-optimization-v3"'
 
 
 def replace_once(old, new, label):
@@ -29,13 +29,8 @@ if MARKER not in index:
 
     replace_once(
         '${p.photo?`<img class="thumb" src="${p.photo}" alt="">`:\'<div class="thumb placeholder">▣</div>\'}',
-        '${p.photo?`<img class="thumb" src="${esc(window.machineparkThumbnailRef?window.machineparkThumbnailRef(p.photo):p.photo)}" data-full-src="${esc(p.photo)}" loading="lazy" decoding="async" fetchpriority="low" alt="">`:\'<div class="thumb placeholder">▣</div>\'}',
+        '${p.photo?`<img class="thumb" src="${esc(window.machineparkThumbnailRef?window.machineparkThumbnailRef(p.photo):p.photo)}" data-full-src="${esc(p.photo)}" data-photo-lightbox loading="lazy" decoding="async" fetchpriority="low" alt="">`:\'<div class="thumb placeholder">▣</div>\'}',
         'onderdelenoverzicht thumbnail en lazy loading',
-    )
-
-    index = index.replace(
-        '<div class="device-detail-photo"><img src="${esc(src)}" alt="Toestelfoto ${index + 1}">',
-        '<div class="device-detail-photo"><img src="${esc(src)}" loading="lazy" decoding="async" alt="Toestelfoto ${index + 1}">',
     )
 
     replace_once(
@@ -62,7 +57,7 @@ if MARKER not in index:
 
     style = f'''
 <style {MARKER}>
-.device-overview-photo,.thumb{{content-visibility:auto}}
+.device-overview-photo,.thumb,.service-photo-item img,.service-photo-details img{{content-visibility:auto}}
 .photo-optimization-note{{font-size:11px;color:var(--muted)}}
 </style>
 '''
@@ -71,11 +66,12 @@ if MARKER not in index:
     index = index.replace('</head>', style + '</head>', 1)
 
     script = r'''
-<script data-machinepark-build-fix="photo-storage-optimization-v2">
+<script data-machinepark-build-fix="photo-storage-optimization-v3">
 (() => {
   const DEVICE_PHOTO_URL = '/.netlify/functions/device-photos';
   const PART_PHOTO_URL = '/.netlify/functions/part-photos';
-  const LEGACY_MIGRATION_KEY = 'machinepark-photo-thumbnails-v1';
+  const SERVICE_PHOTO_URL = '/.netlify/functions/service-photos';
+  const LEGACY_MIGRATION_KEY = 'machinepark-photo-thumbnails-v2';
   let photoSaveBusy = 0;
   let migrationTimer = null;
 
@@ -83,6 +79,7 @@ if MARKER not in index:
     const value = String(src || '');
     if (value.includes('/.netlify/functions/device-photos?')) return DEVICE_PHOTO_URL;
     if (value.includes('/.netlify/functions/part-photos?')) return PART_PHOTO_URL;
+    if (value.includes('/.netlify/functions/service-photos?')) return SERVICE_PHOTO_URL;
     return '';
   }
 
@@ -132,6 +129,14 @@ if MARKER not in index:
     return Boolean(window.machineparkCanEdit?.parts);
   }
 
+  function canManageServicePhotosClient(storeName) {
+    if (window.machineparkAccessReady && typeof window.machineparkHasPermission === 'function') {
+      const prefix = storeName === 'maintenance' ? 'maintenance' : 'breakdowns';
+      return window.machineparkHasPermission(`${prefix}.edit`) || window.machineparkHasPermission(`${prefix}.add`);
+    }
+    return true;
+  }
+
   function afterUserWork(task, delay = 1400) {
     const run = () => {
       if (photoSaveBusy > 0) {
@@ -146,27 +151,27 @@ if MARKER not in index:
     }, delay);
   }
 
+  async function apiPost(url, body, errorLabel) {
+    const headers = await centralHeaders(true);
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), cache: 'no-store' });
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch (_) {}
+    if (!res.ok) throw new Error(data.error || text || `${errorLabel} (${res.status})`);
+    return data;
+  }
+
   window.machineparkPersistDevicePhotoList = async function(deviceId, photos, { force = false } = {}) {
     const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 5);
     if (!force && !list.some(isRawPhoto)) return list;
     const rawIndexes = list.map((src, index) => isRawPhoto(src) ? index : -1).filter((index) => index >= 0);
     photoSaveBusy += 1;
     try {
-      const headers = await centralHeaders(true);
-      const res = await fetch(DEVICE_PHOTO_URL, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ deviceId, photos: list }),
-        cache: 'no-store',
-      });
-      const text = await res.text();
-      let body = {};
-      try { body = text ? JSON.parse(text) : {}; } catch (_) {}
-      if (!res.ok) throw new Error(body.error || text || `Toestelfoto’s opslaan mislukt (${res.status})`);
+      const body = await apiPost(DEVICE_PHOTO_URL, { deviceId, photos: list }, 'Toestelfoto’s opslaan mislukt');
       const refs = Array.isArray(body.photos) ? body.photos.slice(0, 5) : list;
       rawIndexes.forEach((index) => {
         const ref = refs[index];
-        if (ref) afterUserWork(() => ensureStoredThumbnail('device', deviceId, ref), 1800 + index * 300);
+        if (ref) afterUserWork(() => ensureStoredThumbnail('device', deviceId, ref), 1800 + index * 250);
       });
       return refs;
     } finally {
@@ -181,17 +186,7 @@ if MARKER not in index:
     if (!isRawPhoto(value)) return value;
     photoSaveBusy += 1;
     try {
-      const headers = await centralHeaders(true);
-      const res = await fetch(PART_PHOTO_URL, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ partId, photo: value }),
-        cache: 'no-store',
-      });
-      const text = await res.text();
-      let body = {};
-      try { body = text ? JSON.parse(text) : {}; } catch (_) {}
-      if (!res.ok) throw new Error(body.error || text || `Onderdeelfoto opslaan mislukt (${res.status})`);
+      const body = await apiPost(PART_PHOTO_URL, { partId, photo: value }, 'Onderdeelfoto opslaan mislukt');
       const ref = String(body.photo || value);
       if (ref) afterUserWork(() => ensureStoredThumbnail('part', partId, ref), 1800);
       return ref;
@@ -200,46 +195,55 @@ if MARKER not in index:
     }
   };
 
-  function writePartDirect(part) {
+  window.machineparkPersistServicePhotos = async function(storeName, entityId, photos) {
+    const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 5);
+    const rawIndexes = list.map((src, index) => isRawPhoto(src) ? index : -1).filter((index) => index >= 0);
+    photoSaveBusy += 1;
+    try {
+      const body = await apiPost(SERVICE_PHOTO_URL, { storeName, entityId, photos: list }, 'Verslagfoto’s opslaan mislukt');
+      const refs = Array.isArray(body.photos) ? body.photos.slice(0, 5) : list;
+      rawIndexes.forEach((index) => {
+        const ref = refs[index];
+        if (ref) afterUserWork(() => ensureStoredThumbnail('service', entityId, ref, storeName), 1800 + index * 250);
+      });
+      return refs;
+    } finally {
+      photoSaveBusy = Math.max(0, photoSaveBusy - 1);
+    }
+  };
+
+  function writeStoreDirect(storeName, item) {
     return new Promise((resolve, reject) => {
-      const tr = db.transaction('parts', 'readwrite');
-      const request = tr.objectStore('parts').put(part);
+      const tr = db.transaction(storeName, 'readwrite');
+      const request = tr.objectStore(storeName).put(item);
       request.onerror = () => reject(request.error);
-      tr.oncomplete = () => resolve(part);
+      tr.oncomplete = () => resolve(item);
       tr.onerror = () => reject(tr.error);
-      tr.onabort = () => reject(tr.error || new Error('Lokale onderdeelfotomigratie afgebroken'));
+      tr.onabort = () => reject(tr.error || new Error('Lokale fotomigratie afgebroken'));
     });
   }
 
-  const baseLocalSnapshotForPartPhotos = localSnapshot;
-  localSnapshot = async function() {
-    const data = await baseLocalSnapshotForPartPhotos();
-    if (!Array.isArray(data.parts) || !canManagePartPhotosClient() || photoSaveBusy > 0) return data;
-    for (let index = 0; index < data.parts.length; index += 1) {
-      const part = data.parts[index];
-      if (!isRawPhoto(part?.photo)) continue;
-      const photo = await window.machineparkPersistPartPhoto(part.id, part.photo);
-      const updated = { ...part, photo };
-      data.parts[index] = updated;
-      await writePartDirect(updated);
+  async function ensureStoredThumbnail(kind, id, photoRef, storeName = '') {
+    let endpoint = '';
+    let body = null;
+    if (kind === 'device') {
+      endpoint = DEVICE_PHOTO_URL;
+      body = { action: 'thumbnail', deviceId: id, photoRef };
+    } else if (kind === 'part') {
+      endpoint = PART_PHOTO_URL;
+      body = { action: 'thumbnail', partId: id, photoRef };
+    } else if (kind === 'service') {
+      endpoint = SERVICE_PHOTO_URL;
+      body = { action: 'thumbnail', storeName, entityId: id, photoRef };
     }
-    return data;
-  };
-
-  async function ensureStoredThumbnail(kind, id, photoRef) {
-    const endpoint = kind === 'device' ? DEVICE_PHOTO_URL : PART_PHOTO_URL;
-    if (!String(photoRef || '').includes(endpoint + '?')) return false;
+    if (!endpoint || !String(photoRef || '').includes(endpoint + '?')) return false;
     const thumb = window.machineparkThumbnailRef(photoRef);
     try {
       const probe = await fetch(thumb, { method: 'HEAD', cache: 'no-store' });
       if (probe.ok) return true;
-      const thumbnail = await thumbnailDataFromSource(photoRef);
-      const headers = await centralHeaders(true);
-      const body = kind === 'device'
-        ? { action: 'thumbnail', deviceId: id, photoRef, thumbnail }
-        : { action: 'thumbnail', partId: id, photoRef, thumbnail };
-      const res = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body), cache: 'no-store' });
-      return res.ok;
+      body.thumbnail = await thumbnailDataFromSource(photoRef);
+      await apiPost(endpoint, body, 'Thumbnail opslaan mislukt');
+      return true;
     } catch (error) {
       console.warn('Thumbnail kon niet worden voorbereid', error);
       return false;
@@ -255,22 +259,31 @@ if MARKER not in index:
       try {
         const photo = await window.machineparkPersistPartPhoto(part.id, part.photo);
         part.photo = photo;
-        await writePartDirect(part);
+        await writeStoreDirect('parts', part);
         migrated += 1;
-        await new Promise((resolve) => setTimeout(resolve, 120));
+        await new Promise((resolve) => setTimeout(resolve, 80));
       } catch (error) {
         console.warn('Bestaande onderdeelfoto kon niet worden gemigreerd', part?.artNr, error);
       }
     }
-    if (migrated && photoSaveBusy === 0) {
-      renderParts();
+    return migrated;
+  }
+
+  async function migrateExistingServicePhotos(storeName) {
+    const list = Array.isArray(state?.[storeName]) ? state[storeName] : [];
+    if (photoSaveBusy > 0 || !canManageServicePhotosClient(storeName) || !list.length) return 0;
+    let migrated = 0;
+    for (const record of list) {
+      if (photoSaveBusy > 0) break;
+      const photos = Array.isArray(record?.photos) ? record.photos.filter(Boolean).slice(0, 5) : [];
+      if (!photos.some(isRawPhoto)) continue;
       try {
-        if (centralSync?.enabled) {
-          centralSync.pending = true;
-          await centralPush();
-        }
+        record.photos = await window.machineparkPersistServicePhotos(storeName, record.id, photos);
+        await writeStoreDirect(storeName, record);
+        migrated += 1;
+        await new Promise((resolve) => setTimeout(resolve, 80));
       } catch (error) {
-        console.warn('Centrale opslag na onderdeelfotomigratie', error);
+        console.warn('Bestaande verslagfoto kon niet worden gemigreerd', storeName, record?.id, error);
       }
     }
     return migrated;
@@ -279,6 +292,26 @@ if MARKER not in index:
   async function optimizeExistingThumbnailLibrary() {
     if (photoSaveBusy > 0 || document.visibilityState !== 'visible') return false;
     const migratedParts = await migrateExistingPartPhotos();
+    const migratedMaintenance = await migrateExistingServicePhotos('maintenance');
+    const migratedBreakdowns = await migrateExistingServicePhotos('breakdowns');
+    const migrated = migratedParts + migratedMaintenance + migratedBreakdowns;
+
+    if (migrated && photoSaveBusy === 0) {
+      try {
+        renderParts?.();
+        renderMaintenance?.();
+        renderBreakdowns?.();
+      } catch (_) {}
+      try {
+        if (centralSync?.enabled) {
+          centralSync.pending = true;
+          await centralPush();
+        }
+      } catch (error) {
+        console.warn('Centrale opslag na fotomigratie', error);
+      }
+    }
+
     let optimized = 0;
     const shouldScanLegacy = localStorage.getItem(LEGACY_MIGRATION_KEY) !== 'done';
     if (shouldScanLegacy && photoSaveBusy === 0) {
@@ -287,21 +320,34 @@ if MARKER not in index:
         for (const photo of (Array.isArray(device?.devicePhotos) ? device.devicePhotos : []).slice(0, 5)) {
           if (photoSaveBusy > 0) break;
           if (await ensureStoredThumbnail('device', device.id, photo)) optimized += 1;
-          await new Promise((resolve) => setTimeout(resolve, 120));
+          await new Promise((resolve) => setTimeout(resolve, 60));
         }
       }
       for (const part of (Array.isArray(state?.parts) ? state.parts : [])) {
         if (photoSaveBusy > 0) break;
         if (part?.photo && await ensureStoredThumbnail('part', part.id, part.photo)) optimized += 1;
-        await new Promise((resolve) => setTimeout(resolve, 120));
+        await new Promise((resolve) => setTimeout(resolve, 60));
+      }
+      for (const storeName of ['maintenance', 'breakdowns']) {
+        for (const record of (Array.isArray(state?.[storeName]) ? state[storeName] : [])) {
+          if (photoSaveBusy > 0) break;
+          for (const photo of (Array.isArray(record?.photos) ? record.photos : []).slice(0, 5)) {
+            if (photoSaveBusy > 0) break;
+            if (await ensureStoredThumbnail('service', record.id, photo, storeName)) optimized += 1;
+            await new Promise((resolve) => setTimeout(resolve, 60));
+          }
+        }
       }
       if (photoSaveBusy === 0) localStorage.setItem(LEGACY_MIGRATION_KEY, 'done');
     }
-    if (migratedParts || optimized) console.info(`[Machinepark] foto-optimalisatie: ${migratedParts} onderdelen gemigreerd, ${optimized} thumbnails gecontroleerd`);
+
+    if (migrated || optimized) {
+      console.info(`[Machinepark] foto-optimalisatie: ${migratedParts} onderdelen, ${migratedMaintenance} onderhoud, ${migratedBreakdowns} depannages gemigreerd; ${optimized} thumbnails gecontroleerd`);
+    }
     return true;
   }
 
-  function scheduleLibraryOptimization(delay = 15000) {
+  function scheduleLibraryOptimization(delay = 12000) {
     clearTimeout(migrationTimer);
     migrationTimer = setTimeout(() => {
       const run = async () => {
@@ -336,7 +382,8 @@ required = [
     'machineparkThumbnailRef',
     'loading="lazy"',
     'machineparkPersistPartPhoto',
-    'part-photos',
+    'machineparkPersistServicePhotos',
+    'service-photos',
     'ensureStoredThumbnail',
     'requestIdleCallback',
     "method: 'HEAD'",
@@ -344,10 +391,14 @@ required = [
     "const response = await fetch(String(dataUrl), { cache: 'no-store' });",
     'photoSaveBusy',
     'afterUserWork',
+    'migrateExistingServicePhotos',
     'scheduleLibraryOptimization',
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: foto-optimalisatie ontbreekt ({needle})')
 
-print('[Machinepark] snelle foto-opslag met thumbnails op achtergrond, lazy loading en bestaande foto-optimalisatie actief')
+if 'const baseLocalSnapshotForPartPhotos = localSnapshot;' in index:
+    raise SystemExit('Buildvalidatie mislukt: fotomigratie blokkeert nog de centrale snapshot')
+
+print('[Machinepark] alle foto’s via achtergrondmigratie, thumbnails en lazy loading geoptimaliseerd')
