@@ -3,12 +3,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
-MARKER = 'data-machinepark-build-fix="device-photo-lightbox-v1"'
+MARKER = 'data-machinepark-build-fix="photo-lightbox-v2"'
 
 if MARKER not in index:
     style = f'''
 <style {MARKER}>
-.device-detail-photo img{{cursor:zoom-in}}
+[data-photo-lightbox]{{cursor:zoom-in}}
 .device-photo-lightbox{{position:fixed;inset:0;z-index:3000;background:rgba(8,18,15,.9);display:none;align-items:center;justify-content:center;padding:24px}}
 .device-photo-lightbox.show{{display:flex}}
 .device-photo-lightbox-inner{{position:relative;max-width:min(1200px,96vw);max-height:94vh;display:flex;align-items:center;justify-content:center}}
@@ -25,17 +25,17 @@ if MARKER not in index:
 '''
 
     script = r'''
-<script data-machinepark-build-fix="device-photo-lightbox-v1">
+<script data-machinepark-build-fix="photo-lightbox-v2">
 (() => {
-  function ensureDevicePhotoLightbox() {
+  function ensurePhotoLightbox() {
     let box = document.getElementById('devicePhotoLightbox');
     if (box) return box;
     box = document.createElement('div');
     box.id = 'devicePhotoLightbox';
     box.className = 'device-photo-lightbox';
     box.setAttribute('aria-hidden', 'true');
-    box.innerHTML = `<div class="device-photo-lightbox-inner" role="dialog" aria-modal="true" aria-label="Vergrote toestelfoto">
-      <img alt="Vergrote toestelfoto">
+    box.innerHTML = `<div class="device-photo-lightbox-inner" role="dialog" aria-modal="true" aria-label="Vergrote foto">
+      <img alt="Vergrote foto">
       <div class="device-photo-lightbox-caption"></div>
       <button type="button" class="device-photo-lightbox-close" aria-label="Foto sluiten">×</button>
     </div>`;
@@ -54,32 +54,33 @@ if MARKER not in index:
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && box.classList.contains('show')) close();
     });
-    box._machineparkClose = close;
     return box;
   }
 
-  function openDevicePhotoLightbox(img) {
-    if (!img?.src) return;
-    const box = ensureDevicePhotoLightbox();
+  function openPhotoLightbox(img) {
+    if (!img) return;
+    const src = img.dataset.fullSrc || img.currentSrc || img.src;
+    if (!src) return;
+    const box = ensurePhotoLightbox();
     const large = box.querySelector('img');
     const caption = box.querySelector('.device-photo-lightbox-caption');
-    large.src = img.src;
-    large.alt = img.alt || 'Vergrote toestelfoto';
-    const card = img.closest('.device-detail-photo');
-    const badge = card?.querySelector('.badge')?.textContent?.trim();
-    caption.textContent = badge || img.alt || 'Toestelfoto';
+    large.src = src;
+    large.alt = img.alt || 'Vergrote foto';
+    const badge = img.closest('.device-detail-photo')?.querySelector('.badge')?.textContent?.trim();
+    caption.textContent = badge || img.alt || 'Foto';
     caption.style.display = caption.textContent ? '' : 'none';
     box.classList.add('show');
     box.setAttribute('aria-hidden', 'false');
     box.querySelector('.device-photo-lightbox-close')?.focus();
   }
+  window.machineparkOpenPhotoLightbox = openPhotoLightbox;
 
   document.addEventListener('click', (event) => {
-    const img = event.target.closest('.device-detail-photo img');
+    const img = event.target.closest('img[data-photo-lightbox]');
     if (!img) return;
     event.preventDefault();
     event.stopPropagation();
-    openDevicePhotoLightbox(img);
+    openPhotoLightbox(img);
   });
 })();
 </script>
@@ -95,12 +96,12 @@ if MARKER not in index:
 required = [
     MARKER,
     'device-photo-lightbox',
-    "event.target.closest('.device-detail-photo img')",
-    'cursor:zoom-in',
+    "event.target.closest('img[data-photo-lightbox]')",
+    'img.dataset.fullSrc',
     "event.key === 'Escape'",
 ]
 for needle in required:
     if needle not in index:
-        raise SystemExit(f'Buildvalidatie mislukt: toestelfoto vergroting ontbreekt ({needle})')
+        raise SystemExit(f'Buildvalidatie mislukt: fotovergroting ontbreekt ({needle})')
 
-print('[Machinepark] toestelfoto’s in details klikbaar en vergrootbaar')
+print('[Machinepark] alle aanklikbare foto’s zijn vergrootbaar')
