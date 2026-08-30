@@ -33,6 +33,19 @@ if MARKER not in index:
         'onderdelenoverzicht thumbnail en lazy loading',
     )
 
+    # De rollenmodule bouwt een aparte alleen-lezen depannageweergave. Laat die zowel
+    # oude base64-foto’s als nieuwe Blob-referenties tonen.
+    replace_once(
+        "const photos = Array.isArray(b.photos) ? b.photos.filter((src) => typeof src === 'string' && src.startsWith('data:image/')) : [];",
+        "const photos = Array.isArray(b.photos) ? b.photos.filter((src) => typeof src === 'string' && src.trim()) : [];",
+        'Blob-foto’s in alleen-lezen depannagedetails',
+    )
+    index = index.replace(
+        '${photos.map((src) => `<img src="${src}" alt="Verslagfoto">`).join(\'\')}',
+        '${photos.map((src) => `<img src="${esc(window.machineparkThumbnailRef?window.machineparkThumbnailRef(src):src)}" data-full-src="${esc(src)}" data-photo-lightbox loading="lazy" decoding="async" alt="Verslagfoto">`).join(\'\')}',
+        1,
+    )
+
     replace_once(
         "  async function normalizePartImageForExcel(dataUrl) {\n    const image = dataUrlExportImage(dataUrl);",
         "  async function normalizePartImageForExcel(dataUrl) {\n    if (dataUrl && !String(dataUrl).startsWith('data:')) {\n      try {\n        const response = await fetch(String(dataUrl), { cache: 'no-store' });\n        if (response.ok) {\n          const blob = await response.blob();\n          dataUrl = await new Promise((resolve, reject) => {\n            const reader = new FileReader();\n            reader.onload = () => resolve(String(reader.result || ''));\n            reader.onerror = () => reject(reader.error);\n            reader.readAsDataURL(blob);\n          });\n        }\n      } catch (_) {}\n    }\n    const image = dataUrlExportImage(dataUrl);",
