@@ -94,8 +94,9 @@ sw = re.sub(r"'/assets/machinepark-build\.js\?v=[^']+'", f"'/assets/machinepark-
 sw = re.sub(r"'/assets/machinepark-build\.css\?v=[^']+'", f"'/assets/machinepark-build.css?v={asset_version}'", sw, count=1)
 SW_PATH.write_text(sw, encoding='utf-8')
 
-if marker_re.search(JS_PATH.read_text(encoding='utf-8')):
-    raise SystemExit('Buildvalidatie mislukt: buildmarkers zijn onverwacht in gegenereerde JS terechtgekomen')
+marker_match = marker_re.search(JS_PATH.read_text(encoding='utf-8'))
+if marker_match:
+    raise SystemExit(f'Buildvalidatie mislukt: buildmarker onverwacht in gegenereerde JS: {marker_match.group(0)}')
 if 'photo-lightbox-v2' not in js_content or 'machineparkOpenPhotoLightbox' not in js_content:
     raise SystemExit('Buildvalidatie mislukt: foto-lightbox ontbreekt in de gegenereerde featurebundel')
 
