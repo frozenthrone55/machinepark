@@ -10,6 +10,7 @@ import {
   roleLabel,
   validSnapshot,
 } from './_shared/permissions.mjs';
+import { cleanupRemovedEntityPhotos } from './_shared/photo-cleanup.mjs';
 
 const STORE_NAME = 'machinepark-central';
 const STATE_KEY = 'state-v1';
@@ -217,6 +218,13 @@ export default async (req) => {
         return json({ error: 'De centrale gegevens zijn intussen gewijzigd.', etag: current?.etag || null }, 409);
       }
       try { await writeAudit(store, auth, previousData, data); } catch (auditError) { console.error('machinepark audit logging', auditError); }
+      try {
+        const cleanup = await cleanupRemovedEntityPhotos(store, previousData, data);
+        if (cleanup.blobs) console.info('machinepark foto-opruiming', cleanup);
+      } catch (cleanupError) {
+        console.error('machinepark foto-opruiming mislukt', cleanupError);
+        return json({ error: 'De gegevens zijn verwijderd, maar de gekoppelde foto-opruiming kon niet volledig worden afgerond. Probeer de verwijdering/verversing opnieuw.' }, 500);
+      }
       const current = await store.getMetadata(STATE_KEY, { consistency: 'strong' });
       return json({ ok: true, etag: current?.etag || null, updatedAt: data.updatedAt, ...accessPayload(auth) });
     }
