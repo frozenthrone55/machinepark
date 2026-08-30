@@ -89,13 +89,32 @@ test('gegenereerde featurecode staat in externe assets', () => {
   assert.equal(/<style\b[^>]*data-machinepark-build-fix=/i.test(html), false);
 });
 
+test('featureblokken blijven runtime-foutgeisoleerd na bundeling', () => {
+  assert.ok(buildJs.includes("console.error('[Machinepark feature "));
+  assert.ok(buildJs.includes('/* photo-lightbox-v2 */'));
+  assert.ok(buildJs.includes('window.machineparkOpenPhotoLightbox = openPhotoLightbox;'));
+  assert.ok(buildJs.includes("event.target.closest('img[data-photo-lightbox]')"));
+  assert.ok(builtSource.includes('data-photo-lightbox'));
+});
+
+test('frontend-assets gebruiken inhoudsgebonden cache-busting', () => {
+  const jsMatch = html.match(/\/assets\/machinepark-build\.js\?v=1\.64\.0-([a-f0-9]{12})/);
+  const cssMatch = html.match(/\/assets\/machinepark-build\.css\?v=1\.64\.0-([a-f0-9]{12})/);
+  assert.ok(jsMatch, 'JavaScript asset mist inhoudshash');
+  assert.ok(cssMatch, 'CSS asset mist inhoudshash');
+  assert.equal(jsMatch[1], cssMatch[1], 'JS en CSS moeten dezelfde buildhash gebruiken');
+  assert.ok(sw.includes(`machinepark-v1.64.0-assets-${jsMatch[1]}`));
+  assert.ok(sw.includes(`/assets/machinepark-build.js?v=1.64.0-${jsMatch[1]}`));
+  assert.ok(sw.includes(`/assets/machinepark-build.css?v=1.64.0-${jsMatch[1]}`));
+});
+
 test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () => {
   assert.equal((html.match(/id="clerkUserButton"/g) || []).length, 1);
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
 test('service worker cachet de modulaire frontend-assets', () => {
-  assert.ok(sw.includes('machinepark-v1.64-modular-assets'));
+  assert.ok(sw.includes('machinepark-v1.64.0-assets-'));
   assert.ok(sw.includes('/assets/machinepark-build.js'));
   assert.ok(sw.includes('/assets/machinepark-build.css'));
 });
