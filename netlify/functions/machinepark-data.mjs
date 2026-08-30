@@ -1,68 +1,22 @@
 import { getStore } from '@netlify/blobs';
-import { createClerkClient, verifyToken } from '@clerk/backend';
 import {
-  ROLE_CONFIG_KEY,
   assertSnapshotWriteAllowed,
-  defaultRoleConfig,
-  normalizeRole,
-  normalizeRoleConfig,
-  permissionsForRole,
   roleLabel,
   validSnapshot,
 } from './_shared/permissions.mjs';
 import { cleanupRemovedEntityPhotos } from './_shared/photo-cleanup.mjs';
+import {
+  ADMIN_EMAIL,
+  NO_STORE,
+  STORE_NAME,
+  authenticateClerk,
+  jsonResponse as json,
+  resolveRoleAccess,
+} from './_shared/server-auth.mjs';
 
-const STORE_NAME = 'machinepark-central';
 const STATE_KEY = 'state-v1';
 const AUDIT_PREFIX = 'audit/';
 const CLEAR_SERVICE_DATES_MIGRATION_KEY = 'migration/clear-service-dates-2026-08-25-v1';
-const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
-const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
-
-function json(data, status = 200, headers = {}) {
-  return Response.json(data, { status, headers: { ...NO_STORE, ...headers } });
-}
-
-async function authenticate(req) {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) throw Object.assign(new Error('CLERK_SECRET_KEY is niet ingesteld in Netlify.'), { status: 500 });
-  const authorization = req.headers.get('authorization') || '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) throw Object.assign(new Error('Aanmelding vereist.'), { status: 401 });
-
-  try {
-    const verified = await verifyToken(token, { secretKey });
-    if (!verified?.sub) throw new Error('Geen gebruiker in token.');
-    const origin = req.headers.get('origin');
-    if (origin && verified.azp && verified.azp !== origin) {
-      throw Object.assign(new Error('Deze sessie hoort niet bij deze website.'), { status: 403 });
-    }
-    const clerk = createClerkClient({ secretKey });
-    const user = await clerk.users.getUser(verified.sub);
-    const primary = (user.emailAddresses || []).find((x) => x.id === user.primaryEmailAddressId);
-    const email = String(primary?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '').trim().toLowerCase();
-    const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-    const owner = (user.emailAddresses || []).some((x) => String(x.emailAddress || '').trim().toLowerCase() === ADMIN_EMAIL);
-    return { ...verified, email, name, owner, rawRole: user?.publicMetadata?.role || 'gebruiker' };
-  } catch (error) {
-    if (error?.status) throw error;
-    throw Object.assign(new Error('Clerk-sessie kon niet worden geverifieerd.'), { status: 401 });
-  }
-}
-
-async function resolveAccess(store, auth) {
-  const roleEntry = await store.getWithMetadata(ROLE_CONFIG_KEY, { type: 'json', consistency: 'strong' });
-  const roleConfig = normalizeRoleConfig(roleEntry?.data || defaultRoleConfig());
-  const role = normalizeRole(auth.rawRole, { owner: auth.owner, config: roleConfig });
-  return {
-    ...auth,
-    role,
-    roleLabel: roleLabel(role, roleConfig),
-    permissions: permissionsForRole(role, roleConfig, { owner: auth.owner }),
-    roleConfig,
-    roleConfigEtag: roleEntry?.etag || null,
-  };
-}
 
 const FIELD_LABELS = {
   assetCode: 'WCL nr.', location: 'Locatie', brand: 'Merk', model: 'Model', serial: 'Serienummer',
@@ -178,15 +132,19 @@ async function clearServiceDatesOnce(store, auth) {
 }
 
 function accessPayload(auth) {
-  return { role: auth.role, roleLabel: auth.roleLabel, permissions: auth.permissions, roleConfigEtag: auth.roleConfigEtag };
+  return {
+    role: auth.role,
+    roleLabel: roleLabel(auth.role, auth.roleConfig),
+    permissions: auth.permissions,
+    roleConfigEtag: auth.roleConfigEtag,
+  };
 }
 
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: NO_STORE });
   try {
-    const rawAuth = await authenticate(req);
     const store = getStore({ name: STORE_NAME, consistency: 'strong' });
-    const auth = await resolveAccess(store, rawAuth);
+    const auth = await resolveRoleAccess(store, await authenticateClerk(req));
 
     if (req.method === 'GET') {
       await clearServiceDatesOnce(store, auth);
