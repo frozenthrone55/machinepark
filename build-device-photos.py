@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
-MARKER = 'data-machinepark-build-fix="device-photos-v1"'
+MARKER = 'data-machinepark-build-fix="device-photos-v2"'
 
 
 def replace_once(old, new, label):
@@ -23,7 +23,7 @@ if MARKER not in index:
 
     replace_once(
         "notes:val(fd,'notes'),createdAt:old.createdAt||now",
-        "notes:val(fd,'notes'),devicePhotos:(typeof window.machineparkDevicePhotosFromForm==='function'?window.machineparkDevicePhotosFromForm(fd,old):(Array.isArray(old.devicePhotos)?old.devicePhotos.slice(0,3):[])),deviceOverviewPhotoIndex:(typeof window.machineparkDeviceOverviewIndexFromForm==='function'?window.machineparkDeviceOverviewIndexFromForm(fd,old):Number(old.deviceOverviewPhotoIndex||0)),createdAt:old.createdAt||now",
+        "notes:val(fd,'notes'),devicePhotos:(typeof window.machineparkDevicePhotosFromForm==='function'?window.machineparkDevicePhotosFromForm(fd,old):(Array.isArray(old.devicePhotos)?old.devicePhotos.slice(0,5):[])),deviceOverviewPhotoIndex:(typeof window.machineparkDeviceOverviewIndexFromForm==='function'?window.machineparkDeviceOverviewIndexFromForm(fd,old):Number(old.deviceOverviewPhotoIndex||0)),createdAt:old.createdAt||now",
         'toestelfoto opslag',
     )
 
@@ -41,7 +41,7 @@ if MARKER not in index:
 .device-photo-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
 .device-photo-card{{border:1px solid var(--line);border-radius:13px;background:#fbfcfb;overflow:hidden;display:grid;grid-template-rows:150px auto}}
 .device-photo-image-wrap{{position:relative;background:#eef2f0;overflow:hidden}}
-.device-photo-card img{{width:100%;height:100%;object-fit:cover;display:block}}
+.device-photo-card img{{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}}
 .device-photo-number{{position:absolute;left:8px;top:8px;background:rgba(20,45,38,.82);color:#fff;border-radius:999px;padding:4px 7px;font-size:10px;font-weight:800}}
 .device-photo-card-foot{{padding:9px;display:grid;gap:8px}}
 .device-photo-overview{{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:#36443e;cursor:pointer}}
@@ -53,7 +53,7 @@ if MARKER not in index:
 .device-detail-photo-head strong{{font-size:13px}}
 .device-detail-photo-gallery{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}}
 .device-detail-photo{{position:relative;aspect-ratio:4/3;border-radius:11px;overflow:hidden;border:1px solid var(--line);background:#eef2f0}}
-.device-detail-photo img{{width:100%;height:100%;object-fit:cover;display:block}}
+.device-detail-photo img{{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}}
 .device-detail-photo .badge{{position:absolute;left:7px;bottom:7px;box-shadow:0 2px 8px rgba(0,0,0,.12)}}
 @media(max-width:700px){{
   .device-photo-grid,.device-detail-photo-gallery{{grid-template-columns:1fr}}
@@ -65,12 +65,44 @@ if MARKER not in index:
     replace_once('</head>', style + '</head>', 'toestelfoto stylesheet')
 
     script = r'''
-<script data-machinepark-build-fix="device-photos-v1">
+<script data-machinepark-build-fix="device-photos-v2">
 (() => {
+  const DEVICE_PHOTO_LIMIT = 5;
+
   function normalizedDevicePhotos(device) {
     return (Array.isArray(device?.devicePhotos) ? device.devicePhotos : [])
       .filter((src) => typeof src === 'string' && src.trim())
-      .slice(0, 3);
+      .slice(0, DEVICE_PHOTO_LIMIT);
+  }
+
+  function compressDevicePhoto(file) {
+    if (!file || !file.size) return Promise.resolve('');
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = (event) => { img.src = event.target.result; };
+      img.onerror = reject;
+      img.onload = () => {
+        const max = 720;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        let quality = .68;
+        let data = canvas.toDataURL('image/jpeg', quality);
+        while (data.length > 260000 && quality > .44) {
+          quality -= .08;
+          data = canvas.toDataURL('image/jpeg', quality);
+        }
+        resolve(data);
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   function overviewIndex(device, photos = normalizedDevicePhotos(device)) {
@@ -89,7 +121,7 @@ if MARKER not in index:
     if (!raw) return normalizedDevicePhotos(old);
     try {
       const parsed = JSON.parse(raw);
-      return (Array.isArray(parsed) ? parsed : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 3);
+      return (Array.isArray(parsed) ? parsed : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, DEVICE_PHOTO_LIMIT);
     } catch (_) {
       return normalizedDevicePhotos(old);
     }
@@ -108,7 +140,7 @@ if MARKER not in index:
     const html = baseDeviceFormForPhotos(d);
     const section = `<div class="field full device-photo-field">
       <div class="device-photo-toolbar">
-        <div><strong>Foto’s toestel</strong><small>Maximaal 3 foto’s. Kies één foto als overzichtsfoto voor de toestellenlijst.</small></div>
+        <div><strong>Foto’s toestel</strong><small>Maximaal ${DEVICE_PHOTO_LIMIT} foto’s. Kies één foto als overzichtsfoto voor de toestellenlijst.</small></div>
         <label class="btn small device-photo-add" id="devicePhotoAddLabel">+ Foto’s toevoegen<input type="file" id="devicePhotoFiles" accept="image/*" multiple hidden></label>
       </div>
       <div id="devicePhotoGrid" class="device-photo-grid"></div>
@@ -124,6 +156,10 @@ if MARKER not in index:
       return window.machineparkHasPermission(existing ? 'devices.edit' : 'devices.add');
     }
     return Boolean(window.machineparkCanEdit?.devices || !existing);
+  }
+
+  function previewPhoto(src) {
+    return typeof window.machineparkThumbnailRef === 'function' ? window.machineparkThumbnailRef(src) : src;
   }
 
   function initDevicePhotoPicker(deviceId = '') {
@@ -150,17 +186,17 @@ if MARKER not in index:
     function render() {
       syncHidden();
       grid.innerHTML = photos.length ? photos.map((src, index) => `<div class="device-photo-card" data-device-photo-index="${index}">
-        <div class="device-photo-image-wrap"><img src="${esc(src)}" alt="Toestelfoto ${index + 1}"><span class="device-photo-number">Foto ${index + 1}</span></div>
+        <div class="device-photo-image-wrap"><img src="${esc(previewPhoto(src))}" data-full-src="${esc(src)}" data-photo-lightbox loading="lazy" decoding="async" alt="Toestelfoto ${index + 1}"><span class="device-photo-number">Foto ${index + 1}</span></div>
         <div class="device-photo-card-foot">
           <label class="device-photo-overview"><input type="radio" name="devicePhotoOverviewChoice" value="${index}" ${index === selected ? 'checked' : ''} ${canManage ? '' : 'disabled'}><span>Op overzicht</span></label>
           ${canManage ? `<button type="button" class="device-photo-remove" data-device-photo-remove="${index}">Foto verwijderen</button>` : '<div class="device-photo-readonly">Alleen bekijken</div>'}
         </div>
       </div>`).join('') : '<div class="empty" style="grid-column:1/-1;padding:22px 12px">Nog geen foto’s toegevoegd.</div>';
-      if (status) status.textContent = `${photos.length} van maximaal 3 foto’s${canManage ? ' · selecteer één foto voor het overzicht' : ' · deze rol kan toestelgegevens niet volledig wijzigen'}`;
-      if (input) input.disabled = !canManage || photos.length >= 3;
+      if (status) status.textContent = `${photos.length} van maximaal ${DEVICE_PHOTO_LIMIT} foto’s${canManage ? ' · selecteer één foto voor het overzicht' : ' · deze rol kan toestelgegevens niet volledig wijzigen'}`;
+      if (input) input.disabled = !canManage || photos.length >= DEVICE_PHOTO_LIMIT;
       if (addLabel) {
         addLabel.style.display = canManage ? '' : 'none';
-        addLabel.classList.toggle('disabled', photos.length >= 3);
+        addLabel.classList.toggle('disabled', photos.length >= DEVICE_PHOTO_LIMIT);
       }
     }
 
@@ -186,9 +222,9 @@ if MARKER not in index:
     if (input) input.addEventListener('change', async () => {
       if (!canManage) return;
       const files = [...(input.files || [])];
-      const available = 3 - photos.length;
+      const available = DEVICE_PHOTO_LIMIT - photos.length;
       if (files.length > available) {
-        alert(`Je kunt nog maximaal ${available} foto${available === 1 ? '' : '’s'} toevoegen. Een toestel kan maximaal 3 foto’s bevatten.`);
+        alert(`Je kunt nog maximaal ${available} foto${available === 1 ? '' : '’s'} toevoegen. Een toestel kan maximaal ${DEVICE_PHOTO_LIMIT} foto’s bevatten.`);
         input.value = '';
         return;
       }
@@ -198,10 +234,10 @@ if MARKER not in index:
       try {
         const wasEmpty = photos.length === 0;
         for (const file of files) {
-          const compressed = await compressImage(file);
+          const compressed = await compressDevicePhoto(file);
           if (compressed) photos.push(compressed);
         }
-        photos = photos.slice(0, 3);
+        photos = photos.slice(0, DEVICE_PHOTO_LIMIT);
         if (wasEmpty && photos.length) selected = 0;
       } catch (error) {
         console.error(error);
@@ -256,7 +292,7 @@ if MARKER not in index:
       if (!grid) return;
       const block = document.createElement('div');
       block.className = 'field full';
-      block.innerHTML = `<div class="device-detail-photo-section"><div class="device-detail-photo-head"><strong>Foto’s toestel</strong><span class="muted" style="font-size:11px">${photos.length} van 3</span></div><div class="device-detail-photo-gallery">${photos.map((src, index) => `<div class="device-detail-photo"><img src="${esc(src)}" alt="Toestelfoto ${index + 1}">${index === selected ? '<span class="badge success">Overzichtsfoto</span>' : ''}</div>`).join('')}</div></div>`;
+      block.innerHTML = `<div class="device-detail-photo-section"><div class="device-detail-photo-head"><strong>Foto’s toestel</strong><span class="muted" style="font-size:11px">${photos.length} van ${DEVICE_PHOTO_LIMIT}</span></div><div class="device-detail-photo-gallery">${photos.map((src, index) => `<div class="device-detail-photo"><img src="${esc(src)}" data-full-src="${esc(src)}" data-photo-lightbox loading="lazy" decoding="async" alt="Toestelfoto ${index + 1}">${index === selected ? '<span class="badge success">Overzichtsfoto</span>' : ''}</div>`).join('')}</div></div>`;
       const first = grid.firstElementChild;
       if (first) first.after(block); else grid.appendChild(block);
     }, 0);
@@ -268,6 +304,17 @@ if MARKER not in index:
     replace_once('</body>', script + '</body>', 'toestelfoto script')
 
     index_path.write_text(index, encoding="utf-8")
-    print('[Machinepark] maximaal 3 toestelfoto’s met overzichtsfoto actief')
-else:
-    print('[Machinepark] toestelfoto’s reeds actief')
+
+required = [
+    MARKER,
+    'const DEVICE_PHOTO_LIMIT = 5;',
+    'function compressDevicePhoto(file)',
+    'const max = 720;',
+    'data-photo-lightbox',
+    'maximaal ${DEVICE_PHOTO_LIMIT} foto’s',
+]
+for needle in required:
+    if needle not in index:
+        raise SystemExit(f'Buildvalidatie mislukt: geconsolideerde toestelfoto-code ontbreekt ({needle})')
+
+print('[Machinepark] maximaal 5 compacte toestelfoto’s met overzichtsfoto actief')
