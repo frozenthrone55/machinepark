@@ -7,6 +7,7 @@ import {
   normalizeRole,
   normalizeRoleConfig,
 } from './_shared/permissions.mjs';
+import { cleanupRemovedEntityPhotos, withoutPermanentPhotoRefs } from './_shared/photo-cleanup.mjs';
 
 const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
 const STORE_NAME = 'machinepark-central';
@@ -64,7 +65,7 @@ function inverseUndoPayload(undo) {
     fields: (undo.fields || []).map((f) => ({ key: f.key, beforeExists: f.afterExists, afterExists: f.beforeExists, beforeRaw: f.afterRaw, afterRaw: f.beforeRaw })),
   };
   if (undo.kind === 'remove-added') return { kind: 'restore-deleted', storeName: undo.storeName, entityId: undo.entityId, beforeItem: undo.expectedAfter };
-  if (undo.kind === 'restore-deleted') return { kind: 'remove-added', storeName: undo.storeName, entityId: undo.entityId, expectedAfter: undo.beforeItem };
+  if (undo.kind === 'restore-deleted') return { kind: 'remove-added', storeName: undo.storeName, entityId: undo.entityId, expectedAfter: withoutPermanentPhotoRefs(undo.storeName, undo.beforeItem) };
   return null;
 }
 
@@ -97,7 +98,7 @@ function applyUndoToSnapshot(snapshot, change) {
   } else if (undo.kind === 'restore-deleted') {
     if (index >= 0) throw Object.assign(new Error('Er bestaat intussen opnieuw een item met hetzelfde ID. Herstellen is daarom geblokkeerd.'), { status: 409 });
     if (!undo.beforeItem) throw Object.assign(new Error('De oorspronkelijke gegevens ontbreken in deze logboekregel.'), { status: 409 });
-    list.push({ ...undo.beforeItem });
+    list.push(withoutPermanentPhotoRefs(undo.storeName, undo.beforeItem));
   } else throw Object.assign(new Error('Dit type wijziging kan niet ongedaan worden gemaakt.'), { status: 409 });
   return { ...snapshot, [undo.storeName]: list };
 }
@@ -204,6 +205,14 @@ export default async (req) => {
       after.updatedByEmail = auth.email || '';
       const result = await store.setJSON(STATE_KEY, after, { onlyIfMatch: current.etag, metadata: { updatedAt: after.updatedAt, updatedBy: auth.sub, updatedByEmail: auth.email || '' } });
       if (!result.modified) return json({ error: 'De centrale gegevens zijn intussen gewijzigd. Vernieuw en probeer opnieuw.' }, 409);
+
+      try {
+        const cleanup = await cleanupRemovedEntityPhotos(store, before, after);
+        if (cleanup.blobs) console.info('audit undo foto-opruiming', cleanup);
+      } catch (cleanupError) {
+        console.error('audit undo foto-opruiming mislukt', cleanupError);
+        return json({ error: 'De wijziging is uitgevoerd, maar gekoppelde foto’s konden niet volledig worden opgeruimd.' }, 500);
+      }
 
       for (const item of undoItems) {
         const markerKey = `${UNDO_PREFIX}${originalEntry.id}/${item.changeIndex}`;
