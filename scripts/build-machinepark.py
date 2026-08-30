@@ -5,12 +5,11 @@ index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 sw = (ROOT / "sw.js").read_text(encoding="utf-8")
 
-PATCH_MARKER = 'data-machinepark-build-fix="mobile-search-technician-v1"'
-PHOTO_PATCH_MARKER = 'data-machinepark-build-fix="service-report-photos-v1"'
+PATCH_MARKER = 'data-machinepark-build-fix="mobile-search-v2"'
+PHOTO_PATCH_MARKER = 'data-machinepark-build-fix="service-report-photos-v2"'
 
-# De bronpagina is bewust één groot zelfstandig HTML-bestand. Voeg deze twee kleine
-# UI-correcties tijdens de build idempotent toe, zodat de bestaande applicatielogica
-# niet breed hoeft te worden herschreven.
+# Mobiele zoekbalk. De vroegere hardcoded technieker-wrapper is bewust verwijderd:
+# alle toestelrechten worden centraal door het configureerbare rollenmodel bepaald.
 if PATCH_MARKER not in index:
     mobile_style = f'''
 <style {PATCH_MARKER}>
@@ -24,81 +23,25 @@ if PATCH_MARKER not in index:
 }}
 </style>
 '''
-
-    technician_script = f'''
-<script {PATCH_MARKER}>
-(() => {{
-  const originalOpenDevice = openDevice;
-  const originalShowDeviceHistory = showDeviceHistory;
-  const technicianCanEditDevice = () => window.machineparkRole === 'technieker';
-  window.machineparkTechnicianCanEditDevice = technicianCanEditDevice;
-
-  openDevice = function(id) {{
-    if (!technicianCanEditDevice() || !id) return originalOpenDevice(id);
-    const old = state.devices.find(d => d.id === id);
-    if (!old) {{ toast('Toestel niet gevonden'); return; }}
-
-    const body = `<div class="form-grid">
-      <div class="field full"><div class="alert"><strong>Techniekerrechten</strong>Technieker kan alleen toestelstatus en notities aanpassen. Andere toestelgegevens blijven alleen-lezen.</div></div>
-      <div class="field"><label>Toestel</label><input value="${{esc(old.assetCode || old.model || 'Toestel')}}" readonly style="background:#f4f6f5"></div>
-      <div class="field"><label>Locatie</label><input value="${{esc(deviceLocationAt(old) || old.location || 'Geen locatie')}}" readonly style="background:#f4f6f5"></div>
-      <div class="field"><label>Status</label><select name="status">${{['Actief','In herstelling','Buiten dienst'].map(x => `<option ${{old.status === x ? 'selected' : ''}}>${{x}}</option>`).join('')}}</select></div>
-      <div class="field full"><label>Notities</label><textarea name="notes">${{esc(old.notes || '')}}</textarea></div>
-    </div>`;
-
-    showModal('Toestelstatus & notities', body, 'Opslaan', async fd => {{
-      const obj = {{
-        ...old,
-        status: val(fd, 'status') || old.status || 'Actief',
-        notes: val(fd, 'notes'),
-        updatedAt: new Date().toISOString(),
-      }};
-      await put('devices', obj);
-      closeModal();
-      await refresh();
-      toast('Toestelstatus en notities opgeslagen');
-    }});
-  }};
-
-  showDeviceHistory = function(id) {{
-    originalShowDeviceHistory(id);
-    if (!technicianCanEditDevice()) return;
-    setTimeout(() => {{
-      const foot = $('#modal .modal-foot');
-      if (!foot || $('#technicianEditDevice')) return;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.id = 'technicianEditDevice';
-      btn.className = 'btn';
-      btn.textContent = 'Status / notities aanpassen';
-      btn.onclick = () => {{ closeModal(); openDevice(id); }};
-      foot.insertBefore(btn, foot.querySelector('.btn.primary') || null);
-    }}, 0);
-  }};
-}})();
-</script>
-'''
-
-    if "</head>" not in index or "</body>" not in index:
-        raise SystemExit("Buildvalidatie mislukt: HTML-afsluiters ontbreken")
+    if "</head>" not in index:
+        raise SystemExit("Buildvalidatie mislukt: HTML-head ontbreekt")
     index = index.replace("</head>", mobile_style + "</head>", 1)
-    index = index.replace("</body>", technician_script + "</body>", 1)
     index_path.write_text(index, encoding="utf-8")
 
-# Onderhoud en depannage krijgen maximaal vier gecomprimeerde foto's per verslag.
-# De bestaande formulieren en opslagfuncties worden alleen aan de UI-rand uitgebreid;
-# de onderliggende records blijven volledig compatibel met bestaande gegevens.
+# Onderhoud en depannage krijgen maximaal vijf gecomprimeerde foto's per verslag.
+# Nieuwe/bewerkte foto’s worden via machineparkPersistServicePhotos buiten de centrale
+# snapshot opgeslagen. Bestaande base64-foto’s blijven compatibel tot de achtergrondmigratie.
 if PHOTO_PATCH_MARKER not in index:
     photo_style = f'''
 <style {PHOTO_PATCH_MARKER}>
 .service-photo-editor{{grid-column:1/-1}}
 .service-photo-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:10px;margin:8px 0}}
 .service-photo-item{{border:1px solid var(--line);border-radius:12px;background:#f8faf9;padding:7px;display:grid;gap:6px}}
-.service-photo-item img{{width:100%;height:96px;object-fit:cover;border-radius:8px;background:white}}
+.service-photo-item img{{width:100%;height:96px;object-fit:cover;border-radius:8px;background:white;cursor:zoom-in}}
 .service-photo-item label{{display:flex;gap:6px;align-items:center;font-size:11px;font-weight:650;color:var(--muted)}}
 .service-photo-files{{padding:9px!important}}
 .service-photo-details{{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:8px}}
-.service-photo-details img{{width:100%;height:150px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#f8faf9}}
+.service-photo-details img{{width:100%;height:150px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#f8faf9;cursor:zoom-in}}
 @media(max-width:700px){{
   .service-photo-grid{{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .service-photo-details{{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -109,7 +52,8 @@ if PHOTO_PATCH_MARKER not in index:
     photo_script = f'''
 <script {PHOTO_PATCH_MARKER}>
 (() => {{
-  const REPORT_PHOTO_LIMIT = 4;
+  const REPORT_PHOTO_LIMIT = 5;
+  const SERVICE_PHOTO_ENDPOINT = '/.netlify/functions/service-photos?';
 
   function insertBeforeLastDiv(html, extra) {{
     const pos = html.lastIndexOf('</div>');
@@ -122,20 +66,29 @@ if PHOTO_PATCH_MARKER not in index:
     return pos < 0 ? insertBeforeLastDiv(html, extra) : html.slice(0, pos) + extra + html.slice(pos);
   }}
 
+  function isServicePhoto(value) {{
+    const src = String(value || '').trim();
+    return src.startsWith('data:image/') || src.includes(SERVICE_PHOTO_ENDPOINT);
+  }}
+
   function photoArray(value) {{
-    return Array.isArray(value) ? value.filter(x => typeof x === 'string' && x.startsWith('data:image/')) : [];
+    return Array.isArray(value) ? value.filter(x => typeof x === 'string' && isServicePhoto(x)).slice(0, REPORT_PHOTO_LIMIT) : [];
+  }}
+
+  function photoPreviewSrc(src) {{
+    return typeof window.machineparkThumbnailRef === 'function' ? window.machineparkThumbnailRef(src) : src;
   }}
 
   function servicePhotoEditorHtml(existing = [], inputClass = '') {{
     const photos = photoArray(existing);
     const current = photos.length
-      ? `<div class="service-photo-grid">${{photos.map((src, i) => `<div class="service-photo-item"><img src="${{src}}" alt="Verslagfoto ${{i + 1}}"><label><input type="checkbox" class="service-photo-remove" value="${{i}}"> Verwijderen</label></div>`).join('')}}</div>`
+      ? `<div class="service-photo-grid">${{photos.map((src, i) => `<div class="service-photo-item"><img src="${{esc(photoPreviewSrc(src))}}" data-full-src="${{esc(src)}}" data-photo-lightbox loading="lazy" decoding="async" alt="Verslagfoto ${{i + 1}}"><label><input type="checkbox" class="service-photo-remove" value="${{i}}"> Verwijderen</label></div>`).join('')}}</div>`
       : '<div class="muted" style="font-size:11px;margin:4px 0 8px">Nog geen foto’s toegevoegd.</div>';
     return `<div class="field full service-photo-editor">
       <label>Foto’s bij verslag</label>
       ${{current}}
       <input class="service-photo-files ${{inputClass}}" type="file" accept="image/*" multiple>
-      <div class="muted" style="font-size:11px;margin-top:4px">Maximaal ${{REPORT_PHOTO_LIMIT}} foto’s per verslag. Foto’s worden automatisch verkleind voor opslag.</div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Maximaal ${{REPORT_PHOTO_LIMIT}} foto’s per verslag. Foto’s worden automatisch verkleind en apart opgeslagen.</div>
       <div class="service-photo-selected muted" style="font-size:11px;margin-top:4px"></div>
     </div>`;
   }}
@@ -143,7 +96,7 @@ if PHOTO_PATCH_MARKER not in index:
   function servicePhotoDetailsHtml(photos) {{
     const list = photoArray(photos);
     if (!list.length) return '<span class="muted">Geen foto’s bij dit verslag.</span>';
-    return `<div class="service-photo-details">${{list.map((src, i) => `<img src="${{src}}" alt="Verslagfoto ${{i + 1}}">`).join('')}}</div>`;
+    return `<div class="service-photo-details">${{list.map((src, i) => `<img src="${{esc(photoPreviewSrc(src))}}" data-full-src="${{esc(src)}}" data-photo-lightbox loading="lazy" decoding="async" alt="Verslagfoto ${{i + 1}}">`).join('')}}</div>`;
   }}
 
   async function collectServicePhotos(editor, existing = []) {{
@@ -157,7 +110,12 @@ if PHOTO_PATCH_MARKER not in index:
     }}
     const added = [];
     for (const file of files) added.push(await compressImage(file));
-    return [...kept, ...added].filter(Boolean);
+    return [...kept, ...added].filter(Boolean).slice(0, REPORT_PHOTO_LIMIT);
+  }}
+
+  async function persistServicePhotos(storeName, item, photos) {{
+    if (typeof window.machineparkPersistServicePhotos !== 'function') return photos;
+    return window.machineparkPersistServicePhotos(storeName, item.id, photos);
   }}
 
   function editorForRecord(storeName, deviceId) {{
@@ -210,7 +168,8 @@ if PHOTO_PATCH_MARKER not in index:
     if ((storeName === 'maintenance' || storeName === 'breakdowns') && obj) {{
       const editor = document.querySelector('#modalForm .modal-body > .form-grid > .service-photo-editor');
       if (editor && !editor.closest('.maintenance-machine-card')) {{
-        obj = {{ ...obj, photos: await collectServicePhotos(editor, obj.photos || []) }};
+        const photos = await collectServicePhotos(editor, obj.photos || []);
+        obj = {{ ...obj, photos: await persistServicePhotos(storeName, obj, photos) }};
       }}
     }}
     return originalPut(storeName, obj);
@@ -222,7 +181,9 @@ if PHOTO_PATCH_MARKER not in index:
       const enriched = [];
       for (const item of items) {{
         const editor = editorForRecord(storeName, item.deviceId);
-        enriched.push(editor ? {{ ...item, photos: await collectServicePhotos(editor, []) }} : item);
+        if (!editor) {{ enriched.push(item); continue; }}
+        const photos = await collectServicePhotos(editor, item.photos || []);
+        enriched.push({{ ...item, photos: await persistServicePhotos(storeName, item, photos) }});
       }}
       items = enriched;
     }}
@@ -290,13 +251,12 @@ required = {
     "depannage verwijderen": "deleteBreakdownFromDetails",
     "onderdelen navigatie": 'data-view="parts"',
     "mobiele zoekfix": PATCH_MARKER,
-    "technieker beperkte toestelbewerking": "Technieker kan alleen toestelstatus en notities aanpassen.",
-    "technieker bewerkknop": "Status / notities aanpassen",
     "verslagfoto patch": PHOTO_PATCH_MARKER,
     "onderhoud verslagfoto's": "originalMaintenanceForm",
     "depannage verslagfoto's": "originalBreakdownForm",
     "foto's per toestel": "editorForRecord",
     "foto opslag": "collectServicePhotos",
+    "Blob verslagfoto-opslag": "machineparkPersistServicePhotos",
 }
 for label, needle in required.items():
     if needle not in index:
@@ -307,4 +267,6 @@ if 'id="clearAll"' in index:
     raise SystemExit("Buildvalidatie mislukt: Alles wissen is teruggekeerd")
 if "machinepark-v1.64-export-images" not in sw:
     raise SystemExit("Buildvalidatie mislukt: verkeerde service-worker cache")
+if 'Technieker kan alleen toestelstatus en notities aanpassen.' in index:
+    raise SystemExit("Buildvalidatie mislukt: oude hardcoded techniekerwrapper is nog actief")
 print("[Machinepark] broncodevalidatie geslaagd")
