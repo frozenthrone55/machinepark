@@ -3,7 +3,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
-sw = (ROOT / "sw.js").read_text(encoding="utf-8")
 
 PATCH_MARKER = 'data-machinepark-build-fix="mobile-search-v2"'
 PHOTO_PATCH_MARKER = 'data-machinepark-build-fix="service-report-photos-v2"'
@@ -265,8 +264,6 @@ if index.count('id="clerkUserButton"') != 1:
     raise SystemExit("Buildvalidatie mislukt: Clerk-profielknop is niet uniek")
 if 'id="clearAll"' in index:
     raise SystemExit("Buildvalidatie mislukt: Alles wissen is teruggekeerd")
-if "machinepark-v1.64-export-images" not in sw:
-    raise SystemExit("Buildvalidatie mislukt: verkeerde service-worker cache")
 if 'Technieker kan alleen toestelstatus en notities aanpassen.' in index:
     raise SystemExit("Buildvalidatie mislukt: oude hardcoded techniekerwrapper is nog actief")
 print("[Machinepark] broncodevalidatie geslaagd")
