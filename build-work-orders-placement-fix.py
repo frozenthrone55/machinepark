@@ -42,6 +42,27 @@ if old_access_hook not in block:
     raise SystemExit('Buildvalidatie mislukt: oude werkbonrechten-wrapper niet gevonden')
 block = block.replace(old_access_hook, new_access_hook, 1)
 
+# De configuratiepagina ligt bewust boven de gewone app (z-index 2400). De algemene
+# modal stond daardoor achter deze pagina. Geef de modal tijdens werkbonconfiguratie
+# tijdelijk een hogere laag en beheer die toestand expliciet op de body.
+css_anchor = '.workorder-config-page.show{display:block}'
+css_replacement = css_anchor + '\nbody.workorder-config-active .modal-backdrop{z-index:2600}'
+if index.count(css_anchor) != 1:
+    raise SystemExit('Buildvalidatie mislukt: werkbonconfiguratie-CSS niet eenduidig gevonden')
+index = index.replace(css_anchor, css_replacement, 1)
+
+old_close = "page.querySelector('#closeWorkOrderConfig').onclick = () => page.classList.remove('show');"
+new_close = "page.querySelector('#closeWorkOrderConfig').onclick = () => { page.classList.remove('show'); document.body.classList.remove('workorder-config-active'); };"
+if block.count(old_close) != 1:
+    raise SystemExit('Buildvalidatie mislukt: terugknop werkbonconfiguratie niet gevonden')
+block = block.replace(old_close, new_close, 1)
+
+old_open = "page.classList.add('show');\n    page.querySelector('#workOrderConfigStatus').textContent = 'Werkbonnen laden…';"
+new_open = "page.classList.add('show');\n    document.body.classList.add('workorder-config-active');\n    page.querySelector('#workOrderConfigStatus').textContent = 'Werkbonnen laden…';"
+if block.count(old_open) != 1:
+    raise SystemExit('Buildvalidatie mislukt: openen werkbonconfiguratie niet gevonden')
+block = block.replace(old_open, new_open, 1)
+
 body_pos = index.rfind('</body>')
 if body_pos < 0:
     raise SystemExit('Buildvalidatie mislukt: echte </body> ontbreekt voor werkbonscript')
@@ -52,5 +73,9 @@ if index.rfind(SCRIPT_START) < index.rfind('</head>'):
     raise SystemExit('Buildvalidatie mislukt: werkbonscript staat niet in document-body')
 if 'baseApplyOperationalPermissionsForWorkOrders' in index:
     raise SystemExit('Buildvalidatie mislukt: dubbele operationele rechtenwrapper is blijven staan')
+if 'body.workorder-config-active .modal-backdrop{z-index:2600}' not in index:
+    raise SystemExit('Buildvalidatie mislukt: werkboneditor staat niet boven configuratiepagina')
+if "document.body.classList.add('workorder-config-active')" not in index:
+    raise SystemExit('Buildvalidatie mislukt: werkbonconfiguratie activeert modal-laag niet')
 
-print('[Machinepark] werkbonmodule veilig geplaatst zonder extra kernwrapper')
+print('[Machinepark] werkboneditor opent zichtbaar boven configuratiepagina')
