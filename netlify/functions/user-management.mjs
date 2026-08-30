@@ -1,87 +1,57 @@
 import { getStore } from '@netlify/blobs';
-import { createClerkClient, verifyToken } from '@clerk/backend';
 import {
-  ROLE_CONFIG_KEY,
-  defaultRoleConfig,
   hasPermission,
   normalizeRole,
-  normalizeRoleConfig,
   roleLabel,
   sanitizeRoleId,
 } from './_shared/permissions.mjs';
+import {
+  ADMIN_EMAIL,
+  NO_STORE,
+  STORE_NAME,
+  authenticateClerk,
+  emailsOf,
+  jsonResponse as json,
+  primaryEmailOf,
+  resolveRoleAccess,
+} from './_shared/server-auth.mjs';
 
-const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
-const STORE_NAME = 'machinepark-central';
 const AUDIT_PREFIX = 'audit/';
-const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
-
-function json(data, status = 200, headers = {}) {
-  return Response.json(data, { status, headers: { ...NO_STORE, ...headers } });
-}
-
-function emailsOf(user) {
-  return (user?.emailAddresses || []).map((x) => String(x.emailAddress || '').trim().toLowerCase()).filter(Boolean);
-}
-
-function primaryEmailOf(user) {
-  const primary = (user?.emailAddresses || []).find((x) => x.id === user?.primaryEmailAddressId);
-  return String(primary?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || '').trim().toLowerCase();
-}
 
 function isOwnerUser(user) { return emailsOf(user).includes(ADMIN_EMAIL); }
-
-async function loadRoleConfig(store) {
-  const entry = await store.getWithMetadata(ROLE_CONFIG_KEY, { type: 'json', consistency: 'strong' });
-  return normalizeRoleConfig(entry?.data || defaultRoleConfig());
-}
 
 function roleOf(user, config) {
   return normalizeRole(user?.publicMetadata?.role, { owner: isOwnerUser(user), config });
 }
 
 async function authenticateManager(req, store) {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) throw Object.assign(new Error('CLERK_SECRET_KEY is niet ingesteld in Netlify.'), { status: 500 });
-  const authorization = req.headers.get('authorization') || '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) throw Object.assign(new Error('Aanmelding vereist.'), { status: 401 });
-
-  let verified;
-  try { verified = await verifyToken(token, { secretKey }); }
-  catch { throw Object.assign(new Error('Clerk-sessie kon niet worden geverifieerd.'), { status: 401 }); }
-  if (!verified?.sub) throw Object.assign(new Error('Aanmelding vereist.'), { status: 401 });
-
-  const origin = req.headers.get('origin');
-  if (origin && verified.azp && verified.azp !== origin) {
-    throw Object.assign(new Error('Deze sessie hoort niet bij deze website.'), { status: 403 });
-  }
-
-  const clerk = createClerkClient({ secretKey });
-  const currentUser = await clerk.users.getUser(verified.sub);
-  const config = await loadRoleConfig(store);
-  const owner = isOwnerUser(currentUser);
-  const role = roleOf(currentUser, config);
-  if (!owner && !hasPermission(role, 'users.manage', config)) {
+  const base = await authenticateClerk(req);
+  const access = await resolveRoleAccess(store, base);
+  if (!access.owner && !hasPermission(access.role, 'users.manage', access.roleConfig)) {
     throw Object.assign(new Error('Deze rol mag gebruikers niet beheren.'), { status: 403 });
   }
-  return { clerk, currentUser, verified, config, owner, role };
+  return {
+    ...access,
+    currentUser: access.user,
+    config: access.roleConfig,
+  };
 }
 
 async function writeAdminAudit(store, auth, action, label, fields = []) {
   try {
     const at = new Date().toISOString();
     const id = crypto.randomUUID();
-    const email = primaryEmailOf(auth.currentUser) || auth.verified.sub;
+    const email = primaryEmailOf(auth.currentUser) || auth.sub;
     await store.setJSON(`${AUDIT_PREFIX}${Date.now()}-${id}`, {
       id, at,
-      userId: auth.verified.sub,
+      userId: auth.sub,
       userEmail: email,
       userName: [auth.currentUser.firstName, auth.currentUser.lastName].filter(Boolean).join(' '),
       userRole: auth.role,
       changeCount: 1,
       changes: [{ entityType: 'Gebruikersbeheer', entityId: label, entityLabel: label, action, fields }],
       truncated: false,
-    }, { metadata: { at, userId: auth.verified.sub, userEmail: email } });
+    }, { metadata: { at, userId: auth.sub, userEmail: email } });
   } catch (error) {
     console.error('gebruikersbeheer audit', error);
   }
