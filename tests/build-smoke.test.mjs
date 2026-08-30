@@ -55,6 +55,8 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'technieker',
     'magazijnier',
     'machineparkPersistServicePhotos',
+    'machineparkServiceBlobWritesEnabled',
+    "host.startsWith('deploy-preview-')",
     'const DEVICE_PHOTO_LIMIT = 5;',
   ]) assert.ok(builtSource.includes(needle), `Ontbreekt in gebouwde app: ${needle}`);
 });
