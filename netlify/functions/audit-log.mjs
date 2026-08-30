@@ -1,56 +1,25 @@
 import { getStore } from '@netlify/blobs';
-import { createClerkClient, verifyToken } from '@clerk/backend';
-import {
-  ROLE_CONFIG_KEY,
-  defaultRoleConfig,
-  hasPermission,
-  normalizeRole,
-  normalizeRoleConfig,
-} from './_shared/permissions.mjs';
+import { hasPermission } from './_shared/permissions.mjs';
 import { cleanupRemovedEntityPhotos, withoutPermanentPhotoRefs } from './_shared/photo-cleanup.mjs';
+import {
+  NO_STORE,
+  STORE_NAME,
+  authenticateClerk,
+  jsonResponse as json,
+  resolveRoleAccess,
+} from './_shared/server-auth.mjs';
 
-const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
-const STORE_NAME = 'machinepark-central';
 const STATE_KEY = 'state-v1';
 const AUDIT_PREFIX = 'audit/';
 const UNDO_PREFIX = 'audit-undo/';
-const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
 const VALID_STORES = new Set(['devices', 'parts', 'maintenance', 'breakdowns']);
 
-function json(data, status = 200, headers = {}) {
-  return Response.json(data, { status, headers: { ...NO_STORE, ...headers } });
-}
-function emailsOf(user) {
-  return (user?.emailAddresses || []).map((x) => String(x.emailAddress || '').trim().toLowerCase()).filter(Boolean);
-}
-
 async function authenticate(req, store, permission) {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) throw Object.assign(new Error('CLERK_SECRET_KEY is niet ingesteld in Netlify.'), { status: 500 });
-  const authorization = req.headers.get('authorization') || '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) throw Object.assign(new Error('Aanmelding vereist.'), { status: 401 });
-
-  let verified;
-  try { verified = await verifyToken(token, { secretKey }); }
-  catch { throw Object.assign(new Error('Clerk-sessie kon niet worden geverifieerd.'), { status: 401 }); }
-  if (!verified?.sub) throw Object.assign(new Error('Aanmelding vereist.'), { status: 401 });
-  const origin = req.headers.get('origin');
-  if (origin && verified.azp && verified.azp !== origin) throw Object.assign(new Error('Deze sessie hoort niet bij deze website.'), { status: 403 });
-
-  const clerk = createClerkClient({ secretKey });
-  const currentUser = await clerk.users.getUser(verified.sub);
-  const owner = emailsOf(currentUser).includes(ADMIN_EMAIL);
-  const roleEntry = await store.getWithMetadata(ROLE_CONFIG_KEY, { type: 'json', consistency: 'strong' });
-  const config = normalizeRoleConfig(roleEntry?.data || defaultRoleConfig());
-  const role = normalizeRole(currentUser?.publicMetadata?.role, { owner, config });
-  if (!owner && !hasPermission(role, permission, config)) {
+  const access = await resolveRoleAccess(store, await authenticateClerk(req));
+  if (!access.owner && !hasPermission(access.role, permission, access.roleConfig)) {
     throw Object.assign(new Error(permission === 'audit.undo' ? 'Deze rol mag wijzigingen niet ongedaan maken.' : 'Deze rol mag het wijzigingslogboek niet bekijken.'), { status: 403 });
   }
-  const primary = (currentUser.emailAddresses || []).find((x) => x.id === currentUser.primaryEmailAddressId);
-  const email = String(primary?.emailAddress || currentUser.emailAddresses?.[0]?.emailAddress || '').trim().toLowerCase();
-  const name = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ').trim();
-  return { sub: verified.sub, email, name, role };
+  return access;
 }
 
 function deepEqual(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
