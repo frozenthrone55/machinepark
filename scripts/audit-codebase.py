@@ -9,6 +9,11 @@ BUILD_COMMAND = PACKAGE.get('scripts', {}).get('build', '')
 CHECK_FUNCTIONS = PACKAGE.get('scripts', {}).get('check:functions', '')
 INDEX = (ROOT / 'index.html').read_text(encoding='utf-8')
 SW = (ROOT / 'sw.js').read_text(encoding='utf-8')
+BUILD_JS_PATH = ROOT / 'assets/machinepark-build.js'
+BUILD_CSS_PATH = ROOT / 'assets/machinepark-build.css'
+BUILD_JS = BUILD_JS_PATH.read_text(encoding='utf-8') if BUILD_JS_PATH.exists() else ''
+BUILD_CSS = BUILD_CSS_PATH.read_text(encoding='utf-8') if BUILD_CSS_PATH.exists() else ''
+APP_SOURCE = '\n'.join([INDEX, BUILD_JS, BUILD_CSS])
 
 errors = []
 warnings = []
@@ -45,6 +50,9 @@ for path in sorted(set(active_root_builds) - set(root_build_files)):
 for path in sorted(set(active_root_builds)):
     if active_root_builds.count(path) > 1:
         error(f'Dubbele buildstap: {path}')
+
+if 'scripts/extract-build-assets.py' not in active_build_files:
+    error('De build wordt niet afgesloten met de frontend-assetextractie.')
 
 # 2. Buildmarkers mogen niet door verschillende patches gedeeld worden.
 marker_owners = {}
@@ -83,28 +91,43 @@ for dependency in sorted(PACKAGE.get('dependencies', {})):
         error(f'Ongebruikte package dependency: {dependency}')
 
 # 5. Centrale foto-instellingen en opslagarchitectuur.
-if 'const REPORT_PHOTO_LIMIT = 5;' not in INDEX:
+if 'const REPORT_PHOTO_LIMIT = 5;' not in APP_SOURCE:
     error('Verslagfoto-limiet is niet 5 in de gebouwde app.')
-if 'const REPORT_PHOTO_LIMIT = 4;' in INDEX:
+if 'const REPORT_PHOTO_LIMIT = 4;' in APP_SOURCE:
     error('Oude verslagfoto-limiet 4 is nog aanwezig.')
-if 'const DEVICE_PHOTO_LIMIT = 5;' not in INDEX:
+if 'const DEVICE_PHOTO_LIMIT = 5;' not in APP_SOURCE:
     error('Toestelfoto-limiet is niet centraal op 5 ingesteld.')
-if 'Een toestel kan maximaal 3 foto’s bevatten.' in INDEX or 'van maximaal 3 foto’s' in INDEX:
+if 'Een toestel kan maximaal 3 foto’s bevatten.' in APP_SOURCE or 'van maximaal 3 foto’s' in APP_SOURCE:
     error('Oude toestelfoto-limiet 3 is nog aanwezig.')
-if 'machineparkPersistServicePhotos' not in INDEX or '/.netlify/functions/service-photos' not in INDEX:
+if 'machineparkPersistServicePhotos' not in APP_SOURCE or '/.netlify/functions/service-photos' not in APP_SOURCE:
     error('Verslagfoto’s gebruiken de aparte Blob-opslag niet.')
-if 'const baseLocalSnapshotForPartPhotos = localSnapshot;' in INDEX:
+if 'const baseLocalSnapshotForPartPhotos = localSnapshot;' in APP_SOURCE:
     error('Achtergrondfotomigratie blokkeert nog de centrale snapshot.')
 
-# 6. Service-worker cacheversie moet aansluiten bij package major.minor.
+# 6. De featurelaag moet na de build uit de grote HTML gehaald zijn.
+if not BUILD_JS_PATH.exists() or BUILD_JS_PATH.stat().st_size < 1000:
+    error('Gegenereerde JavaScript-asset ontbreekt of is onverwacht klein.')
+if not BUILD_CSS_PATH.exists() or BUILD_CSS_PATH.stat().st_size < 1000:
+    error('Gegenereerde CSS-asset ontbreekt of is onverwacht klein.')
+if '/assets/machinepark-build.js' not in INDEX or '/assets/machinepark-build.css' not in INDEX:
+    error('index.html verwijst niet naar beide gegenereerde frontend-assets.')
+if re.search(r'<script\b[^>]*data-machinepark-build-fix=', INDEX, flags=re.IGNORECASE):
+    error('Feature-JavaScript staat nog inline in index.html.')
+if re.search(r'<style\b[^>]*data-machinepark-build-fix=', INDEX, flags=re.IGNORECASE):
+    error('Feature-CSS staat nog inline in index.html.')
+
+# 7. Service-worker cacheversie moet aansluiten bij package major.minor en externe assets bevatten.
 version = str(PACKAGE.get('version', '')).strip()
 version_parts = version.split('.')
 if len(version_parts) >= 2:
     expected_cache_prefix = f'machinepark-v{version_parts[0]}.{version_parts[1]}'
     if expected_cache_prefix not in SW:
         error(f'Service-worker cache wijkt af van packageversie: verwacht {expected_cache_prefix}.')
+for asset in ['/assets/machinepark-build.js', '/assets/machinepark-build.css']:
+    if asset not in SW:
+        error(f'Service worker cachet gegenereerde asset niet: {asset}')
 
-# 7. Serverauth hoort uitsluitend in de gedeelde module thuis.
+# 8. Serverauth hoort uitsluitend in de gedeelde module thuis.
 server_files = list((ROOT / 'netlify/functions').glob('*.mjs'))
 server_texts = {path.name: path.read_text(encoding='utf-8') for path in server_files}
 for name, text in server_texts.items():
@@ -117,18 +140,23 @@ shared_auth = (ROOT / 'netlify/functions/_shared/server-auth.mjs').read_text(enc
 if "from '@clerk/backend'" not in shared_auth or "export const ADMIN_EMAIL" not in shared_auth:
     error('Gedeelde server-authenticatie/config ontbreekt of is onvolledig.')
 
-# 8. Rapportage over onderhoudbaarheid: niet fataal, wel zichtbaar in elke CI-run.
+# 9. Rapportage over onderhoudbaarheid.
 index_kb = round(len(INDEX.encode('utf-8')) / 1024, 1)
-note(f'Gebouwde index.html: {index_kb} KB')
+js_kb = round(len(BUILD_JS.encode('utf-8')) / 1024, 1)
+css_kb = round(len(BUILD_CSS.encode('utf-8')) / 1024, 1)
+note(f'index.html: {index_kb} KB')
+note(f'Feature-JavaScript: {js_kb} KB')
+note(f'Feature-CSS: {css_kb} KB')
 note(f'Actieve root-buildpatches: {len(active_root_builds)}')
 note(f'Netlify-modules: {len(function_files)}')
 
 if index_kb > 350:
-    warning('index.html groeit boven 350 KB; externe build-assets worden sterk aanbevolen.')
+    warning('index.html blijft boven 350 KB ondanks assetextractie; verdere bronmodularisatie is aanbevolen.')
 
-# Wrapperlagen zijn nuttig tijdens ontwikkeling, maar veel overschrijvingen maken de runtime moeilijker te volgen.
+# Veel wrappers maken runtime-volgorde moeilijker. Twee lagen (feature + rechten) zijn acceptabel;
+# drie of meer worden als onderhoudsprobleem gerapporteerd.
 for name in ['openDevice', 'showDeviceHistory', 'applyOperationalPermissions', 'localSnapshot']:
-    assignments = len(re.findall(rf'\b{re.escape(name)}\s*=\s*(?:async\s+)?function\b', INDEX))
+    assignments = len(re.findall(rf'\b{re.escape(name)}\s*=\s*(?:async\s+)?function\b', APP_SOURCE))
     if assignments > 2:
         warning(f'{name} wordt {assignments} keer opnieuw toegewezen in de gebouwde app; kandidaat voor consolidatie.')
 
