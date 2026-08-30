@@ -75,7 +75,7 @@ test('service worker forceert nieuwe cache voor export met afbeeldingen', () => 
   assert.ok(sw.includes('machinepark-v1.64-export-images'));
 });
 
-test('tijdelijke buildpatches zijn uit de repository verdwenen', () => {
+test('scriptsmap bevat alleen de vaste build en audit tooling', () => {
   const scripts = readdirSync(new URL('../scripts/', import.meta.url)).sort();
-  assert.deepEqual(scripts, ['build-machinepark.py']);
+  assert.deepEqual(scripts, ['audit-codebase.py', 'build-machinepark.py']);
 });
