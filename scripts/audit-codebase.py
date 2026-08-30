@@ -60,14 +60,14 @@ for marker, owners in sorted(marker_owners.items()):
     if len(set(owners)) > 1:
         error(f'Buildmarker {marker!r} zit in meerdere bestanden: {", ".join(sorted(set(owners)))}')
 
-# 3. Alle top-level Netlify-functions moeten syntactisch gecontroleerd worden.
+# 3. Alle Netlify JavaScript-modules, inclusief _shared, moeten syntactisch gecontroleerd worden.
 function_files = sorted(
     path.relative_to(ROOT).as_posix()
-    for path in (ROOT / 'netlify/functions').glob('*.mjs')
+    for path in (ROOT / 'netlify/functions').rglob('*.mjs')
 )
 for relative in function_files:
     if f'node --check {relative}' not in CHECK_FUNCTIONS:
-        error(f'Netlify-function ontbreekt in check:functions: {relative}')
+        error(f'Netlify-module ontbreekt in check:functions: {relative}')
 
 # 4. Dependencies moeten werkelijk gebruikt worden buiten package.json.
 source_paths = [
@@ -82,19 +82,19 @@ for dependency in sorted(PACKAGE.get('dependencies', {})):
     if dependency not in source_text:
         error(f'Ongebruikte package dependency: {dependency}')
 
-# 5. Centrale foto-instellingen moeten na de build overal dezelfde limiet gebruiken.
+# 5. Centrale foto-instellingen en opslagarchitectuur.
 if 'const REPORT_PHOTO_LIMIT = 5;' not in INDEX:
     error('Verslagfoto-limiet is niet 5 in de gebouwde app.')
 if 'const REPORT_PHOTO_LIMIT = 4;' in INDEX:
     error('Oude verslagfoto-limiet 4 is nog aanwezig.')
-if 'Maximaal 3 foto’s. Kies één foto als overzichtsfoto' in INDEX:
+if 'const DEVICE_PHOTO_LIMIT = 5;' not in INDEX:
+    error('Toestelfoto-limiet is niet centraal op 5 ingesteld.')
+if 'Een toestel kan maximaal 3 foto’s bevatten.' in INDEX or 'van maximaal 3 foto’s' in INDEX:
     error('Oude toestelfoto-limiet 3 is nog aanwezig.')
-if 'van maximaal 3 foto’s' in INDEX:
-    error('Oude toestelfoto-statuslimiet 3 is nog aanwezig.')
-if 'Een toestel kan maximaal 3 foto’s bevatten.' in INDEX:
-    error('Oude toestelfoto-foutmelding met limiet 3 is nog aanwezig.')
-if 'Maximaal 5 foto’s. Kies één foto als overzichtsfoto' not in INDEX:
-    error('Toestelfoto-limiet 5 ontbreekt in de editor.')
+if 'machineparkPersistServicePhotos' not in INDEX or '/.netlify/functions/service-photos' not in INDEX:
+    error('Verslagfoto’s gebruiken de aparte Blob-opslag niet.')
+if 'const baseLocalSnapshotForPartPhotos = localSnapshot;' in INDEX:
+    error('Achtergrondfotomigratie blokkeert nog de centrale snapshot.')
 
 # 6. Service-worker cacheversie moet aansluiten bij package major.minor.
 version = str(PACKAGE.get('version', '')).strip()
@@ -104,34 +104,27 @@ if len(version_parts) >= 2:
     if expected_cache_prefix not in SW:
         error(f'Service-worker cache wijkt af van packageversie: verwacht {expected_cache_prefix}.')
 
-# 7. Rapportage over onderhoudbaarheid: niet fataal, wel zichtbaar in elke CI-run.
+# 7. Serverauth hoort uitsluitend in de gedeelde module thuis.
+server_files = list((ROOT / 'netlify/functions').glob('*.mjs'))
+server_texts = {path.name: path.read_text(encoding='utf-8') for path in server_files}
+for name, text in server_texts.items():
+    if "from '@clerk/backend'" in text:
+        error(f'{name} implementeert Clerk nog rechtstreeks; gebruik _shared/server-auth.mjs.')
+    if re.search(r'^const ADMIN_EMAIL\s*=', text, flags=re.MULTILINE):
+        error(f'{name} bevat nog een eigen ADMIN_EMAIL; gebruik de gedeelde serverconfig.')
+
+shared_auth = (ROOT / 'netlify/functions/_shared/server-auth.mjs').read_text(encoding='utf-8') if (ROOT / 'netlify/functions/_shared/server-auth.mjs').exists() else ''
+if "from '@clerk/backend'" not in shared_auth or "export const ADMIN_EMAIL" not in shared_auth:
+    error('Gedeelde server-authenticatie/config ontbreekt of is onvolledig.')
+
+# 8. Rapportage over onderhoudbaarheid: niet fataal, wel zichtbaar in elke CI-run.
 index_kb = round(len(INDEX.encode('utf-8')) / 1024, 1)
 note(f'Gebouwde index.html: {index_kb} KB')
 note(f'Actieve root-buildpatches: {len(active_root_builds)}')
-note(f'Netlify-functions: {len(function_files)}')
+note(f'Netlify-modules: {len(function_files)}')
 
 if index_kb > 350:
-    warning('index.html groeit boven 350 KB; opsplitsing in modules wordt dan sterk aanbevolen.')
-
-server_files = list((ROOT / 'netlify/functions').glob('*.mjs'))
-server_texts = {path.name: path.read_text(encoding='utf-8') for path in server_files}
-auth_files = [name for name, text in server_texts.items() if re.search(r'async function authenticate(?:Manager)?\s*\(', text)]
-if len(auth_files) >= 4:
-    warning(f'Clerk-authenticatie wordt in {len(auth_files)} serverfuncties apart geïmplementeerd; kandidaat voor één _shared/auth.mjs.')
-
-admin_email_files = [name for name, text in server_texts.items() if "const ADMIN_EMAIL =" in text]
-if len(admin_email_files) >= 4:
-    warning(f'ADMIN_EMAIL staat dubbel in {len(admin_email_files)} serverfuncties; kandidaat voor gedeelde serverconfig.')
-
-# De verslagfoto’s zitten nog als data:image in de centrale snapshot. Dat is functioneel,
-# maar vormt de grootste resterende schaalbaarheidsgrens na de Blob-migratie van toestel- en onderdeelfoto’s.
-base_build = (ROOT / 'scripts/build-machinepark.py').read_text(encoding='utf-8')
-if "collectServicePhotos" in base_build and "data:image/" in base_build:
-    warning('Onderhouds-/depannagefoto’s worden nog als base64 in de centrale snapshot bewaard; bij veel dossiers kan de PUT opnieuw te groot worden.')
-
-role_management = server_texts.get('role-management.mjs', '')
-if "getUserList({ limit: 100" in role_management:
-    warning('Rollen verwijderen controleert maximaal 100 Clerk-gebruikers; bij >100 gebruikers is paginering nodig.')
+    warning('index.html groeit boven 350 KB; externe build-assets worden sterk aanbevolen.')
 
 # Wrapperlagen zijn nuttig tijdens ontwikkeling, maar veel overschrijvingen maken de runtime moeilijker te volgen.
 for name in ['openDevice', 'showDeviceHistory', 'applyOperationalPermissions', 'localSnapshot']:
