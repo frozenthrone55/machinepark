@@ -4,6 +4,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const buildJs = readFileSync(new URL('../assets/machinepark-build.js', import.meta.url), 'utf8');
+const buildCss = readFileSync(new URL('../assets/machinepark-build.css', import.meta.url), 'utf8');
+const builtSource = `${html}\n${buildJs}\n${buildCss}`;
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 
 test('kritieke UI bouwstenen zijn aanwezig', () => {
@@ -51,10 +54,12 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'Maandelijks',
     'technieker',
     'magazijnier',
-  ]) assert.ok(html.includes(needle), `Ontbreekt in broncode: ${needle}`);
+    'machineparkPersistServicePhotos',
+    'const DEVICE_PHOTO_LIMIT = 5;',
+  ]) assert.ok(builtSource.includes(needle), `Ontbreekt in gebouwde app: ${needle}`);
 });
 
-test('inline app-JavaScript bevat geen syntaxfouten', () => {
+test('inline en gegenereerde app-JavaScript bevatten geen syntaxfouten', () => {
   const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
   assert.ok(scripts.length > 0, 'Geen inline scripts gevonden');
   scripts.forEach((code, index) => {
@@ -64,6 +69,22 @@ test('inline app-JavaScript bevat geen syntaxfouten', () => {
       assert.fail(`Syntaxfout in inline script ${index + 1}:\n${error.stack || error.message}`);
     }
   });
+  try {
+    new vm.Script(buildJs, { filename: 'assets/machinepark-build.js' });
+  } catch (error) {
+    assert.fail(`Syntaxfout in gegenereerde frontend-JavaScript:\n${error.stack || error.message}`);
+  }
+});
+
+test('gegenereerde featurecode staat in externe assets', () => {
+  assert.ok(html.includes('data-machinepark-generated-asset="css"'));
+  assert.ok(html.includes('data-machinepark-generated-asset="js"'));
+  assert.ok(html.includes('/assets/machinepark-build.css'));
+  assert.ok(html.includes('/assets/machinepark-build.js'));
+  assert.ok(buildJs.length > 1000, 'Gegenereerde JavaScript-bundel is onverwacht leeg');
+  assert.ok(buildCss.length > 1000, 'Gegenereerde CSS-bundel is onverwacht leeg');
+  assert.equal(/<script\b[^>]*data-machinepark-build-fix=/i.test(html), false);
+  assert.equal(/<style\b[^>]*data-machinepark-build-fix=/i.test(html), false);
 });
 
 test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () => {
@@ -71,11 +92,13 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
-test('service worker forceert nieuwe cache voor export met afbeeldingen', () => {
-  assert.ok(sw.includes('machinepark-v1.64-export-images'));
+test('service worker cachet de modulaire frontend-assets', () => {
+  assert.ok(sw.includes('machinepark-v1.64-modular-assets'));
+  assert.ok(sw.includes('/assets/machinepark-build.js'));
+  assert.ok(sw.includes('/assets/machinepark-build.css'));
 });
 
-test('scriptsmap bevat alleen de vaste build en audit tooling', () => {
+test('scriptsmap bevat alleen de vaste build-, audit- en finalizetooling', () => {
   const scripts = readdirSync(new URL('../scripts/', import.meta.url)).sort();
-  assert.deepEqual(scripts, ['audit-codebase.py', 'build-machinepark.py']);
+  assert.deepEqual(scripts, ['audit-codebase.py', 'build-machinepark.py', 'extract-build-assets.py']);
 });
