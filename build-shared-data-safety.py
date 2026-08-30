@@ -5,7 +5,22 @@ index_path = ROOT / 'index.html'
 index = index_path.read_text(encoding='utf-8')
 MARKER = 'data-machinepark-build-fix="shared-data-safety-v1"'
 
+
+def replace_once(old, new, label):
+    global index
+    count = index.count(old)
+    if count != 1:
+        raise SystemExit(f'Buildvalidatie mislukt: verwacht 1x {label}, gevonden {count}x')
+    index = index.replace(old, new, 1)
+
+
 if MARKER not in index:
+    replace_once(
+        "if (photoSaveBusy > 0 || !canManageServicePhotosClient(storeName) || !list.length) return 0;",
+        "if (window.machineparkServiceBlobWritesEnabled === false || photoSaveBusy > 0 || !canManageServicePhotosClient(storeName) || !list.length) return 0;",
+        'previewbeveiliging achtergrondmigratie verslagfoto’s',
+    )
+
     script = r'''
 <script data-machinepark-build-fix="shared-data-safety-v1">
 (() => {
@@ -37,7 +52,13 @@ if MARKER not in index:
     index = before + script + '</body>' + after
     index_path.write_text(index, encoding='utf-8')
 
-for needle in [MARKER, 'machineparkServiceBlobWritesEnabled', "host.startsWith('deploy-preview-')", 'machineparkPersistServicePhotos']:
+for needle in [
+    MARKER,
+    'machineparkServiceBlobWritesEnabled',
+    "host.startsWith('deploy-preview-')",
+    'machineparkPersistServicePhotos',
+    'window.machineparkServiceBlobWritesEnabled === false',
+]:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: gedeelde-data beveiliging ontbreekt ({needle})')
 
