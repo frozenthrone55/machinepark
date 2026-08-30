@@ -47,6 +47,15 @@ if MARKER not in index:
         'volledige tijdlijnfoto bij afdrukken',
     )
 
+    # printDeviceDetails opent een apart document. De gewone pagina-CSS wordt daar niet
+    # automatisch meegenomen, dus geef tijdlijnfoto’s expliciet dezelfde afdrukmaat en
+    # 3-kolomsindeling als de toestel-/machinefoto’s in dat document.
+    replace_once(
+        '      .device-detail-photo .badge{position:absolute;left:2mm;bottom:2mm;background:#fff}\n      @media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}',
+        '      .device-detail-photo .badge{position:absolute;left:2mm;bottom:2mm;background:#fff}\n      .timeline-service-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3mm;margin-top:3mm}\n      .timeline-service-photo{display:block;width:100%!important;height:48mm!important;object-fit:contain!important;background:#fff;border:1px solid #ccc;border-radius:2mm;break-inside:avoid}\n      @media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}',
+        'tijdlijnfoto afdrukformaat gelijk aan machinefoto’s',
+    )
+
     style = f'''
 <style {MARKER}>
 .timeline-service-photos{{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}}
@@ -57,8 +66,8 @@ if MARKER not in index:
   .timeline-service-photo{{width:64px;height:64px}}
 }}
 @media print{{
-  .timeline-service-photos{{display:flex;flex-wrap:wrap;gap:2mm;margin-top:2.5mm}}
-  .timeline-service-photo{{width:17mm!important;height:17mm!important;object-fit:cover;border:1px solid #ccc;border-radius:2mm;break-inside:avoid}}
+  .timeline-service-photos{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3mm;margin-top:3mm}}
+  .timeline-service-photo{{width:100%!important;height:48mm!important;object-fit:contain!important;background:#fff;border:1px solid #ccc;border-radius:2mm;break-inside:avoid}}
 }}
 </style>
 '''
@@ -74,6 +83,8 @@ required = [
     "deviceTimelinePhotosHtml(b.photos,'Depannagefoto')",
     'class="timeline-service-photo"',
     'width:64px;height:64px',
+    'grid-template-columns:repeat(3,minmax(0,1fr))',
+    'height:48mm!important',
     'data-photo-lightbox',
     "img.dataset.fullSrc || img.src",
 ]
@@ -81,4 +92,4 @@ for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: verslagfoto in Machinedetails ontbreekt ({needle})')
 
-print('[Machinepark] tijdlijnfoto’s zijn 64x64 px, gelijk aan toesteloverzicht')
+print('[Machinepark] tijdlijnfoto’s scherm 64x64 px en afdruk gelijk aan machinefoto’s')
