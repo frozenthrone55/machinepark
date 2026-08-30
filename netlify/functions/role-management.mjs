@@ -1,63 +1,37 @@
 import { getStore } from '@netlify/blobs';
-import { createClerkClient, verifyToken } from '@clerk/backend';
 import {
   ALL_PERMISSION_KEYS,
   PERMISSION_CATALOG,
-  ROLE_CONFIG_KEY,
-  defaultRoleConfig,
   hasPermission,
   normalizeRole,
   normalizeRoleConfig,
-  roleLabel,
   sanitizeRoleId,
 } from './_shared/permissions.mjs';
+import {
+  NO_STORE,
+  STORE_NAME,
+  authenticateClerk,
+  jsonResponse as json,
+  primaryEmailOf,
+  resolveRoleAccess,
+} from './_shared/server-auth.mjs';
 
-const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
-const STORE_NAME = 'machinepark-central';
+const ROLE_CONFIG_KEY = 'role-config-v1';
 const AUDIT_PREFIX = 'audit/';
-const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
-
-function json(data, status = 200, headers = {}) {
-  return Response.json(data, { status, headers: { ...NO_STORE, ...headers } });
-}
-
-function emailsOf(user) {
-  return (user?.emailAddresses || []).map((x) => String(x.emailAddress || '').trim().toLowerCase()).filter(Boolean);
-}
-
-function primaryEmailOf(user) {
-  const primary = (user?.emailAddresses || []).find((x) => x.id === user?.primaryEmailAddressId);
-  return String(primary?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || '').trim().toLowerCase();
-}
-
-async function getRoleConfig(store) {
-  const entry = await store.getWithMetadata(ROLE_CONFIG_KEY, { type: 'json', consistency: 'strong' });
-  return { entry, config: normalizeRoleConfig(entry?.data || defaultRoleConfig()) };
-}
 
 async function authenticate(req, store) {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) throw Object.assign(new Error('CLERK_SECRET_KEY is niet ingesteld in Netlify.'), { status: 500 });
-  const authorization = req.headers.get('authorization') || '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) throw Object.assign(new Error('Aanmelding vereist.'), { status: 401 });
-
-  let verified;
-  try { verified = await verifyToken(token, { secretKey }); }
-  catch { throw Object.assign(new Error('Clerk-sessie kon niet worden geverifieerd.'), { status: 401 }); }
-  if (!verified?.sub) throw Object.assign(new Error('Aanmelding vereist.'), { status: 401 });
-  const origin = req.headers.get('origin');
-  if (origin && verified.azp && verified.azp !== origin) throw Object.assign(new Error('Deze sessie hoort niet bij deze website.'), { status: 403 });
-
-  const clerk = createClerkClient({ secretKey });
-  const user = await clerk.users.getUser(verified.sub);
-  const owner = emailsOf(user).includes(ADMIN_EMAIL);
-  const { entry, config } = await getRoleConfig(store);
-  const role = normalizeRole(user?.publicMetadata?.role, { owner, config });
-  if (!owner && !hasPermission(role, 'roles.manage', config)) {
+  const base = await authenticateClerk(req);
+  const access = await resolveRoleAccess(store, base);
+  if (!access.owner && !hasPermission(access.role, 'roles.manage', access.roleConfig)) {
     throw Object.assign(new Error('Deze rol mag rollen en rechten niet beheren.'), { status: 403 });
   }
-  return { clerk, user, owner, role, verified, configEntry: entry, config };
+  return {
+    ...access,
+    configEntry: access.roleConfigEtag
+      ? { etag: access.roleConfigEtag, data: access.roleConfig }
+      : null,
+    config: access.roleConfig,
+  };
 }
 
 async function roleUsageCount(clerk, roleId, config) {
@@ -78,15 +52,15 @@ async function writeAudit(store, auth, action, label, fields = []) {
   try {
     const at = new Date().toISOString();
     const id = crypto.randomUUID();
-    const email = primaryEmailOf(auth.user) || auth.verified.sub;
+    const email = primaryEmailOf(auth.user) || auth.sub;
     await store.setJSON(`${AUDIT_PREFIX}${Date.now()}-${id}`, {
-      id, at, userId: auth.verified.sub, userEmail: email,
+      id, at, userId: auth.sub, userEmail: email,
       userName: [auth.user.firstName, auth.user.lastName].filter(Boolean).join(' '),
       userRole: auth.role,
       changeCount: 1,
       changes: [{ entityType: 'Rollenbeheer', entityId: label, entityLabel: label, action, fields }],
       truncated: false,
-    }, { metadata: { at, userId: auth.verified.sub, userEmail: email } });
+    }, { metadata: { at, userId: auth.sub, userEmail: email } });
   } catch (error) {
     console.error('rollenbeheer audit', error);
   }
@@ -94,8 +68,9 @@ async function writeAudit(store, auth, action, label, fields = []) {
 
 async function saveConfig(store, previousEntry, config, expectedEtag) {
   const metadata = { updatedAt: new Date().toISOString() };
-  const options = previousEntry
-    ? { onlyIfMatch: expectedEtag || previousEntry.etag, metadata }
+  const previousEtag = previousEntry?.etag || null;
+  const options = previousEtag
+    ? { onlyIfMatch: expectedEtag || previousEtag, metadata }
     : { onlyIfNew: true, metadata };
   const result = await store.setJSON(ROLE_CONFIG_KEY, normalizeRoleConfig(config), options);
   if (!result.modified) {
@@ -125,9 +100,9 @@ export default async (req) => {
       return json({
         roles: publicConfig(auth.config),
         permissionCatalog: PERMISSION_CATALOG,
-        etag: auth.configEntry?.etag || null,
+        etag: auth.roleConfigEtag || null,
         ownerProtected: true,
-      }, 200, auth.configEntry?.etag ? { etag: auth.configEntry.etag } : {});
+      }, 200, auth.roleConfigEtag ? { etag: auth.roleConfigEtag } : {});
     }
 
     if (req.method === 'POST') {
@@ -156,7 +131,7 @@ export default async (req) => {
         if (index >= 0) roles[index] = nextRole;
         else roles.push(nextRole);
 
-        const saved = await saveConfig(store, auth.configEntry, { version: 1, roles }, body?.etag || null);
+        const saved = await saveConfig(store, { etag: auth.roleConfigEtag }, { version: 1, roles }, body?.etag || null);
         await writeAudit(store, auth, existing ? 'aangepast' : 'toegevoegd', nextRole.label, [
           { field: 'Rol', before: existing?.label || '—', after: nextRole.label },
           { field: 'Toegestane handelingen', before: existing ? String(Object.values(existing.permissions).filter(Boolean).length) : '0', after: String(Object.values(nextRole.permissions).filter(Boolean).length) },
@@ -174,7 +149,7 @@ export default async (req) => {
         if (inUseCount) return json({ error: `Deze rol is nog toegewezen aan ${inUseCount} gebruiker(s). Wijs eerst een andere rol toe.` }, 409);
 
         const roles = current.roles.filter((role) => role.id !== roleId);
-        const saved = await saveConfig(store, auth.configEntry, { version: 1, roles }, body?.etag || null);
+        const saved = await saveConfig(store, { etag: auth.roleConfigEtag }, { version: 1, roles }, body?.etag || null);
         await writeAudit(store, auth, 'verwijderd', target.label, [{ field: 'Rol', before: target.label, after: '—' }]);
         return json({ ok: true, roles: publicConfig(saved.data), etag: saved.etag || null });
       }
