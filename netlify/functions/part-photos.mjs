@@ -1,52 +1,18 @@
 import { getStore } from '@netlify/blobs';
-import { createClerkClient, verifyToken } from '@clerk/backend';
 import {
-  ROLE_CONFIG_KEY,
-  defaultRoleConfig,
-  normalizeRole,
-  normalizeRoleConfig,
-  permissionsForRole,
-} from './_shared/permissions.mjs';
+  NO_STORE,
+  STORE_NAME,
+  authenticateClerk,
+  jsonResponse as json,
+  resolveRoleAccess,
+} from './_shared/server-auth.mjs';
 
-const STORE_NAME = 'machinepark-central';
 const PHOTO_PREFIX = 'part-photos/';
 const THUMB_SUFFIX = '.thumb';
-const ADMIN_EMAIL = 'kriskoffieapp@telenet.be';
-const NO_STORE = { 'cache-control': 'no-store, max-age=0' };
-
-function json(data, status = 200) {
-  return Response.json(data, { status, headers: NO_STORE });
-}
-
-async function authenticate(req) {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) throw Object.assign(new Error('CLERK_SECRET_KEY is niet ingesteld in Netlify.'), { status: 500 });
-  const authorization = req.headers.get('authorization') || '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) throw Object.assign(new Error('Aanmelding vereist.'), { status: 401 });
-  try {
-    const verified = await verifyToken(token, { secretKey });
-    if (!verified?.sub) throw new Error('Geen gebruiker in token.');
-    const origin = req.headers.get('origin');
-    if (origin && verified.azp && verified.azp !== origin) throw Object.assign(new Error('Deze sessie hoort niet bij deze website.'), { status: 403 });
-    const clerk = createClerkClient({ secretKey });
-    const user = await clerk.users.getUser(verified.sub);
-    const primary = (user.emailAddresses || []).find((x) => x.id === user.primaryEmailAddressId);
-    const email = String(primary?.emailAddress || user.emailAddresses?.[0]?.emailAddress || '').trim().toLowerCase();
-    const owner = (user.emailAddresses || []).some((x) => String(x.emailAddress || '').trim().toLowerCase() === ADMIN_EMAIL);
-    return { ...verified, email, owner, rawRole: user?.publicMetadata?.role || 'gebruiker' };
-  } catch (error) {
-    if (error?.status) throw error;
-    throw Object.assign(new Error('Clerk-sessie kon niet worden geverifieerd.'), { status: 401 });
-  }
-}
 
 async function canManagePartPhotos(store, auth) {
-  const roleEntry = await store.getWithMetadata(ROLE_CONFIG_KEY, { type: 'json', consistency: 'strong' });
-  const roleConfig = normalizeRoleConfig(roleEntry?.data || defaultRoleConfig());
-  const role = normalizeRole(auth.rawRole, { owner: auth.owner, config: roleConfig });
-  const permissions = permissionsForRole(role, roleConfig, { owner: auth.owner });
-  return Boolean(auth.owner || permissions['parts.edit'] || permissions['parts.add']);
+  const access = await resolveRoleAccess(store, auth);
+  return Boolean(access.owner || access.permissions['parts.edit'] || access.permissions['parts.add']);
 }
 
 function safePartId(value) {
@@ -141,7 +107,7 @@ export default async (req) => {
     }
 
     if (req.method === 'POST') {
-      const auth = await authenticate(req);
+      const auth = await authenticateClerk(req);
       const body = await req.json();
       const action = String(body?.action || 'save');
       const partId = safePartId(body?.partId);
