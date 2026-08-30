@@ -60,6 +60,20 @@ async function authenticate(req, store) {
   return { clerk, user, owner, role, verified, configEntry: entry, config };
 }
 
+async function roleUsageCount(clerk, roleId, config) {
+  const pageSize = 100;
+  let offset = 0;
+  let count = 0;
+  while (true) {
+    const result = await clerk.users.getUserList({ limit: pageSize, offset, orderBy: '-created_at' });
+    const users = result.data || [];
+    count += users.filter((user) => normalizeRole(user?.publicMetadata?.role, { config }) === roleId).length;
+    offset += users.length;
+    const totalCount = Number(result.totalCount);
+    if (users.length < pageSize || (Number.isFinite(totalCount) && offset >= totalCount)) return count;
+  }
+}
+
 async function writeAudit(store, auth, action, label, fields = []) {
   try {
     const at = new Date().toISOString();
@@ -156,9 +170,8 @@ export default async (req) => {
         if (!target) return json({ error: 'Rol niet gevonden.' }, 404);
         if (target.builtIn) return json({ error: 'Een standaardrol kan niet worden verwijderd; de rechten ervan kunnen wel worden aangepast.' }, 400);
 
-        const users = await auth.clerk.users.getUserList({ limit: 100, orderBy: '-created_at' });
-        const inUse = (users.data || []).filter((user) => normalizeRole(user?.publicMetadata?.role, { config: current }) === roleId);
-        if (inUse.length) return json({ error: `Deze rol is nog toegewezen aan ${inUse.length} gebruiker(s). Wijs eerst een andere rol toe.` }, 409);
+        const inUseCount = await roleUsageCount(auth.clerk, roleId, current);
+        if (inUseCount) return json({ error: `Deze rol is nog toegewezen aan ${inUseCount} gebruiker(s). Wijs eerst een andere rol toe.` }, 409);
 
         const roles = current.roles.filter((role) => role.id !== roleId);
         const saved = await saveConfig(store, auth.configEntry, { version: 1, roles }, body?.etag || null);
