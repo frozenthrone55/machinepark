@@ -33,6 +33,9 @@ if MARKER not in index:
 .breakdown-detail-field.full{grid-column:1/-1}
 .breakdown-detail-field label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:5px}
 .breakdown-detail-field .value{font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.breakdown-detail-parts{display:grid;gap:5px}
+.breakdown-detail-part{font-size:13px;line-height:1.5;padding:5px 0;border-bottom:1px solid #e7ece9;overflow-wrap:anywhere}
+.breakdown-detail-part:last-child{border-bottom:0}
 .breakdown-detail-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:10px;margin-top:4px}
 .breakdown-detail-photos img{display:block;width:100%;height:135px;object-fit:cover;border:1px solid var(--line);border-radius:10px;background:#f8faf9;cursor:zoom-in}
 @media(max-width:650px){.breakdown-detail-summary{grid-template-columns:1fr}.breakdown-detail-field.full{grid-column:1}.breakdown-detail-photos{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -64,13 +67,19 @@ if MARKER not in index:
     return minutes ? `${minutes} min` : '—';
   }
 
-  function detailParts(record) {
-    try { return usedPartsText(record?.usedParts || []) || '—'; }
-    catch (_) { return '—'; }
-  }
-
   function detailField(label, value, full = false) {
     return `<div class="breakdown-detail-field${full ? ' full' : ''}"><label>${detailEsc(label)}</label><div class="value">${detailEsc(value || '—')}</div></div>`;
+  }
+
+  function detailParts(record) {
+    const parts = Array.isArray(record?.usedParts) ? record.usedParts : [];
+    if (!parts.length) return detailField('Gebruikte onderdelen', '—', true);
+    const rows = parts.map(part => {
+      let text = '—';
+      try { text = usedPartsText([part]) || '—'; } catch (_) {}
+      return `<div class="breakdown-detail-part">${detailEsc(text)}</div>`;
+    }).join('');
+    return `<div class="breakdown-detail-field full"><label>Gebruikte onderdelen</label><div class="breakdown-detail-parts">${rows}</div></div>`;
   }
 
   function detailPhotos(record) {
@@ -108,7 +117,7 @@ if MARKER not in index:
       ${detailField('Probleem / melding', record.issue || '—', true)}
       ${detailField('Diagnose', record.diagnosis || '—', true)}
       ${detailField('Oplossing / uitgevoerde werken', record.solution || '—', true)}
-      ${detailField('Gebruikte onderdelen', detailParts(record), true)}
+      ${detailParts(record)}
       ${detailPhotos(record)}
     </div>`;
 
@@ -160,6 +169,8 @@ required = [
     'Diagnose',
     'Oplossing / uitgevoerde werken',
     'Gebruikte onderdelen',
+    'breakdown-detail-parts',
+    'usedPartsText([part])',
     'Foto’s bij verslag',
 ]
 for needle in required:
