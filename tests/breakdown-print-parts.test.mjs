@@ -7,7 +7,7 @@ const build = readFileSync(new URL('../build-print-service-details.py', import.m
 test('depannage-afdruk zet elk gebruikt onderdeel op een eigen regel', () => {
   assert.ok(build.includes("serviceRecordParts(record, true)"));
   assert.ok(build.includes("usedPartsText([part])"));
-  assert.ok(build.includes("lines.join('\\n')"));
+  assert.ok(build.includes("lines.join(String.fromCharCode(10))"));
   assert.ok(build.includes('white-space:pre-wrap'));
 });
 
