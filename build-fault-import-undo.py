@@ -65,9 +65,10 @@ if MARKER not in index:
 </script>
 '''
     anchor = '<script src="/offline-first.js"></script>'
-    if index.count(anchor) != 1:
-        raise SystemExit('Buildvalidatie mislukt: offline runtime-anker niet uniek voor import-undo')
-    index = index.replace(anchor, script + '\n' + anchor, 1)
+    pos = index.rfind(anchor)
+    if pos < 0:
+        raise SystemExit('Buildvalidatie mislukt: offline runtime-anker ontbreekt voor import-undo')
+    index = index[:pos] + script + '\n' + index[pos:]
 
 UNDO_KEY_CONST = "const FAULT_IMPORT_UNDO_KEY = 'fault-import-undo-v1';"
 if UNDO_KEY_CONST not in endpoint:
@@ -151,7 +152,6 @@ async function finalizeFaultImportUndo(store, staged, saved, added, updated, tot
         raise SystemExit('Buildvalidatie mislukt: faultImportKey-anker niet uniek')
     endpoint = endpoint.replace(helper_anchor, helper + helper_anchor, 1)
 
-# Stage snapshot immediately before the atomic import write, then mark it ready only after success.
 STAGE_MARKER = 'const stagedUndo = await stageFaultImportUndo(store, config, etag, access);'
 if STAGE_MARKER not in endpoint:
     anchor = "      if (merged.length > MAX_FAULTS) return json({ error: `De storingsbibliotheek mag maximaal ${MAX_FAULTS} storingen bevatten.` }, 400);\n      const saved = await saveConfig(store, { version: 1, faults: merged }, etag, body?.etag || null);\n      await writeImportAudit(store, access, added, updated, incoming.length);"
