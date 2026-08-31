@@ -13,11 +13,12 @@ test('molentijden nemen per veld steeds de recentste niet-lege waarde', () => {
   assert.ok(build.includes("if (!labelKey || byLabel.has(labelKey)) return;"));
 });
 
-test('machinedetails tonen laatste molentijden met registratiedatum', () => {
+test('machinedetails tonen laatste molentijden met registratiedatum via bestaande detailhook', () => {
   assert.ok(js.includes('Laatste molentijden'));
   assert.ok(js.includes('Laatst genoteerd op'));
   assert.ok(js.includes('mill-latest-times-block'));
-  assert.ok(js.includes('showDeviceHistory = function(id)'));
+  assert.ok(js.includes('machineparkInsertMillTimes'));
+  assert.doesNotMatch(js, /baseShowDeviceHistoryForMillTimes/);
 });
 
 test('nieuwe molenwerkbon toont vorige waarde alleen als lichte referentie', () => {
