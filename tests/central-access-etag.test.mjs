@@ -28,7 +28,7 @@ test('nieuwe storingenrechten bestaan in de actuele serverrechten', () => {
   assert.match(permissions, /faults\.manage/);
 });
 
-test('toegangsrefresh is onderdeel van versie 1.67.4', () => {
-  assert.equal(packageJson.version, '1.67.4');
+test('toegangsrefresh blijft aanwezig in versie 1.67.5', () => {
+  assert.equal(packageJson.version, '1.67.5');
   assert.match(packageJson.scripts.build, /build-central-access-etag\.py/);
 });
