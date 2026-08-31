@@ -64,10 +64,10 @@ if MARKER not in index:
 })();
 </script>
 '''
-    anchor = '<script src="/offline-first.js"></script>'
+    anchor = '</body>'
     pos = index.rfind(anchor)
     if pos < 0:
-        raise SystemExit('Buildvalidatie mislukt: offline runtime-anker ontbreekt voor import-undo')
+        raise SystemExit('Buildvalidatie mislukt: body-einde ontbreekt voor import-undo')
     index = index[:pos] + script + '\n' + index[pos:]
 
 UNDO_KEY_CONST = "const FAULT_IMPORT_UNDO_KEY = 'fault-import-undo-v1';"
