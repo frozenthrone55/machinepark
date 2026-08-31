@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const faultJs = readFileSync(new URL('../fault-library.js', import.meta.url), 'utf8');
@@ -57,8 +58,19 @@ test('rollen hebben aparte rechten voor storingen en bestaande ingebouwde rollen
   assert.match(permissions, /existing\?\.builtIn && existing\?\.permissions\?\.\[key\]/);
 });
 
+test('storingszoeker verdraagt merk-modelvarianten en verbergt tekstmatches niet', () => {
+  assert.match(faultJs, /machinepark-fault-picker-matching-v2/);
+  assert.match(faultJs, /faultScopeComparable/);
+  assert.match(faultJs, /faultScopeMatches/);
+  assert.match(faultJs, /const visible = q \? candidates : candidates\.filter/);
+  assert.match(faultJs, /⚠ ander merk\/model/);
+  assert.match(faultJs, /aMismatch - bMismatch/);
+  assert.doesNotThrow(() => new vm.Script(faultJs));
+});
+
 test('build en functiecontrole nemen de storingsbibliotheek mee', () => {
-  assert.equal(packageJson.version, '1.67.4');
+  assert.equal(packageJson.version, '1.67.5');
   assert.match(packageJson.scripts.build, /build-fault-library\.py/);
+  assert.match(packageJson.scripts.build, /build-fault-picker-matching\.py/);
   assert.match(packageJson.scripts['check:functions'], /fault-library\.mjs/);
 });
