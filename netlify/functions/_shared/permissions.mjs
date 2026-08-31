@@ -6,6 +6,7 @@ export const PERMISSION_CATALOG = [
   { group: 'Weergave', key: 'view.devices', label: 'Toestellen bekijken' },
   { group: 'Weergave', key: 'view.maintenance', label: 'Onderhoud bekijken' },
   { group: 'Weergave', key: 'view.breakdowns', label: 'Depannages bekijken' },
+  { group: 'Weergave', key: 'view.faults', label: 'Storingen bekijken' },
   { group: 'Weergave', key: 'view.parts', label: 'Onderdelen bekijken' },
   { group: 'Weergave', key: 'view.settings', label: 'Beheer bekijken' },
   { group: 'Toestellen', key: 'devices.add', label: 'Toestellen toevoegen' },
@@ -19,6 +20,7 @@ export const PERMISSION_CATALOG = [
   { group: 'Depannages', key: 'breakdowns.add', label: 'Depannages registreren' },
   { group: 'Depannages', key: 'breakdowns.edit', label: 'Depannages wijzigen' },
   { group: 'Depannages', key: 'breakdowns.delete', label: 'Depannages verwijderen' },
+  { group: 'Storingen', key: 'faults.manage', label: 'Storingsbibliotheek beheren' },
   { group: 'Onderdelen', key: 'parts.add', label: 'Onderdelen toevoegen' },
   { group: 'Onderdelen', key: 'parts.edit', label: 'Onderdeelgegevens wijzigen' },
   { group: 'Onderdelen', key: 'parts.stock', label: 'Voorraad aanpassen' },
@@ -39,8 +41,8 @@ function permissionSet(values = []) { return Object.fromEntries(ALL_PERMISSION_K
 
 const DEFAULT_ROLES = [
   { id: 'beheerder', label: 'Beheerder', builtIn: true, permissions: permissionSet('all') },
-  { id: 'gebruiker', label: 'Gebruiker', builtIn: true, permissions: permissionSet(['view.dashboard','view.devices','view.maintenance','view.breakdowns','view.parts','devices.add','devices.edit','devices.delete','maintenance.add','maintenance.edit','maintenance.delete','breakdowns.add','breakdowns.edit','breakdowns.delete','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print']) },
-  { id: 'technieker', label: 'Technieker', builtIn: true, permissions: permissionSet(['view.dashboard','view.devices','view.maintenance','view.breakdowns','view.parts','devices.statusNotes','maintenance.add','maintenance.edit','maintenance.delete','breakdowns.add','breakdowns.edit','breakdowns.delete','print']) },
+  { id: 'gebruiker', label: 'Gebruiker', builtIn: true, permissions: permissionSet(['view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts','devices.add','devices.edit','devices.delete','maintenance.add','maintenance.edit','maintenance.delete','breakdowns.add','breakdowns.edit','breakdowns.delete','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print']) },
+  { id: 'technieker', label: 'Technieker', builtIn: true, permissions: permissionSet(['view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts','devices.statusNotes','maintenance.add','maintenance.edit','maintenance.delete','breakdowns.add','breakdowns.edit','breakdowns.delete','print']) },
   { id: 'magazijnier', label: 'Magazijnier', builtIn: true, permissions: permissionSet(['view.dashboard','view.parts','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print']) },
 ];
 
@@ -55,7 +57,12 @@ export function normalizeRoleConfig(config) {
     const id = sanitizeRoleId(item?.id); if (!id) continue;
     const existing = byId.get(id);
     const label = String(item?.label || existing?.label || id).trim().slice(0, 80) || id;
-    const permissions = permissionSet(ALL_PERMISSION_KEYS.filter((key) => Boolean(item?.permissions?.[key])));
+    const sourcePermissions = item?.permissions && typeof item.permissions === 'object' ? item.permissions : {};
+    const enabled = ALL_PERMISSION_KEYS.filter((key) => {
+      if (Object.prototype.hasOwnProperty.call(sourcePermissions, key)) return Boolean(sourcePermissions[key]);
+      return Boolean(existing?.builtIn && existing?.permissions?.[key]);
+    });
+    const permissions = permissionSet(enabled);
     byId.set(id, { id, label, builtIn: Boolean(existing?.builtIn), permissions });
   }
   return { version: 1, roles: [...byId.values()] };
