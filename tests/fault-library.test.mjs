@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const buildJs = readFileSync(new URL('../assets/machinepark-build.js', import.meta.url), 'utf8');
-const builtSource = `${html}\n${buildJs}`;
+const faultJs = readFileSync(new URL('../fault-library.js', import.meta.url), 'utf8');
+const builtSource = `${html}\n${faultJs}`;
 const endpoint = readFileSync(new URL('../netlify/functions/fault-library.mjs', import.meta.url), 'utf8');
 const permissions = readFileSync(new URL('../netlify/functions/_shared/permissions.mjs', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 
 test('storingsbibliotheek ondersteunt storingen met en zonder code', () => {
   assert.match(builtSource, /Storingscode \/ nummer/);
@@ -41,10 +42,12 @@ test('storingsbibliotheek is gekoppeld aan depannages met een momentopname', () 
   assert.match(builtSource, /data-fault-pick/);
 });
 
-test('storingsbibliotheek is offline leesbaar via eigen IndexedDB-cache', () => {
+test('storingsbibliotheek is offline leesbaar en runtimebestanden zitten in de service-worker cache', () => {
   assert.match(builtSource, /MachineparkFaultLibraryDB/);
   assert.match(builtSource, /navigator\.onLine === false/);
   assert.match(builtSource, /offline opgeslagen bibliotheek/);
+  assert.match(sw, /'\/fault-library\.js'/);
+  assert.match(sw, /'\/fault-library\.css'/);
 });
 
 test('rollen hebben aparte rechten voor storingen en bestaande ingebouwde rollen migreren veilig', () => {
