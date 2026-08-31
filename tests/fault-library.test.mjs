@@ -68,9 +68,18 @@ test('storingszoeker verdraagt merk-modelvarianten en verbergt tekstmatches niet
   assert.doesNotThrow(() => new vm.Script(faultJs));
 });
 
+test('storingspicker ververst centraal en zoekt zonder gevoeligheid voor spaties of streepjes', () => {
+  assert.match(faultJs, /machinepark-fault-picker-refresh-search-v1/);
+  assert.match(faultJs, /function faultCompact/);
+  assert.match(faultJs, /faultCompact\(text\)\.includes\(compactQuery\)/);
+  assert.match(faultJs, /faultMatchesQuery\(fault, q\)/);
+  assert.ok((faultJs.match(/await loadFaultLibrary\(true\);/g) || []).length >= 2);
+});
+
 test('build en functiecontrole nemen de storingsbibliotheek mee', () => {
-  assert.equal(packageJson.version, '1.67.5');
+  assert.equal(packageJson.version, '1.67.6');
   assert.match(packageJson.scripts.build, /build-fault-library\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-matching\.py/);
+  assert.match(packageJson.scripts.build, /build-fault-picker-refresh-search\.py/);
   assert.match(packageJson.scripts['check:functions'], /fault-library\.mjs/);
 });
