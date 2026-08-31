@@ -76,10 +76,11 @@ test('storingspicker ververst centraal en zoekt zonder gevoeligheid voor spaties
   assert.ok((faultJs.match(/await loadFaultLibrary\(true\);/g) || []).length >= 2);
 });
 
-test('build en functiecontrole nemen de storingsbibliotheek mee', () => {
-  assert.equal(packageJson.version, '1.67.6');
+test('build en functiecontrole nemen de storingsbibliotheek en Excel-import mee', () => {
+  assert.equal(packageJson.version, '1.68.0');
   assert.match(packageJson.scripts.build, /build-fault-library\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-matching\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-refresh-search\.py/);
+  assert.match(packageJson.scripts.build, /build-fault-excel-import\.py/);
   assert.match(packageJson.scripts['check:functions'], /fault-library\.mjs/);
 });
