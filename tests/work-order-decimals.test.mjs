@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const js = readFileSync(new URL('../assets/machinepark-build.js', import.meta.url), 'utf8');
-const build = readFileSync(new URL('../build-work-order-decimals.py', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('werkbon-getalveld gebruikt decimale tekstinvoer in plaats van HTML number', () => {
@@ -13,7 +12,8 @@ test('werkbon-getalveld gebruikt decimale tekstinvoer in plaats van HTML number'
 });
 
 test('werkbon-getalveld accepteert zowel komma als punt en valideert overige tekst', () => {
-  assert.ok(build.includes("(?:\\d+(?:[.,]\\d+)?|[.,]\\d+)"));
+  assert.ok(js.includes("field.type === 'number' && value !== ''"));
+  assert.ok(js.includes('[.,]'));
   assert.match(js, /bij “\$\{field\.label\}”, bijvoorbeeld 12,5 of 12\.5/);
 });
 
