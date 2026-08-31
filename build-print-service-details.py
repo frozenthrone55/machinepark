@@ -61,7 +61,7 @@ if MARKER not in index:
       .map(part => usedPartsText([part]))
       .map(value => String(value || '').trim())
       .filter(Boolean);
-    return lines.length ? lines.join('\n') : (usedPartsText(parts) || '—');
+    return lines.length ? lines.join(String.fromCharCode(10)) : (usedPartsText(parts) || '—');
   }}
 
   function serviceRecordPhotos(record) {{
@@ -187,7 +187,7 @@ required = [
     "servicePrintField('Datum'",
     "serviceRecordDate",
     "serviceRecordParts(record, true)",
-    "lines.join('\\n')",
+    "lines.join(String.fromCharCode(10))",
     "previousShowMaintenanceDetails",
     "previousOpenBreakdown",
 ]
