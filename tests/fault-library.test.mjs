@@ -58,7 +58,7 @@ test('rollen hebben aparte rechten voor storingen en bestaande ingebouwde rollen
 });
 
 test('build en functiecontrole nemen de storingsbibliotheek mee', () => {
-  assert.equal(packageJson.version, '1.67.3');
+  assert.equal(packageJson.version, '1.67.4');
   assert.match(packageJson.scripts.build, /build-fault-library\.py/);
   assert.match(packageJson.scripts['check:functions'], /fault-library\.mjs/);
 });
