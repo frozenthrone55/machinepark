@@ -26,6 +26,12 @@ test('offline-first runtime synchroniseert automatisch bij reconnect', () => {
   assert.match(offline, /centralPush = async function/);
 });
 
+test('gelijktijdige offline en online voorraadwijzigingen worden als delta samengevoegd', () => {
+  assert.match(offline, /storeName === 'parts' && key === 'stock'/);
+  assert.match(offline, /baseStock \+ \(localStock - baseStock\) \+ \(remoteStock - baseStock\)/);
+  assert.match(offline, /mergeEntity\(base\.get\(id\), local\.get\(id\), remote\.get\(id\), stats, storeName\)/);
+});
+
 test('gebouwde app laadt de offline runtime', () => {
   assert.match(index, /\/offline-first\.js/);
   assert.match(index, /data-machinepark-offline-first="1"/);
