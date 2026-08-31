@@ -27,8 +27,10 @@ async function deleteServiceRecord(storeName,id){
   if(!record){toast('Registratie niet meer gevonden');return}
   const kind=storeName==='maintenance'?'onderhoud':'depannage',device=deviceName(record.deviceId,recordMoment(record)),impact=serviceDeleteImpact(record);
   const lines=[`${kind==='onderhoud'?'Onderhoud':'Depannage'} van ${device} definitief verwijderen?`,''];
-  if(impact.usedQty>0)lines.push(`• ${impact.usedQty} gebruikt voorraadonderdeel${impact.usedQty===1?'':'en'} (${impact.usedTypes} type${impact.usedTypes===1?'':'s'}) wordt/worden automatisch terug op voorraad gezet.`);
-  else lines.push('• Er zijn geen gebruikte voorraadonderdelen om terug op voorraad te zetten.');
+  if(impact.usedQty>0){
+    lines.push('Alle gebruikte onderdelen van deze registratie worden automatisch terug op voorraad gezet.');
+    lines.push(`• In totaal ${impact.usedQty} stuk${impact.usedQty===1?'':'s'} uit ${impact.usedTypes} voorraadtype${impact.usedTypes===1?'':'s'}.`);
+  }else lines.push('• Er zijn geen gebruikte voorraadonderdelen om terug op voorraad te zetten.');
   if(impact.oneOff)lines.push(`• ${impact.oneOff} eenmalig onderdeel${impact.oneOff===1?'':'delen'} wordt/worden samen met de registratie verwijderd.`);
   if(impact.sessions||impact.hasWorkOrder)lines.push('• Werkdagen, werkuren en gekoppelde werkbongegevens worden samen met de registratie verwijderd.');
   if(impact.photos)lines.push(`• ${impact.photos} verslagfoto${impact.photos===1?'':'\'s'} wordt/worden na centrale synchronisatie uit de gekoppelde foto-opslag verwijderd.`);
@@ -60,7 +62,7 @@ required = [
     'record?.workSessions',
     'record?.workOrder',
     'record?.photos',
-    'automatisch terug op voorraad gezet',
+    'Alle gebruikte onderdelen van deze registratie worden automatisch terug op voorraad gezet.',
     'alle gekoppelde gegevens worden samen gesynchroniseerd',
     "deleteServiceRecordAtomic(storeName,record)",
 ]
