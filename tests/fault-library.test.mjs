@@ -76,8 +76,17 @@ test('storingspicker ververst centraal en zoekt zonder gevoeligheid voor spaties
   assert.ok((faultJs.match(/await loadFaultLibrary\(true\);/g) || []).length >= 2);
 });
 
+test('eenmalige Lattiz-opschoning bewaart exact één 00005 en raakt andere merken niet', () => {
+  assert.match(endpoint, /fault-lattiz-cleanup-keep-00005-v1/);
+  assert.match(endpoint, /function isLattizFault/);
+  assert.match(endpoint, /function isLattizKeepCode/);
+  assert.match(endpoint, /const kept = keepCandidates\[0\] \|\| null/);
+  assert.match(endpoint, /!isLattizFault\(fault\) \|\| fault\.id === kept\.id/);
+  assert.match(endpoint, /Lattiz-code 00005 niet gevonden/);
+});
+
 test('build en functiecontrole nemen de storingsbibliotheek en Excel-import mee', () => {
-  assert.equal(packageJson.version, '1.68.0');
+  assert.equal(packageJson.version, '1.68.1');
   assert.match(packageJson.scripts.build, /build-fault-library\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-matching\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-refresh-search\.py/);
