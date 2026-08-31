@@ -14,6 +14,6 @@ test('foutieve Lattiz2 import wordt exact op Lattiz2 gericht verwijderd', () => 
 });
 
 test('Lattiz2 cleanup zit in de build zonder versiebreuk', () => {
-  assert.equal(packageJson.version, '1.68.2');
+  assert.equal(packageJson.version, '1.68.3');
   assert.match(packageJson.scripts.build, /build-fault-lattiz2-import-cleanup\.py/);
 });
