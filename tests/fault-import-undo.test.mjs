@@ -33,8 +33,8 @@ test('undo herstelt exact de pre-importbibliotheek en kan niet dubbel worden uit
   assert.match(endpoint, /snapshot\.status !== 'ready'/);
 });
 
-test('versie 1.68.2 bouwt storingsimport-undo mee', () => {
-  assert.equal(packageJson.version, '1.68.2');
+test('versie 1.68.3 bouwt storingsimport-undo mee', () => {
+  assert.equal(packageJson.version, '1.68.3');
   assert.match(packageJson.scripts.build, /build-fault-import-undo\.py/);
   assert.match(html, /Storingsbibliotheek/);
 });
