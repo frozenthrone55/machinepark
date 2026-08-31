@@ -28,6 +28,14 @@ test('depannagedetails tonen de operationele verslaginformatie', () => {
   assert.ok(js.includes('data-photo-lightbox'));
 });
 
+test('gebruikte onderdelen staan in depannagedetails elk op een eigen regel', () => {
+  assert.ok(build.includes('breakdown-detail-parts'));
+  assert.ok(build.includes('breakdown-detail-part'));
+  assert.ok(build.includes('usedPartsText([part])'));
+  assert.ok(js.includes('breakdown-detail-parts'));
+  assert.ok(js.includes('breakdown-detail-part'));
+});
+
 test('depannagedetails draaien na de werktijdensessies in de build', () => {
   const script = packageJson.scripts.build;
   assert.ok(script.includes('python3 build-breakdown-details.py'));
