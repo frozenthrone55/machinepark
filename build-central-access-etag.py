@@ -2,6 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 offline_path = ROOT / 'offline-first.js'
+server_path = ROOT / 'netlify/functions/machinepark-data.mjs'
 source = offline_path.read_text(encoding='utf-8')
 MARKER = '// machinepark-central-access-etag-v1'
 
@@ -27,10 +28,22 @@ if MARKER not in source:
     source = source.replace(old, new, 1)
     offline_path.write_text(source, encoding='utf-8')
 
+server = server_path.read_text(encoding='utf-8')
+old_server = "const cachedEtag = req.headers.get('if-none-match') || undefined;"
+new_server = "const cachedEtag = req.headers.get('x-machinepark-if-none-match') || req.headers.get('if-none-match') || undefined;"
+if old_server in server:
+    server = server.replace(old_server, new_server, 1)
+    server_path.write_text(server, encoding='utf-8')
+elif new_server not in server:
+    raise SystemExit('Buildvalidatie mislukt: centrale server-ETag-header niet gevonden')
+
 built = offline_path.read_text(encoding='utf-8')
+built_server = server_path.read_text(encoding='utf-8')
 for needle in [MARKER, "headers['X-Machinepark-If-None-Match'] = etag", 'applyMachineparkServerAccess(body)']:
     if needle not in built:
         raise SystemExit(f'Buildvalidatie mislukt: toegangsvriendelijke ETag ontbreekt ({needle})')
+if "req.headers.get('x-machinepark-if-none-match')" not in built_server:
+    raise SystemExit('Buildvalidatie mislukt: server leest de Machinepark-ETag-header niet')
 
 anchor = built.find(MARKER)
 section = built[anchor:anchor + 900]
