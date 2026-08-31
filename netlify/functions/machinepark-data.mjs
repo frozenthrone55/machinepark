@@ -25,7 +25,7 @@ const FIELD_LABELS = {
   technician: 'Technieker', issue: 'Storing', diagnosis: 'Diagnose', solution: 'Oplossing', priority: 'Prioriteit',
   artNr: 'Artikelnummer', description: 'Omschrijving', deviceBrand: 'Merk toestel', price: 'Prijs', stock: 'Voorraad',
   minStock: 'Minimumvoorraad', supplierCode: 'Code leverancier', warehouse: 'Magazijnlocatie', usedParts: 'Gebruikte onderdelen',
-  locationHistory: 'Locatiehistoriek', deviceChangeLog: 'Toestelwijzigingen', photo: 'Foto', photos: 'Foto’s verslag',
+  oneOffParts: 'Eenmalige onderdelen', locationHistory: 'Locatiehistoriek', deviceChangeLog: 'Toestelwijzigingen', photo: 'Foto', photos: 'Foto’s verslag',
   hours: 'Werkduur', batchSize: 'Aantal toestellen'
 };
 const IGNORED_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'sourceInventory', 'redInventoryStatusApplied']);
