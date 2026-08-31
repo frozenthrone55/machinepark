@@ -85,13 +85,14 @@ test('eenmalige Lattiz-opschoning bewaart exact één 00005 en raakt andere merk
   assert.match(endpoint, /Lattiz-code 00005 niet gevonden/);
 });
 
-test('build en functiecontrole nemen storingsbibliotheek Excel-import undo en finale opschoning mee', () => {
-  assert.equal(packageJson.version, '1.68.3');
+test('build en functiecontrole nemen storingsbibliotheek Excel-import undo en volledige leegmaak mee', () => {
+  assert.equal(packageJson.version, '1.68.4');
   assert.match(packageJson.scripts.build, /build-fault-library\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-matching\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-refresh-search\.py/);
   assert.match(packageJson.scripts.build, /build-fault-excel-import\.py/);
   assert.match(packageJson.scripts.build, /build-fault-import-undo\.py/);
   assert.match(packageJson.scripts.build, /build-fault-keep-only-waterselector\.py/);
+  assert.match(packageJson.scripts.build, /build-fault-clear-all\.py/);
   assert.match(packageJson.scripts['check:functions'], /fault-library\.mjs/);
 });
