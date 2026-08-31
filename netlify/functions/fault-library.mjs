@@ -11,6 +11,7 @@ import {
 const CONFIG_KEY = 'fault-library-v1';
 const AUDIT_PREFIX = 'audit/';
 const MAX_FAULTS = 5000;
+const LATTIZ_CLEANUP_KEY = 'migration/fault-lattiz-cleanup-keep-00005-v1';
 
 function cleanId(value, fallback = '') {
   const raw = String(value || fallback || '').trim();
@@ -144,12 +145,128 @@ async function writeAudit(store, auth, action, fault, before = null) {
   }
 }
 
+async function writeLattizCleanupAudit(store, auth, removed, kept) {
+  if (!removed.length) return;
+  try {
+    const at = new Date().toISOString();
+    const id = crypto.randomUUID();
+    const email = primaryEmailOf(auth.user) || auth.sub;
+    const changes = removed.slice(0, 200).map((fault) => ({
+      entityType: 'Storingen',
+      entityId: fault.id || '',
+      entityLabel: [fault.code, fault.name].filter(Boolean).join(' — ') || 'Lattiz-storing',
+      action: 'verwijderd via Lattiz-opschoning',
+      fields: [
+        { field: 'Storing', before: [fault.code, fault.name].filter(Boolean).join(' — ') || '—', after: '—' },
+        { field: 'Toepassing', before: scopeLabel(fault), after: '—' },
+      ],
+    }));
+    changes.unshift({
+      entityType: 'Storingen',
+      entityId: kept?.id || '',
+      entityLabel: 'Lattiz opschoning',
+      action: 'opschoning uitgevoerd',
+      fields: [
+        { field: 'Behouden', before: '—', after: kept ? `${kept.code || '00005'} — ${kept.name || 'Storing'}` : 'Geen' },
+        { field: 'Verwijderd', before: String(removed.length), after: '0' },
+      ],
+    });
+    await store.setJSON(`${AUDIT_PREFIX}${Date.now()}-${id}`, {
+      id,
+      at,
+      userId: auth.sub,
+      userEmail: email,
+      userName: [auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(' '),
+      userRole: auth.role,
+      changeCount: removed.length,
+      changes,
+      truncated: removed.length > 200,
+    }, { metadata: { at, userId: auth.sub, userEmail: email } });
+  } catch (error) {
+    console.error('Lattiz cleanup audit', error);
+  }
+}
+
 function canRead(access) {
   return Boolean(access?.owner || access?.permissions?.['view.faults']);
 }
 
 function canManage(access) {
   return Boolean(access?.owner || access?.permissions?.['faults.manage']);
+}
+
+function cleanupNorm(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function isLattizFault(fault) {
+  return cleanupNorm(fault?.brand).includes('lattiz') || cleanupNorm(fault?.model).includes('lattiz');
+}
+
+function isLattizKeepCode(fault) {
+  const digits = String(fault?.code || '').replace(/\D/g, '');
+  return digits === '00005' || (digits !== '' && Number(digits) === 5);
+}
+
+async function applyOneTimeLattizCleanup(store, access, entry, config) {
+  if (!canManage(access)) return { entry, config, cleanup: null };
+
+  const migration = await store.get(LATTIZ_CLEANUP_KEY, { type: 'json', consistency: 'strong' }).catch(() => null);
+  if (migration?.done) return { entry, config, cleanup: migration };
+
+  const lattiz = config.faults.filter(isLattizFault);
+  if (!lattiz.length) {
+    const cleanup = { done: true, at: new Date().toISOString(), removedCount: 0, keptId: null, keptCode: null };
+    await store.setJSON(LATTIZ_CLEANUP_KEY, cleanup, { metadata: { type: 'one-time-migration' } });
+    return { entry, config, cleanup };
+  }
+
+  const keepCandidates = lattiz
+    .filter(isLattizKeepCode)
+    .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
+  const kept = keepCandidates[0] || null;
+
+  // Veiligheid: verwijder niets zolang de expliciet te behouden code 00005 niet gevonden is.
+  if (!kept) return { entry, config, cleanup: { done: false, reason: 'Lattiz-code 00005 niet gevonden' } };
+
+  const removed = lattiz.filter((fault) => fault.id !== kept.id);
+  let nextEntry = entry;
+  let nextConfig = config;
+
+  if (removed.length) {
+    try {
+      nextEntry = await saveConfig(
+        store,
+        { version: 1, faults: config.faults.filter((fault) => !isLattizFault(fault) || fault.id === kept.id) },
+        entry?.etag || null,
+        entry?.etag || null,
+      );
+      nextConfig = normalizeConfig(nextEntry.data);
+    } catch (error) {
+      if (error?.status !== 409) throw error;
+      const latest = await readConfig(store);
+      const latestLattiz = latest.config.faults.filter(isLattizFault);
+      const latestKept = latestLattiz.find((fault) => isLattizKeepCode(fault));
+      if (!latestKept || latestLattiz.length > 1) throw error;
+      nextEntry = latest.entry;
+      nextConfig = latest.config;
+    }
+    await writeLattizCleanupAudit(store, access, removed, kept);
+  }
+
+  const cleanup = {
+    done: true,
+    at: new Date().toISOString(),
+    removedCount: removed.length,
+    keptId: kept.id,
+    keptCode: kept.code || '00005',
+  };
+  await store.setJSON(LATTIZ_CLEANUP_KEY, cleanup, { metadata: { type: 'one-time-migration' } });
+  return { entry: nextEntry, config: nextConfig, cleanup };
 }
 
 export default async (req) => {
@@ -160,13 +277,17 @@ export default async (req) => {
     const access = await resolveRoleAccess(store, await authenticateClerk(req));
     if (!canRead(access) && !canManage(access)) return json({ error: 'Deze rol heeft geen toegang tot de storingsbibliotheek.' }, 403);
 
-    const { entry, config } = await readConfig(store);
-    const etag = entry?.etag || null;
+    let { entry, config } = await readConfig(store);
 
     if (req.method === 'GET') {
-      return json({ faults: config.faults, etag, canManage: canManage(access) }, 200, etag ? { etag } : {});
+      const migrated = await applyOneTimeLattizCleanup(store, access, entry, config);
+      entry = migrated.entry;
+      config = migrated.config;
+      const etag = entry?.etag || null;
+      return json({ faults: config.faults, etag, canManage: canManage(access), lattizCleanup: migrated.cleanup }, 200, etag ? { etag } : {});
     }
 
+    const etag = entry?.etag || null;
     if (req.method !== 'POST') return json({ error: 'Methode niet toegestaan.' }, 405, { allow: 'GET, POST, OPTIONS' });
     if (!canManage(access)) return json({ error: 'Deze rol mag de storingsbibliotheek niet beheren.' }, 403);
 
