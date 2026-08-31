@@ -54,6 +54,10 @@ if MARKER not in index:
     })).filter(item => item.supplierCode || item.description).slice(0, LIMIT);
   }
 
+  function displayLines(record) {
+    return normalize(record?.oneOffParts).map(item => [item.supplierCode, item.description].filter(Boolean).join(' · '));
+  }
+
   function rowHtml(item = {}, disabled = false) {
     const off = disabled ? ' disabled' : '';
     return `<div class="breakdown-oneoff-row"><input class="breakdown-oneoff-code" type="text" maxlength="120" placeholder="Leveranciercode" value="${escAttr(item.supplierCode || '')}"${off}><input class="breakdown-oneoff-description" type="text" maxlength="300" placeholder="Omschrijving" value="${escAttr(item.description || '')}"${off}><button type="button" class="remove-line breakdown-remove-oneoff" data-remove-breakdown-oneoff aria-label="Eenmalig onderdeel verwijderen"${off}>×</button></div>`;
@@ -119,6 +123,60 @@ if MARKER not in index:
     card?.querySelectorAll('.breakdown-oneoff-code,.breakdown-oneoff-description,.breakdown-add-oneoff,.breakdown-remove-oneoff').forEach(el => el.disabled = !enabled);
   };
 
+  function oneOffDetailsHtml(record) {
+    const lines = displayLines(record);
+    if (!lines.length) return '';
+    return `<div class="breakdown-detail-field full" data-breakdown-oneoff-details><label>Eenmalige onderdelen</label><div class="breakdown-detail-parts">${lines.map(line => `<div class="breakdown-detail-part">${escAttr(line)}</div>`).join('')}</div></div>`;
+  }
+
+  const previousShowBreakdownDetails = window.machineparkShowBreakdownDetails;
+  if (typeof previousShowBreakdownDetails === 'function') {
+    window.machineparkShowBreakdownDetails = function(id) {
+      const result = previousShowBreakdownDetails(id);
+      setTimeout(() => {
+        const record = state.breakdowns.find(item => item.id === id);
+        const html = record ? oneOffDetailsHtml(record) : '';
+        if (!html) return;
+        const summary = document.querySelector('#modal .breakdown-detail-summary');
+        if (!summary || summary.querySelector('[data-breakdown-oneoff-details]')) return;
+        const usedPartsField = [...summary.querySelectorAll('.breakdown-detail-field')].find(field => field.querySelector('label')?.textContent.trim() === 'Gebruikte onderdelen');
+        if (usedPartsField) usedPartsField.insertAdjacentHTML('afterend', html);
+        else summary.insertAdjacentHTML('beforeend', html);
+      }, 0);
+      return result;
+    };
+  }
+
+  function injectOneOffPrint(id) {
+    const record = state.breakdowns.find(item => item.id === id);
+    const lines = displayLines(record);
+    if (!lines.length) return;
+    const grid = document.querySelector('#servicePrintSheet .service-print-grid');
+    if (!grid || grid.querySelector('[data-print-oneoff-parts]')) return;
+    const field = document.createElement('div');
+    field.className = 'service-print-field full';
+    field.dataset.printOneoffParts = '1';
+    field.innerHTML = `<div class="service-print-label">Eenmalige onderdelen</div><div class="service-print-value">${escAttr(lines.join(String.fromCharCode(10)))}</div>`;
+    const usedPartsField = [...grid.querySelectorAll('.service-print-field')].find(item => item.querySelector('.service-print-label')?.textContent.trim() === 'Gebruikte onderdelen');
+    if (usedPartsField) usedPartsField.insertAdjacentElement('afterend', field);
+    else grid.appendChild(field);
+  }
+
+  const previousPrintServiceRecord = window.printMachineparkServiceRecord;
+  if (typeof previousPrintServiceRecord === 'function') {
+    window.printMachineparkServiceRecord = function(kind, id) {
+      if (kind !== 'breakdowns') return previousPrintServiceRecord(kind, id);
+      const nativePrint = window.print;
+      window.print = function() {
+        try { injectOneOffPrint(id); }
+        finally { window.print = nativePrint; }
+        return nativePrint.call(window);
+      };
+      try { return previousPrintServiceRecord(kind, id); }
+      finally { if (window.print !== nativePrint) window.print = nativePrint; }
+    };
+  }
+
   document.addEventListener('click', event => {
     const add = event.target.closest?.('[data-add-breakdown-oneoff]');
     if (add) {
@@ -163,6 +221,9 @@ required = [
     'oneOffParts:window.machineparkCollectBreakdownOneOff',
     'breakdown-oneoff-machine',
     'data-add-breakdown-oneoff',
+    'data-breakdown-oneoff-details',
+    'injectOneOffPrint',
+    'previousPrintServiceRecord',
 ]
 for needle in required:
     if needle not in index:
