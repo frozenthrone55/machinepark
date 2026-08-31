@@ -26,8 +26,8 @@ test('304 behoudt lokale data en bestaande ETag', () => {
   assert.match(offline, /data: null/);
 });
 
-test('304-fix blijft als vangnet aanwezig in versie 1.68.1', () => {
-  assert.equal(packageJson.version, '1.68.1');
+test('304-fix blijft als vangnet aanwezig in versie 1.68.2', () => {
+  assert.equal(packageJson.version, '1.68.2');
   assert.match(packageJson.scripts.build, /build-central-not-modified\.py/);
   assert.match(packageJson.scripts.build, /build-central-access-etag\.py/);
 });
