@@ -41,7 +41,7 @@ test('server verwerkt een Excel-import atomair in één bibliotheekwrite', () =>
   assert.match(endpoint, /writeImportAudit/);
 });
 
-test('versie 1.68.0 bouwt de storingsimport mee', () => {
-  assert.equal(packageJson.version, '1.68.0');
+test('versie 1.68.1 bouwt de storingsimport mee', () => {
+  assert.equal(packageJson.version, '1.68.1');
   assert.match(packageJson.scripts.build, /build-fault-excel-import\.py/);
 });
