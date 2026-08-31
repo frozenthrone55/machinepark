@@ -20,7 +20,7 @@ if MARKER not in index:
     replace_once(
         "showModal('Machinedetails & logboek',body,'Sluiten',async()=>closeModal());setTimeout(()=>{const editDeviceBtn=$('#editDeviceFromHistory');",
         "showModal('Machinedetails & logboek',body,'Sluiten',async()=>closeModal());setTimeout(()=>window.machineparkInsertMillTimes?.(id),0);setTimeout(()=>{const editDeviceBtn=$('#editDeviceFromHistory');",
-        'molentijdenhook in machinedetails',
+        'molengegevenshook in machinedetails',
     )
 
     style = f'''
@@ -65,6 +65,22 @@ if MARKER not in index:
       || /(^|\s)sec(?:\.|\s|$)/.test(label);
   }
 
+  function isMillCountField(field) {
+    const label = millNorm(field?.label || '');
+    if (!label) return false;
+    return /\b(aantal|aantallen|count|counts)\b/.test(label);
+  }
+
+  function isMillGrindField(field) {
+    const label = millNorm(field?.label || '');
+    if (!label) return false;
+    return /\b(maalgraad|maalstand|maling|grind|grinder setting|grind setting)\b/.test(label);
+  }
+
+  function isMillTrackedField(field) {
+    return isMillTimeField(field) || isMillCountField(field) || isMillGrindField(field);
+  }
+
   function millRecordSortKey(record) {
     const captured = String(record?.workOrder?.capturedAt || record?.updatedAt || record?.createdAt || '');
     const date = /^\d{4}-\d{2}-\d{2}$/.test(String(record?.date || ''))
@@ -95,7 +111,7 @@ if MARKER not in index:
 
     records.forEach((record) => {
       (Array.isArray(record?.workOrder?.fields) ? record.workOrder.fields : []).forEach((field) => {
-        if (!isMillTimeField(field)) return;
+        if (!isMillTrackedField(field)) return;
         const value = String(field?.value ?? '').trim();
         if (!value) return;
         const labelKey = millNorm(field?.label || '');
@@ -103,7 +119,7 @@ if MARKER not in index:
         if (!labelKey || byLabel.has(labelKey)) return;
         const entry = {
           id: idKey,
-          label: String(field?.label || 'Tijd').trim(),
+          label: String(field?.label || 'Moleninstelling').trim(),
           labelKey,
           value,
           date: millRecordedDate(record),
@@ -152,7 +168,7 @@ if MARKER not in index:
       const labelNode = fieldBox.querySelector('label');
       if (!input || !labelNode) return;
       const label = String(labelNode.textContent || '').replace(/\s*\*\s*$/, '').trim();
-      if (!isMillTimeField({ label })) return;
+      if (!isMillTrackedField({ label })) return;
       const id = String(input.dataset.workorderField || '');
       const previous = (id && latest.byId.get(id)) || latest.byLabel.get(millNorm(label));
       if (!previous) return;
@@ -187,7 +203,7 @@ if MARKER not in index:
       .sort((a, b) => a.label.localeCompare(b.label, 'nl-BE', { numeric: true, sensitivity: 'base' }))
       .map((entry) => `<div class="mill-latest-time"><span>${esc(entry.label)}</span><strong>${esc(entry.value)}</strong><small>Laatst genoteerd op ${esc(entry.date)}</small></div>`)
       .join('');
-    return `<div class="mill-latest-times-panel"><div class="mill-latest-times-head"><strong>Laatste molentijden</strong><span>Steeds de recentste ingevulde waarde per tijdsveld</span></div><div class="mill-latest-times-grid">${rows}</div></div>`;
+    return `<div class="mill-latest-times-panel"><div class="mill-latest-times-head"><strong>Laatste molengegevens</strong><span>Steeds de recentste ingevulde waarde per tijd, aantal en maalgraad</span></div><div class="mill-latest-times-grid">${rows}</div></div>`;
   }
   window.machineparkMillLatestTimesHtml = millLatestTimesHtml;
 
@@ -209,23 +225,26 @@ if MARKER not in index:
 
     pos = index.rfind('</body>')
     if pos < 0:
-        raise SystemExit('Buildvalidatie mislukt: </body> ontbreekt voor molentijden')
+        raise SystemExit('Buildvalidatie mislukt: </body> ontbreekt voor molengegevens')
     index = index[:pos] + style + script + index[pos:]
     index_path.write_text(index, encoding='utf-8')
 
 required = [
     MARKER,
     'latestMillTimesForDevice',
-    'Laatste molentijden',
+    'Laatste molengegevens',
     'Vorige waarde:',
     'Laatst genoteerd op',
     "name.includes('molen')",
+    'isMillCountField',
+    'isMillGrindField',
+    'isMillTrackedField',
     'workorder-last-value-hint',
     'mill-latest-times-panel',
     'machineparkInsertMillTimes',
 ]
 for needle in required:
     if needle not in index:
-        raise SystemExit(f'Buildvalidatie mislukt: molentijdenfunctie ontbreekt ({needle})')
+        raise SystemExit(f'Buildvalidatie mislukt: molengegevensfunctie ontbreekt ({needle})')
 
-print('[Machinepark] laatste molentijden zichtbaar in machinedetails en als referentie in nieuwe werkbonnen')
+print('[Machinepark] laatste molentijden, aantallen en maalgraad zichtbaar in machinedetails en als referentie in nieuwe werkbonnen')
