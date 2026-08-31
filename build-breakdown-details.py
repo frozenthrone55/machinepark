@@ -93,8 +93,14 @@ if MARKER not in index:
   }
 
   function canEditBreakdown() {
+    if (typeof window.machineparkHasPermission === 'function' && window.machineparkAccessReady) return window.machineparkHasPermission('breakdowns.edit');
     if (window.machineparkCanEdit && typeof window.machineparkCanEdit.breakdowns !== 'undefined') return !!window.machineparkCanEdit.breakdowns;
-    if (typeof window.machineparkHasPermission === 'function') return window.machineparkHasPermission('breakdowns.edit');
+    return false;
+  }
+
+  function canDeleteBreakdown() {
+    if (typeof window.machineparkHasPermission === 'function' && window.machineparkAccessReady) return window.machineparkHasPermission('breakdowns.delete');
+    if (window.machineparkCanEdit && typeof window.machineparkCanEdit.breakdowns !== 'undefined') return !!window.machineparkCanEdit.breakdowns;
     return false;
   }
 
@@ -136,6 +142,16 @@ if MARKER not in index:
         foot.insertBefore(print, primary || null);
       }
 
+      if (canDeleteBreakdown()) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn danger';
+        remove.id = 'deleteBreakdownFromDetails';
+        remove.textContent = 'Verwijderen';
+        remove.onclick = () => deleteServiceRecord('breakdowns', id);
+        foot.insertBefore(remove, primary || null);
+      }
+
       if (canEditBreakdown()) {
         const edit = document.createElement('button');
         edit.type = 'button';
@@ -163,6 +179,9 @@ required = [
     'machineparkShowBreakdownDetails',
     'Depannagedetails',
     'editBreakdownFromDetails',
+    'deleteBreakdownFromDetails',
+    "deleteServiceRecord('breakdowns', id)",
+    "machineparkHasPermission('breakdowns.delete')",
     "openBreakdown(id)",
     'Werkdagen en tijd',
     'Probleem / melding',
@@ -177,4 +196,4 @@ for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: depannagedetails ontbreken ({needle})')
 
-print('[Machinepark] depannages openen eerst in detailweergave met aparte bewerkknop')
+print('[Machinepark] depannages openen in detailweergave met bewerken en verwijderen')
