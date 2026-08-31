@@ -1,10 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 
 const offline = fs.readFileSync('offline-first.js', 'utf8');
 const sw = fs.readFileSync('sw.js', 'utf8');
 const index = fs.readFileSync('index.html', 'utf8');
+
+test('offline-first runtime bevat geldige JavaScript', () => {
+  assert.doesNotThrow(() => new vm.Script(offline, { filename: 'offline-first.js' }));
+});
 
 test('offline-first runtime bewaart lokale wijzigingen en merge-informatie', () => {
   assert.match(offline, /MachineparkOfflineSyncDB/);
