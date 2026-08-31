@@ -53,8 +53,15 @@ if MARKER not in index:
     return Number.isNaN(date.getTime()) ? String(record.date) : date.toLocaleDateString('nl-BE');
   }}
 
-  function serviceRecordParts(record) {{
-    return usedPartsText(record.usedParts || []) || '—';
+  function serviceRecordParts(record, multiline = false) {{
+    const parts = Array.isArray(record?.usedParts) ? record.usedParts.filter(Boolean) : [];
+    if (!parts.length) return '—';
+    if (!multiline) return usedPartsText(parts) || '—';
+    const lines = parts
+      .map(part => usedPartsText([part]))
+      .map(value => String(value || '').trim())
+      .filter(Boolean);
+    return lines.length ? lines.join('\n') : (usedPartsText(parts) || '—');
   }}
 
   function serviceRecordPhotos(record) {{
@@ -95,7 +102,7 @@ if MARKER not in index:
           servicePrintField('Probleem / melding', record.issue || '—', true),
           servicePrintField('Diagnose', record.diagnosis || '—', true),
           servicePrintField('Oplossing / uitgevoerde werken', record.solution || '—', true),
-          servicePrintField('Gebruikte onderdelen', serviceRecordParts(record), true),
+          servicePrintField('Gebruikte onderdelen', serviceRecordParts(record, true), true),
         ].join('');
 
     return `<div class="service-print-header"><div><h1>Machinepark · ${{title}}</h1><div class="service-print-subtitle">${{servicePrintEsc(serviceRecordDevice(record))}}</div></div><div class="service-print-subtitle">${{servicePrintEsc(serviceRecordDate(record))}}</div></div><div class="service-print-grid">${{fields}}${{servicePrintPhotos(record)}}</div><div class="service-print-footer">Afgedrukt vanuit Machinepark</div>`;
@@ -179,6 +186,8 @@ required = [
     "Foto’s bij verslag",
     "servicePrintField('Datum'",
     "serviceRecordDate",
+    "serviceRecordParts(record, true)",
+    "lines.join('\\n')",
     "previousShowMaintenanceDetails",
     "previousOpenBreakdown",
 ]
