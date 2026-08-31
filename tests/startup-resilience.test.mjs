@@ -7,7 +7,6 @@ const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.me
 
 test('centrale fout tijdens eerste ophaling blokkeert lokale Machinepark-data niet', () => {
   assert.match(offline, /machinepark-startup-central-fallback-v1/);
-  assert.match(offline, /Centrale synchronisatie tijdelijk niet beschikbaar · lokaal gestart/);
   assert.match(offline, /remote = \{ exists: false, offline: true/);
 
   const start = offline.indexOf("setCentralSyncStatus('☁ Centrale gegevens ophalen…', 'busy');");
@@ -22,7 +21,21 @@ test('fallback behoudt normale lokale opstart en latere synchronisatie', () => {
   assert.match(offline, /window\.addEventListener\('online'/);
 });
 
-test('startup-resilience buildstap is onderdeel van versie 1.67.1', () => {
-  assert.equal(packageJson.version, '1.67.1');
+test('Clerk-token wordt bij online opstart kort herprobeerd', () => {
+  assert.match(offline, /machinepark-central-auth-retry-v1/);
+  assert.match(offline, /attempt < 5/);
+  assert.match(offline, /geen actieve clerk-sessie/i);
+  assert.match(offline, /180 \+ attempt \* 220/);
+});
+
+test('echte centrale foutoorzaak wordt zichtbaar zonder lokale data te wissen', () => {
+  assert.match(offline, /machineparkLastCentralStartupError/);
+  assert.match(offline, /lokale gegevens actief/);
+  assert.match(offline, /startupError/);
+});
+
+test('startup-resilience en auth-retry zijn onderdeel van versie 1.67.2', () => {
+  assert.equal(packageJson.version, '1.67.2');
   assert.match(packageJson.scripts.build, /build-startup-resilience\.py/);
+  assert.match(packageJson.scripts.build, /build-central-auth-retry\.py/);
 });
