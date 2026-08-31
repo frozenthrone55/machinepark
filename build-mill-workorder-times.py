@@ -5,7 +5,24 @@ index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 MARKER = 'data-machinepark-build-fix="mill-workorder-times-v1"'
 
+
+def replace_once(old, new, label):
+    global index
+    count = index.count(old)
+    if count != 1:
+        raise SystemExit(f"Buildvalidatie mislukt: verwacht 1x {label}, gevonden {count}x")
+    index = index.replace(old, new, 1)
+
+
 if MARKER not in index:
+    # Gebruik de bestaande machinedetailfunctie en voeg alleen een hook toe. Zo vermijden we
+    # nog een extra wrapper rond showDeviceHistory.
+    replace_once(
+        "showModal('Machinedetails & logboek',body,'Sluiten',async()=>closeModal());setTimeout(()=>{const editDeviceBtn=$('#editDeviceFromHistory');",
+        "showModal('Machinedetails & logboek',body,'Sluiten',async()=>closeModal());setTimeout(()=>window.machineparkInsertMillTimes?.(id),0);setTimeout(()=>{const editDeviceBtn=$('#editDeviceFromHistory');",
+        'molentijdenhook in machinedetails',
+    )
+
     style = f'''
 <style {MARKER}>
 .mill-latest-times-panel{{border:1px solid var(--line);border-radius:13px;background:#f8faf9;padding:13px}}
@@ -174,24 +191,18 @@ if MARKER not in index:
   }
   window.machineparkMillLatestTimesHtml = millLatestTimesHtml;
 
-  const baseShowDeviceHistoryForMillTimes = showDeviceHistory;
-  showDeviceHistory = function(id) {
-    const result = baseShowDeviceHistoryForMillTimes(id);
-    setTimeout(() => {
-      const html = millLatestTimesHtml(id);
-      if (!html) return;
-      const grid = document.querySelector('#modal .modal-body .form-grid');
-      if (!grid || grid.querySelector('.mill-latest-times-block')) return;
-      const block = document.createElement('div');
-      block.className = 'field full mill-latest-times-block';
-      block.innerHTML = html;
-      const history = [...grid.children].find((node) => node.querySelector?.('.history-group'));
-      if (history) grid.insertBefore(block, history);
-      else grid.appendChild(block);
-    }, 25);
-    return result;
+  window.machineparkInsertMillTimes = function(id) {
+    const html = millLatestTimesHtml(id);
+    if (!html) return;
+    const grid = document.querySelector('#modal .modal-body .form-grid');
+    if (!grid || grid.querySelector('.mill-latest-times-block')) return;
+    const block = document.createElement('div');
+    block.className = 'field full mill-latest-times-block';
+    block.innerHTML = html;
+    const history = [...grid.children].find((node) => node.querySelector?.('.history-group'));
+    if (history) grid.insertBefore(block, history);
+    else grid.appendChild(block);
   };
-  window.showDeviceHistory = showDeviceHistory;
 })();
 </script>
 '''
@@ -211,6 +222,7 @@ required = [
     "name.includes('molen')",
     'workorder-last-value-hint',
     'mill-latest-times-panel',
+    'machineparkInsertMillTimes',
 ]
 for needle in required:
     if needle not in index:
