@@ -8,6 +8,9 @@ const buildJs = readFileSync(new URL('../assets/machinepark-build.js', import.me
 const buildCss = readFileSync(new URL('../assets/machinepark-build.css', import.meta.url), 'utf8');
 const builtSource = `${html}\n${buildJs}\n${buildCss}`;
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const version = String(pkg.version || '1');
+const escapedVersion = version.replace(/\./g, '\\.');
 
 test('kritieke UI bouwstenen zijn aanwezig', () => {
   for (const needle of [
@@ -98,14 +101,14 @@ test('featureblokken blijven runtime-foutgeisoleerd na bundeling', () => {
 });
 
 test('frontend-assets gebruiken inhoudsgebonden cache-busting', () => {
-  const jsMatch = html.match(/\/assets\/machinepark-build\.js\?v=1\.64\.0-([a-f0-9]{12})/);
-  const cssMatch = html.match(/\/assets\/machinepark-build\.css\?v=1\.64\.0-([a-f0-9]{12})/);
+  const jsMatch = html.match(new RegExp(`/assets/machinepark-build\\.js\\?v=${escapedVersion}-([a-f0-9]{12})`));
+  const cssMatch = html.match(new RegExp(`/assets/machinepark-build\\.css\\?v=${escapedVersion}-([a-f0-9]{12})`));
   assert.ok(jsMatch, 'JavaScript asset mist inhoudshash');
   assert.ok(cssMatch, 'CSS asset mist inhoudshash');
   assert.equal(jsMatch[1], cssMatch[1], 'JS en CSS moeten dezelfde buildhash gebruiken');
-  assert.ok(sw.includes(`machinepark-v1.64.0-assets-${jsMatch[1]}`));
-  assert.ok(sw.includes(`/assets/machinepark-build.js?v=1.64.0-${jsMatch[1]}`));
-  assert.ok(sw.includes(`/assets/machinepark-build.css?v=1.64.0-${jsMatch[1]}`));
+  assert.ok(sw.includes(`machinepark-v${version}-assets-${jsMatch[1]}`));
+  assert.ok(sw.includes(`/assets/machinepark-build.js?v=${version}-${jsMatch[1]}`));
+  assert.ok(sw.includes(`/assets/machinepark-build.css?v=${version}-${jsMatch[1]}`));
 });
 
 test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () => {
@@ -114,9 +117,10 @@ test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () =
 });
 
 test('service worker cachet de modulaire frontend-assets', () => {
-  assert.ok(sw.includes('machinepark-v1.64.0-assets-'));
+  assert.ok(sw.includes(`machinepark-v${version}-assets-`));
   assert.ok(sw.includes('/assets/machinepark-build.js'));
   assert.ok(sw.includes('/assets/machinepark-build.css'));
+  assert.ok(sw.includes('/offline-first.js'));
 });
 
 test('scriptsmap bevat alleen de vaste build-, audit- en finalizetooling', () => {
