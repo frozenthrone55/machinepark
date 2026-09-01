@@ -34,10 +34,10 @@ test('gelijktijdige offline en online voorraadwijzigingen worden als delta samen
 });
 
 test('gebouwde app laadt de offline runtime met actuele versie om oude PWA-cache te breken', () => {
-  assert.equal(packageJson.version, '1.68.7');
-  assert.match(index, /\/offline-first\.js\?v=1\.68\.7/);
+  assert.equal(packageJson.version, '1.68.8');
+  assert.match(index, /\/offline-first\.js\?v=1\.68\.8/);
   assert.match(index, /data-machinepark-offline-first="1"/);
-  assert.match(sw, /'\/offline-first\.js\?v=1\.68\.7'/);
+  assert.match(sw, /'\/offline-first\.js\?v=1\.68\.8'/);
 });
 
 test('service worker cachet offline runtime en cachebare API-data', () => {
