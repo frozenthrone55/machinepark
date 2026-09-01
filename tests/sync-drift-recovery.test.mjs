@@ -28,7 +28,7 @@ test('onderhoud en depannages krijgen een snelle centrale sync-trigger', () => {
 });
 
 test('drift-herstel draait na de algemene online consistency patch', () => {
-  assert.equal(packageJson.version, '1.68.8');
+  assert.equal(packageJson.version, '1.68.9');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-sync-drift-recovery\.py/);
   assert.ok(chain.indexOf('build-online-sync-consistency.py') < chain.indexOf('build-sync-drift-recovery.py'));
