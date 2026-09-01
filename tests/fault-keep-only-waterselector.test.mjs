@@ -19,7 +19,7 @@ test('opschoning verwijdert niets wanneer de exacte keeper ontbreekt', () => {
 });
 
 test('eerdere opschoning blijft vóór de definitieve leegmaakactie in de build', () => {
-  assert.equal(packageJson.version, '1.68.4');
+  assert.equal(packageJson.version, '1.68.5');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-fault-keep-only-waterselector\.py/);
   assert.match(chain, /build-fault-clear-all\.py/);
