@@ -68,12 +68,18 @@ function entityLabel(storeName, item, snapshot) {
 }
 const ENTITY_NAMES = { devices: 'Toestel', parts: 'Onderdeel', maintenance: 'Onderhoud', breakdowns: 'Depannage' };
 
+function auditVisibleList(snapshot, storeName) {
+  const list = Array.isArray(snapshot?.[storeName]) ? snapshot[storeName] : [];
+  if (storeName !== 'maintenance' && storeName !== 'breakdowns') return list;
+  return list.filter((item) => item?.isDraft !== true);
+}
+
 function diffSnapshots(before, after) {
   if (!before) return [{ entityType: 'Systeem', entityId: 'state-v1', entityLabel: 'Centrale Machinepark-database', action: 'geïnitialiseerd', fields: [] }];
   const changes = [];
   for (const storeName of ['devices', 'maintenance', 'breakdowns', 'parts']) {
-    const oldMap = new Map((before[storeName] || []).map((x) => [x.id, x]));
-    const newMap = new Map((after[storeName] || []).map((x) => [x.id, x]));
+    const oldMap = new Map(auditVisibleList(before, storeName).map((x) => [x.id, x]));
+    const newMap = new Map(auditVisibleList(after, storeName).map((x) => [x.id, x]));
     for (const [id, item] of newMap) {
       if (!oldMap.has(id)) {
         changes.push({ entityType: ENTITY_NAMES[storeName], entityId: id, entityLabel: entityLabel(storeName, item, after), action: 'toegevoegd', fields: [], undo: { kind: 'remove-added', storeName, entityId: id, expectedAfter: item } });
