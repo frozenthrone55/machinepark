@@ -85,6 +85,38 @@ function diffList(beforeList = [], afterList = []) {
 }
 function deny(message) { throw Object.assign(new Error(message), { status: 403 }); }
 function requirePermission(permissions, key, message) { if (!permissions[key]) deny(message); }
+function requireAnyPermission(permissions, keys, message) { if (!keys.some((key) => permissions[key])) deny(message); }
+function serviceDiffPermission(diff, permissions, prefix, label) {
+  let allowsStockMutation = false;
+  for (const item of diff.added) {
+    requirePermission(permissions, `${prefix}.add`, `Deze rol mag geen ${label} registreren.`);
+    if (item?.isDraft !== true) allowsStockMutation = true;
+  }
+  for (const item of diff.removed) {
+    if (item?.isDraft === true) requireAnyPermission(permissions, [`${prefix}.add`, `${prefix}.delete`], `Deze rol mag dit ${label}concept niet verwijderen.`);
+    else {
+      requirePermission(permissions, `${prefix}.delete`, `Deze rol mag geen ${label} verwijderen.`);
+      allowsStockMutation = true;
+    }
+  }
+  for (const change of diff.changed) {
+    const beforeDraft = change.before?.isDraft === true;
+    const afterDraft = change.after?.isDraft === true;
+    if (beforeDraft && afterDraft) {
+      requireAnyPermission(permissions, [`${prefix}.add`, `${prefix}.edit`], `Deze rol mag dit ${label}concept niet wijzigen.`);
+      continue;
+    }
+    if (beforeDraft && !afterDraft) {
+      requirePermission(permissions, `${prefix}.add`, `Deze rol mag dit ${label}concept niet definitief registreren.`);
+      allowsStockMutation = true;
+      continue;
+    }
+    if (!beforeDraft && afterDraft) deny(`Een bestaande ${label}registratie kan niet terug naar concept worden gezet.`);
+    requirePermission(permissions, `${prefix}.edit`, `Deze rol mag ${label} niet wijzigen.`);
+    allowsStockMutation = true;
+  }
+  return allowsStockMutation;
+}
 function validateDevicePhotos(devices = []) {
   for (const device of devices) {
     if (device?.devicePhotos !== undefined && !Array.isArray(device.devicePhotos)) {
@@ -113,15 +145,11 @@ export function assertSnapshotWriteAllowed(before, after, roleValue, config = nu
   if (devices.added.length) requirePermission(permissions, 'devices.add', role === 'magazijnier' ? 'Een magazijnier kan alleen onderdelen en voorraad wijzigen.' : 'Deze rol mag geen toestellen toevoegen.');
   if (devices.removed.length) requirePermission(permissions, 'devices.delete', role === 'magazijnier' ? 'Een magazijnier kan alleen onderdelen en voorraad wijzigen.' : 'Deze rol mag geen toestellen verwijderen.');
   for (const change of devices.changed) { const statusNotesOnly = change.keys.every((key) => ['status', 'notes'].includes(key)); if (statusNotesOnly && (permissions['devices.statusNotes'] || permissions['devices.edit'])) continue; if (!permissions['devices.edit']) { if (role === 'magazijnier') deny('Een magazijnier kan alleen onderdelen en voorraad wijzigen.'); if (role === 'technieker') deny('Een technieker kan bij toestellen alleen status en notities wijzigen.'); deny('Deze rol mag toestelgegevens niet volledig wijzigen.'); } }
-  if (maintenance.added.length) requirePermission(permissions, 'maintenance.add', 'Deze rol mag geen onderhoud registreren.');
-  if (maintenance.removed.length) requirePermission(permissions, 'maintenance.delete', 'Deze rol mag geen onderhoud verwijderen.');
-  if (maintenance.changed.length) requirePermission(permissions, 'maintenance.edit', 'Deze rol mag onderhoud niet wijzigen.');
-  if (breakdowns.added.length) requirePermission(permissions, 'breakdowns.add', 'Deze rol mag geen depannages registreren.');
-  if (breakdowns.removed.length) requirePermission(permissions, 'breakdowns.delete', 'Deze rol mag geen depannages verwijderen.');
-  if (breakdowns.changed.length) requirePermission(permissions, 'breakdowns.edit', 'Deze rol mag depannages niet wijzigen.');
+  const maintenanceStockMutation = serviceDiffPermission(maintenance, permissions, 'maintenance', 'onderhoud');
+  const breakdownStockMutation = serviceDiffPermission(breakdowns, permissions, 'breakdowns', 'depannage');
   if (parts.added.length) requirePermission(permissions, 'parts.add', 'Deze rol mag geen onderdelen toevoegen.');
   if (parts.removed.length) requirePermission(permissions, 'parts.delete', 'Deze rol mag geen onderdelen verwijderen.');
-  const serviceMutationAllowed = (maintenance.added.length && permissions['maintenance.add']) || (maintenance.changed.length && permissions['maintenance.edit']) || (maintenance.removed.length && permissions['maintenance.delete']) || (breakdowns.added.length && permissions['breakdowns.add']) || (breakdowns.changed.length && permissions['breakdowns.edit']) || (breakdowns.removed.length && permissions['breakdowns.delete']);
+  const serviceMutationAllowed = maintenanceStockMutation || breakdownStockMutation;
   for (const change of parts.changed) { const stockOnly = change.keys.every((key) => key === 'stock'); if (stockOnly && (permissions['parts.stock'] || permissions['parts.edit'] || serviceMutationAllowed)) continue; if (!permissions['parts.edit']) { if (role === 'technieker') deny('Een technieker kan bij onderdelen alleen de voorraad wijzigen via gebruikte onderdelen.'); deny('Deze rol mag onderdeelgegevens niet wijzigen.'); } }
   return true;
 }
