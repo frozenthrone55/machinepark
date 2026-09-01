@@ -38,10 +38,12 @@ test('focus en terugkeren naar zichtbare tab starten directe online sync', () =>
   assert.match(build, /document\.visibilityState === 'visible'/);
 });
 
-test('versie 1.68.7 bouwt de consistente online sync als laatste offline patch', () => {
-  assert.equal(packageJson.version, '1.68.7');
+test('versie 1.68.8 bouwt de consistente online sync vóór drift recovery', () => {
+  assert.equal(packageJson.version, '1.68.8');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-online-sync-consistency\.py/);
+  assert.match(chain, /build-sync-drift-recovery\.py/);
   assert.ok(chain.indexOf('build-central-access-etag.py') < chain.indexOf('build-online-sync-consistency.py'));
-  assert.ok(chain.indexOf('build-online-sync-consistency.py') < chain.indexOf('scripts/extract-build-assets.py'));
+  assert.ok(chain.indexOf('build-online-sync-consistency.py') < chain.indexOf('build-sync-drift-recovery.py'));
+  assert.ok(chain.indexOf('build-sync-drift-recovery.py') < chain.indexOf('scripts/extract-build-assets.py'));
 });
