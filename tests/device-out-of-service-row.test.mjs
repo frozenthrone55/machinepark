@@ -17,8 +17,8 @@ test('alle cellen van de buiten-dienst rij krijgen rode styling en hover blijft 
   assert.match(build, /background:#f3cccc/);
 });
 
-test('versie 1.68.10 bouwt de buiten-dienst rijstijl vóór assetextractie', () => {
-  assert.equal(packageJson.version, '1.68.10');
+test('versie 1.68.9 bouwt de buiten-dienst rijstijl vóór assetextractie', () => {
+  assert.equal(packageJson.version, '1.68.9');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-device-out-of-service-row\.py/);
   assert.ok(chain.indexOf('build-device-out-of-service-row.py') < chain.indexOf('scripts/extract-build-assets.py'));
