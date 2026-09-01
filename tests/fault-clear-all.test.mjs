@@ -21,7 +21,7 @@ test('de lege centrale lijst wordt ook naar de offline storingscache geschreven'
 });
 
 test('definitieve leegmaak draait na eerdere gerichte opschoningen', () => {
-  assert.equal(packageJson.version, '1.68.5');
+  assert.equal(packageJson.version, '1.68.6');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-fault-clear-all\.py/);
   assert.ok(chain.indexOf('build-fault-keep-only-waterselector.py') < chain.indexOf('build-fault-clear-all.py'));
