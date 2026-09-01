@@ -6,6 +6,7 @@ import vm from 'node:vm';
 const offline = fs.readFileSync('offline-first.js', 'utf8');
 const sw = fs.readFileSync('sw.js', 'utf8');
 const index = fs.readFileSync('index.html', 'utf8');
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 
 test('offline-first runtime bevat geldige JavaScript', () => {
   assert.doesNotThrow(() => new vm.Script(offline, { filename: 'offline-first.js' }));
@@ -32,9 +33,11 @@ test('gelijktijdige offline en online voorraadwijzigingen worden als delta samen
   assert.match(offline, /mergeEntity\(base\.get\(id\), local\.get\(id\), remote\.get\(id\), stats, storeName\)/);
 });
 
-test('gebouwde app laadt de offline runtime', () => {
-  assert.match(index, /\/offline-first\.js/);
+test('gebouwde app laadt de offline runtime met actuele versie om oude PWA-cache te breken', () => {
+  assert.equal(packageJson.version, '1.68.7');
+  assert.match(index, /\/offline-first\.js\?v=1\.68\.7/);
   assert.match(index, /data-machinepark-offline-first="1"/);
+  assert.match(sw, /'\/offline-first\.js\?v=1\.68\.7'/);
 });
 
 test('service worker cachet offline runtime en cachebare API-data', () => {
