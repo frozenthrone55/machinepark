@@ -19,7 +19,7 @@ test('Handleidingen krijgt een eigen pagina en beheerkaart', () => {
 
 test('handleidingen kunnen algemeen merk model of toestelgebonden zijn', () => {
   assert.match(client, /manual\.deviceId/);
-  assert.match(client, /manual\.brand && manual\.model/);
+  assert.match(client, /manual\?\.brand && manual\?\.model/);
   assert.match(client, /Algemeen · alle toestellen/);
   assert.match(client, /manualAppliesToDevice/);
   assert.match(client, /deviceId: String\(formData\.get\('deviceId'\)/);
