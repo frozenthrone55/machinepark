@@ -86,7 +86,7 @@ test('eenmalige Lattiz-opschoning bewaart exact één 00005 en raakt andere merk
 });
 
 test('build en functiecontrole nemen storingsbibliotheek Excel-import undo en volledige leegmaak mee', () => {
-  assert.equal(packageJson.version, '1.68.6');
+  assert.equal(packageJson.version, '1.68.7');
   assert.match(packageJson.scripts.build, /build-fault-library\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-matching\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-refresh-search\.py/);
