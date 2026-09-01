@@ -34,8 +34,8 @@ test('echte centrale foutoorzaak wordt zichtbaar zonder lokale data te wissen', 
   assert.match(offline, /startupError/);
 });
 
-test('startup-resilience en auth-retry blijven aanwezig in versie 1.68.7', () => {
-  assert.equal(packageJson.version, '1.68.7');
+test('startup-resilience en auth-retry blijven aanwezig in versie 1.68.8', () => {
+  assert.equal(packageJson.version, '1.68.8');
   assert.match(packageJson.scripts.build, /build-startup-resilience\.py/);
   assert.match(packageJson.scripts.build, /build-central-auth-retry\.py/);
   assert.match(packageJson.scripts.build, /build-central-access-etag\.py/);
