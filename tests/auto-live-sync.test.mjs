@@ -12,10 +12,12 @@ test('zichtbare online clients controleren automatisch om de paar seconden', () 
   assert.match(build, /document\.visibilityState === 'hidden'/);
 });
 
-test('live sync ververst hoofddata en aparte storingsbibliotheek', () => {
+test('live sync ververst hoofddata storingen en handleidingen', () => {
   assert.match(build, /machineparkSyncOnlineNow\(\{ quiet: true \}\)/);
   assert.match(build, /machineparkLoadFaultLibrary\(true\)/);
   assert.match(build, /machineparkRenderFaultLibrary\(\)/);
+  assert.match(build, /machineparkLoadManualLibrary\(true\)/);
+  assert.match(build, /machineparkRenderManualLibrary\(\)/);
 });
 
 test('reconnect focus en terugkeren naar tab verversen onmiddellijk', () => {
