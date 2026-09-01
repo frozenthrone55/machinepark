@@ -23,6 +23,35 @@ for required in (js_path, css_path, endpoint_path):
     if not required.exists():
         raise SystemExit(f'Buildvalidatie mislukt: {required.name} ontbreekt')
 
+# Kleine runtime-hardening: roep de centrale statusfunctie alleen aan wanneer ze
+# werkelijk bestaat. Zo kan een PDF-upload nooit stranden op een optionele UI-hook.
+feature_source = js_path.read_text(encoding='utf-8')
+old_status = "        setCentralSyncStatus?.('☁ PDF uploaden…', 'busy');"
+new_status = "        if (typeof setCentralSyncStatus === 'function') setCentralSyncStatus('☁ PDF uploaden…', 'busy');"
+if old_status in feature_source:
+    feature_source = feature_source.replace(old_status, new_status, 1)
+elif new_status not in feature_source:
+    raise SystemExit('Buildvalidatie mislukt: PDF-upload statushook niet gevonden')
+js_path.write_text(feature_source, encoding='utf-8')
+
+# Content-Disposition krijgt een ASCII fallback én RFC 5987 UTF-8 bestandsnaam.
+# Daardoor blijven ook Nederlandse/Franse accenten veilig in HTTP-headers.
+endpoint_source = endpoint_path.read_text(encoding='utf-8')
+old_filename = r'''  const safeName = String(manual.fileName || 'handleiding.pdf').replace(/[\r\n"]/g, '_');'''
+new_filename = r'''  const originalName = String(manual.fileName || 'handleiding.pdf').replace(/[\r\n"]/g, '_');
+  const asciiName = originalName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '_');'''
+old_disposition = r'''      'content-disposition': `inline; filename="${safeName}"`,'''
+new_disposition = r'''      'content-disposition': `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(originalName)}`,'''
+if old_filename in endpoint_source:
+    endpoint_source = endpoint_source.replace(old_filename, new_filename, 1)
+elif new_filename not in endpoint_source:
+    raise SystemExit('Buildvalidatie mislukt: PDF-bestandsnaam-hardening niet gevonden')
+if old_disposition in endpoint_source:
+    endpoint_source = endpoint_source.replace(old_disposition, new_disposition, 1)
+elif new_disposition not in endpoint_source:
+    raise SystemExit('Buildvalidatie mislukt: PDF Content-Disposition-hardening niet gevonden')
+endpoint_path.write_text(endpoint_source, encoding='utf-8')
+
 if MARKER not in index:
     nav_anchor = '<button type="button" data-view="parts" onclick="switchView(\'parts\')"><span class="icon">▣</span><span class="label">Onderdelen</span></button>'
     nav_manuals = '<button type="button" data-view="manuals" onclick="switchView(\'manuals\')"><span class="icon">📘</span><span class="label">Handleidingen</span></button>\n      '
@@ -90,10 +119,12 @@ required_feature = [
     'MachineparkManualLibraryDB', 'machinepark-manual-files-v1', 'Offline beschikbaar maken',
     'Handleidingen voor dit toestel', 'Handleidingen voor deze depannage', 'manuals.manage',
     'machineparkLoadManualLibrary', 'machineparkOpenManualPdf',
+    "typeof setCentralSyncStatus === 'function'",
 ]
 required_endpoint = [
     "CONFIG_KEY = 'manual-library-v1'", "FILE_PREFIX = 'manual-files/'", 'application/pdf',
     "action === 'save-manual'", "action === 'delete-manual'", 'MAX_FILE_BYTES',
+    "filename*=UTF-8''", 'asciiName',
 ]
 missing = [item for item in required_html if item not in built]
 missing += [item for item in required_feature if item not in feature]
