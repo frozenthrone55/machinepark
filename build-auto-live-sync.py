@@ -7,7 +7,7 @@ MARKER = 'data-machinepark-build-fix="auto-live-sync-v1"'
 
 if MARKER not in index:
     feature = r'''
-<script data-machinepark-build-fix="auto-live-sync-v1">
+<script>
 (() => {
   const LIVE_SYNC_INTERVAL_MS = 3000;
   let liveSyncTimer = null;
@@ -59,6 +59,7 @@ if MARKER not in index:
   startMachineparkLiveSync();
 })();
 </script>
+<span data-machinepark-build-fix="auto-live-sync-v1" hidden></span>
 '''
     if '</body>' not in index:
         raise SystemExit('Buildvalidatie mislukt: </body> ontbreekt voor live sync')
