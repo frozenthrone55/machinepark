@@ -9,9 +9,9 @@ if MARKER not in text:
     old = 'return `<tr data-device-history="${d.id}">'
     new = 'return `<tr class="${d.status===\'Buiten dienst\'?\'device-row-out-of-service\':\'\'}" data-device-history="${d.id}">'
     count = text.count(old)
-    if count != 1:
-        raise SystemExit(f'Buildvalidatie mislukt: verwacht 1 toestelrij-anker, gevonden {count}x')
-    text = text.replace(old, new, 1)
+    if count < 1:
+        raise SystemExit('Buildvalidatie mislukt: geen toestelrij-anker gevonden')
+    text = text.replace(old, new)
 
     style = r'''
 <style data-machinepark-build-fix="device-out-of-service-row-v1">
@@ -44,5 +44,7 @@ required = [
 for needle in required:
     if needle not in built:
         raise SystemExit(f'Buildvalidatie mislukt: buiten-dienst rijmarkering ontbreekt ({needle})')
+if 'return `<tr data-device-history="${d.id}">' in built:
+    raise SystemExit('Buildvalidatie mislukt: niet alle toestelrij-renderpaden zijn gemarkeerd')
 
 print('[Machinepark] volledige toestelrij wordt rood bij status Buiten dienst')
