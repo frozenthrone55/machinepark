@@ -24,8 +24,8 @@ test('reconnect focus en terugkeren naar tab verversen onmiddellijk', () => {
   assert.match(build, /document\.addEventListener\('visibilitychange'/);
 });
 
-test('versie 1.68.10 bouwt live sync na drift recovery', () => {
-  assert.equal(packageJson.version, '1.68.10');
+test('versie 1.68.9 bouwt live sync na drift recovery', () => {
+  assert.equal(packageJson.version, '1.68.9');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-auto-live-sync\.py/);
   assert.ok(chain.indexOf('build-sync-drift-recovery.py') < chain.indexOf('build-auto-live-sync.py'));
