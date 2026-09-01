@@ -13,7 +13,7 @@ test('foutieve Lattiz2 import wordt exact op Lattiz2 gericht verwijderd', () => 
   assert.match(build, /import volledig verwijderd/);
 });
 
-test('Lattiz2 cleanup blijft in de build voor versie 1.68.6', () => {
-  assert.equal(packageJson.version, '1.68.6');
+test('Lattiz2 cleanup blijft in de build voor versie 1.68.7', () => {
+  assert.equal(packageJson.version, '1.68.7');
   assert.match(packageJson.scripts.build, /build-fault-lattiz2-import-cleanup\.py/);
 });
