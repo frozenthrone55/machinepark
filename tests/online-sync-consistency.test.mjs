@@ -38,8 +38,8 @@ test('focus en terugkeren naar zichtbare tab starten directe online sync', () =>
   assert.match(build, /document\.visibilityState === 'visible'/);
 });
 
-test('versie 1.68.8 bouwt de consistente online sync vóór drift recovery', () => {
-  assert.equal(packageJson.version, '1.68.8');
+test('versie 1.68.9 bouwt de consistente online sync vóór drift recovery', () => {
+  assert.equal(packageJson.version, '1.68.9');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-online-sync-consistency\.py/);
   assert.match(chain, /build-sync-drift-recovery\.py/);
