@@ -29,6 +29,12 @@ if MARKER not in index:
           window.machineparkRenderFaultLibrary();
         }
       }
+      if (typeof window.machineparkLoadManualLibrary === 'function') {
+        await window.machineparkLoadManualLibrary(true);
+        if (typeof window.machineparkRenderManualLibrary === 'function') {
+          window.machineparkRenderManualLibrary();
+        }
+      }
     } catch (error) {
       console.warn('Automatische live synchronisatie', error);
     } finally {
@@ -65,6 +71,8 @@ required = [
     'window.machineparkSyncOnlineNow({ quiet: true })',
     'window.machineparkLoadFaultLibrary(true)',
     'window.machineparkRenderFaultLibrary()',
+    'window.machineparkLoadManualLibrary(true)',
+    'window.machineparkRenderManualLibrary()',
     "window.addEventListener('online'",
     "window.addEventListener('focus'",
     "document.addEventListener('visibilitychange'",
@@ -74,4 +82,4 @@ for needle in required:
     if needle not in index and needle != "rfind('</body>')":
         raise SystemExit(f'Buildvalidatie mislukt: automatische live sync ontbreekt ({needle})')
 
-print('[Machinepark] depannages, onderhoud en storingen verversen automatisch tussen toestellen')
+print('[Machinepark] depannages, onderhoud, storingen en handleidingen verversen automatisch tussen toestellen')
