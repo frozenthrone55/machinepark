@@ -46,7 +46,7 @@ if MARKER not in index:
     if (!device || !source) return;
 
     const clone = source.cloneNode(true);
-    clone.querySelectorAll('button,.device-photo-remove,.device-photo-overview').forEach((el) => el.remove());
+    clone.querySelectorAll('button,.device-photo-remove,.device-photo-overview,.manual-device-section').forEach((el) => el.remove());
     absoluteImageSources(clone);
 
     const label = [device.assetCode, device.brand, device.model].filter(Boolean).join(' · ') || 'Toestel';
@@ -129,9 +129,10 @@ required = [
     'waitForPrintImages',
     '.device-detail-photo-gallery',
     '.timeline-item',
+    '.manual-device-section',
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: toesteldetails-afdrukfunctie ontbreekt ({needle})')
 
-print('[Machinepark] toesteldetails individueel afdrukbaar inclusief tijdlijn en foto’s')
+print('[Machinepark] toesteldetails individueel afdrukbaar inclusief tijdlijn en foto’s, zonder handleidingen')
