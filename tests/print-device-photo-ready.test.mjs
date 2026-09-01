@@ -14,7 +14,7 @@ test('toestelfoto wordt volledig geladen en gedecodeerd voor print', () => {
 });
 
 test('afdrukfoto-fix zit na de bestaande toestelfoto- en printbuilds', () => {
-  assert.equal(packageJson.version, '1.68.7');
+  assert.equal(packageJson.version, '1.68.8');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-print-device-photo-ready\.py/);
   assert.ok(chain.indexOf('build-print-device-details.py') < chain.indexOf('build-print-device-photo-ready.py'));
