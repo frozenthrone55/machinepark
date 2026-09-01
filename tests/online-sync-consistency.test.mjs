@@ -12,6 +12,14 @@ test('remote/local merge wordt na succesvolle push meteen lokaal toegepast', () 
   assert.match(build, /await refresh\(\)/);
 });
 
+test('bij serviceconflicten wint de nieuwste onderhouds- of depannageversie', () => {
+  assert.match(build, /function serviceSyncTime\(item\)/);
+  assert.match(build, /function preferRemoteServiceConflict\(storeName, local, remote\)/);
+  assert.match(build, /storeName !== 'maintenance' && storeName !== 'breakdowns'/);
+  assert.match(build, /remoteTime >= localTime/);
+  assert.match(build, /preferRemoteServiceConflict\(storeName, local, remote\)/);
+});
+
 test('alleen offline gaan markeert de dataset niet als gewijzigd', () => {
   assert.match(build, /window\.addEventListener\('offline'/);
   assert.match(build, /offline gaan markeert nog steeds onterecht/);
@@ -30,8 +38,8 @@ test('focus en terugkeren naar zichtbare tab starten directe online sync', () =>
   assert.match(build, /document\.visibilityState === 'visible'/);
 });
 
-test('versie 1.68.6 bouwt de consistente online sync als laatste offline patch', () => {
-  assert.equal(packageJson.version, '1.68.6');
+test('versie 1.68.7 bouwt de consistente online sync als laatste offline patch', () => {
+  assert.equal(packageJson.version, '1.68.7');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-online-sync-consistency\.py/);
   assert.ok(chain.indexOf('build-central-access-etag.py') < chain.indexOf('build-online-sync-consistency.py'));
