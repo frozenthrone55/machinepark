@@ -7,6 +7,48 @@ text = path.read_text(encoding='utf-8')
 MARKER = '// machinepark-online-sync-consistency-v1'
 
 if MARKER not in text:
+    # 0. Onderhoud en depannages hebben updatedAt op iedere echte wijziging. Wanneer
+    # een oudere client geen bruikbare 3-way basis meer heeft, mag een stale lokale
+    # record een later centraal/gsm-record niet terugdraaien. Bij een echt veldconflict
+    # wint daarom voor deze twee stores de nieuwste recordtijd; bij gelijke/onbekende
+    # tijd wint de centrale versie als veilig anker.
+    old = "  function mergeEntity(base, local, remote, stats, storeName = '') {"
+    new = """  function serviceSyncTime(item) {
+    const parsed = Date.parse(String(item?.updatedAt || item?.createdAt || ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function preferRemoteServiceConflict(storeName, local, remote) {
+    if (storeName !== 'maintenance' && storeName !== 'breakdowns') return false;
+    const localTime = serviceSyncTime(local);
+    const remoteTime = serviceSyncTime(remote);
+    if (localTime && remoteTime) return remoteTime >= localTime;
+    if (remoteTime) return true;
+    if (localTime) return false;
+    return true;
+  }
+
+  function mergeEntity(base, local, remote, stats, storeName = '') {"""
+    if text.count(old) != 1:
+        raise SystemExit('Online sync: mergeEntity-anker niet uniek')
+    text = text.replace(old, new, 1)
+
+    old = """      } else {
+        stats.conflicts += 1;
+        if (lHas) result[key] = l;
+      }"""
+    new = """      } else {
+        stats.conflicts += 1;
+        if (preferRemoteServiceConflict(storeName, local, remote)) {
+          if (rHas) result[key] = r;
+        } else if (lHas) {
+          result[key] = l;
+        }
+      }"""
+    if text.count(old) != 1:
+        raise SystemExit('Online sync: conflictkeuze-anker niet uniek')
+    text = text.replace(old, new, 1)
+
     # 1. Als een 409 tot een echte remote/local merge leidt, moet die samengevoegde
     # toestand na de geslaagde PUT ook lokaal worden toegepast. Anders is de server
     # correct terwijl de geopende UI tot een volgende pull verouderd blijft.
@@ -23,7 +65,7 @@ if MARKER not in text:
     text = text.replace(old, new, 1)
 
     old = "              await writeMeta({ etag: centralSync.etag || null, base: local, dirty: false });\n              if (migratedPhotos) await refresh();\n              setCentralSyncStatus(conflicts ? `☁ Gesynchroniseerd · ${conflicts} conflict(en) lokaal behouden` : '☁ Alles centraal opgeslagen', 'ok');"
-    new = "              await writeMeta({ etag: centralSync.etag || null, base: local, dirty: false });\n              if (reconciledRemote || migratedPhotos) {\n                await replaceLocalSnapshot(local);\n                if (window.__koffieServiceStarted && document.getElementById('view-dashboard')) await refresh();\n              }\n              setCentralSyncStatus(conflicts ? `☁ Gesynchroniseerd · ${conflicts} conflict(en) lokaal behouden` : '☁ Alles centraal opgeslagen', 'ok');"
+    new = "              await writeMeta({ etag: centralSync.etag || null, base: local, dirty: false });\n              if (reconciledRemote || migratedPhotos) {\n                await replaceLocalSnapshot(local);\n                if (window.__koffieServiceStarted && document.getElementById('view-dashboard')) await refresh();\n              }\n              setCentralSyncStatus(conflicts ? `☁ Gesynchroniseerd · ${conflicts} conflict(en) veilig samengevoegd` : '☁ Alles centraal opgeslagen', 'ok');"
     if text.count(old) != 1:
         raise SystemExit('Online sync: push-success-anker niet uniek')
     text = text.replace(old, new, 1)
@@ -67,6 +109,10 @@ path.write_text(text, encoding='utf-8')
 built = path.read_text(encoding='utf-8')
 required = [
     MARKER,
+    'function serviceSyncTime(item)',
+    'function preferRemoteServiceConflict(storeName, local, remote)',
+    "storeName !== 'maintenance' && storeName !== 'breakdowns'",
+    'remoteTime >= localTime',
     'let reconciledRemote = false;',
     'reconciledRemote = true;',
     'await replaceLocalSnapshot(local);',
@@ -89,4 +135,4 @@ offline_section = built[offline_anchor:offline_end]
 if 'markDirty().catch' in offline_section:
     raise SystemExit('Buildvalidatie mislukt: offline gaan markeert nog steeds onterecht de dataset dirty')
 
-print('[Machinepark] volledige app synchroniseert bij online opstart, reconnect, focus en merge direct met centrale waarheid')
+print('[Machinepark] volledige app synchroniseert direct en serviceconflicten kiezen de nieuwste recordversie')
