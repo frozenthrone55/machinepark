@@ -26,5 +26,7 @@ jobs:
         run: npm run build
       - name: Code-audit
         run: npm run audit
-      - name: Automatische tests
-        run: node --test tests/*.test.mjs
+      - name: Test storingenoverzicht
+        run: node --test tests/fault-overview-all-fields.test.mjs
+      - name: Overige automatische tests
+        run: node --test $(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'fault-overview-all-fields.test.mjs' -print | sort)
