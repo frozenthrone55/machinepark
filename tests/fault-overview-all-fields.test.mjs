@@ -9,13 +9,19 @@ const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('storingenoverzicht toont alle invulbare velden als kolommen', () => {
+  const tableStart = index.indexOf('<table class="table fault-table">');
+  assert.ok(tableStart >= 0, 'storingenoverzicht-tabel ontbreekt');
+  const tableEnd = index.indexOf('</table>', tableStart);
+  assert.ok(tableEnd > tableStart, 'einde van storingenoverzicht-tabel ontbreekt');
+  const faultTable = index.slice(tableStart, tableEnd);
+
   const headers = [
     'Code', 'Storing', 'Categorie', 'Merk', 'Model', 'Gedetailleerde omschrijving',
     'Melding', 'Symptomen', 'Mogelijke oorzaken', 'Oplossing 1', 'Oplossing 2',
     'Extra controle / oplossingen', 'Interne opmerkingen', 'Actief',
   ];
-  for (const header of headers) assert.match(index, new RegExp(`<th>${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</th>`));
-  assert.doesNotMatch(index, /<th>Oplossing<\/th>/);
+  for (const header of headers) assert.match(faultTable, new RegExp(`<th>${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</th>`));
+  assert.doesNotMatch(faultTable, /<th>Oplossing<\/th>/);
 });
 
 test('overzichtsrij gebruikt de detailwaarden in exact dezelfde kolomvolgorde', () => {
