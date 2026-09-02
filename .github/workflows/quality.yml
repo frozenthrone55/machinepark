@@ -22,5 +22,9 @@ jobs:
           node-version: '22'
       - name: Functies syntactisch controleren
         run: npm run check:functions
-      - name: Build, code-audit en automatische tests
-        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Code-audit
+        run: npm run audit
+      - name: Automatische tests
+        run: node --test tests/*.test.mjs
