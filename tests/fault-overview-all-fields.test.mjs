@@ -8,7 +8,7 @@ const css = readFileSync(new URL('../fault-library.css', import.meta.url), 'utf8
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-test('storingenoverzicht toont alle invulbare velden als kolommen', () => {
+test('storingenoverzicht gebruikt alle detailwaarden correct en cacheveilig', () => {
   const tableStart = index.indexOf('<table class="table fault-table">');
   assert.ok(tableStart >= 0, 'storingenoverzicht-tabel ontbreekt');
   const tableEnd = index.indexOf('</table>', tableStart);
@@ -22,9 +22,7 @@ test('storingenoverzicht toont alle invulbare velden als kolommen', () => {
   ];
   for (const header of headers) assert.match(faultTable, new RegExp(`<th>${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</th>`));
   assert.doesNotMatch(faultTable, /<th>Oplossing<\/th>/);
-});
 
-test('overzichtsrij gebruikt de detailwaarden in exact dezelfde kolomvolgorde', () => {
   const marker = '// machinepark-fault-overview-all-fields-v1';
   const markerPos = frontend.indexOf(marker);
   assert.ok(markerPos >= 0, 'marker van het volledige storingenoverzicht ontbreekt');
@@ -48,18 +46,14 @@ test('overzichtsrij gebruikt de detailwaarden in exact dezelfde kolomvolgorde', 
     'overviewText(fault.notes)',
     'fault.active',
   ];
-
   let previous = -1;
   for (const value of orderedValues) {
     const position = overviewBlock.indexOf(value, previous + 1);
     assert.ok(position > previous, `${value} ontbreekt of staat in de verkeerde overzichtskolom`);
     previous = position;
   }
-
   assert.match(frontend, /colspan="15"/);
-});
 
-test('brede tabel blijft horizontaal bruikbaar en buildvolgorde is correct', () => {
   assert.match(css, /\.fault-table\{min-width:2600px\}/);
   assert.match(css, /\.fault-overview-cell\{/);
   const build = pkg.scripts.build;
@@ -67,9 +61,7 @@ test('brede tabel blijft horizontaal bruikbaar en buildvolgorde is correct', () 
   assert.ok(build.indexOf('build-fault-excel-fields-seed.py') < build.indexOf('build-fault-overview-all-fields.py'));
   assert.ok(build.indexOf('build-fault-overview-all-fields.py') < build.indexOf('build-manual-library.py'));
   assert.equal(pkg.version, '1.68.9');
-});
 
-test('service worker ververst oudere fault-library.js caches na deploy', () => {
   assert.match(sw, /const CACHE='machinepark-v1\.68\.9-fault-overview-v2'/);
   assert.doesNotMatch(sw, /machinepark-v1\.65-offline-first/);
   assert.match(sw, /keys\.filter\(k=>k!==CACHE\).*caches\.delete\(k\)/);
