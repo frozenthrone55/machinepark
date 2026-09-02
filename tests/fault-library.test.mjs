@@ -43,12 +43,14 @@ test('storingsbibliotheek is gekoppeld aan depannages met een momentopname', () 
   assert.match(builtSource, /data-fault-pick/);
 });
 
-test('storingsbibliotheek is offline leesbaar en runtimebestanden zitten in de service-worker cache', () => {
+test('storingsbibliotheek is offline leesbaar en runtimebestanden zitten versiegebonden in de service-worker cache', () => {
   assert.match(builtSource, /MachineparkFaultLibraryDB/);
   assert.match(builtSource, /navigator\.onLine === false/);
   assert.match(builtSource, /offline opgeslagen bibliotheek/);
-  assert.match(sw, /'\/fault-library\.js'/);
-  assert.match(sw, /'\/fault-library\.css'/);
+  assert.match(html, /\/fault-library\.js\?v=1\.68\.9-[a-f0-9]{12}/);
+  assert.match(html, /\/fault-library\.css\?v=1\.68\.9-[a-f0-9]{12}/);
+  assert.match(sw, /'\/fault-library\.js\?v=1\.68\.9-[a-f0-9]{12}'/);
+  assert.match(sw, /'\/fault-library\.css\?v=1\.68\.9-[a-f0-9]{12}'/);
 });
 
 test('rollen hebben aparte rechten voor storingen en bestaande ingebouwde rollen migreren veilig', () => {
