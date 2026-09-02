@@ -211,7 +211,7 @@ required = [
     "maintenanceNav.dataset.view = 'work'",
     "maintenanceNav.querySelector('.label').textContent = 'Werkzaamheden'",
     "breakdownNav.style.display = 'none'",
-    'id="view-work"',
+    "workView.id = 'view-work'",
     'id="workAddMaintenance"',
     'id="workAddBreakdown"',
     '<th>Type</th>',
