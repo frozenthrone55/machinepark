@@ -9,7 +9,7 @@ test('Onderhoud en Depannages worden één navigatietab Werkzaamheden', () => {
   assert.match(patch, /maintenanceNav\.dataset\.view = 'work'/);
   assert.match(patch, /Werkzaamheden/);
   assert.match(patch, /breakdownNav\.style\.display = 'none'/);
-  assert.match(patch, /id=\"view-work\"/);
+  assert.match(patch, /workView\.id = 'view-work'/);
   assert.match(patch, /if \(view === 'maintenance' \|\| view === 'breakdowns' \|\| view === 'work'\)/);
 });
 
