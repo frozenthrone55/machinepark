@@ -8,7 +8,7 @@ const css = readFileSync(new URL('../fault-library.css', import.meta.url), 'utf8
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-test('storingenoverzicht gebruikt alle detailwaarden correct en cacheveilig', () => {
+test('storingenoverzicht gebruikt alle actuele centrale detailwaarden correct en cacheveilig', () => {
   const tableStart = index.indexOf('<table class="table fault-table">');
   assert.ok(tableStart >= 0, 'storingenoverzicht-tabel ontbreekt');
   const tableEnd = index.indexOf('</table>', tableStart);
@@ -30,36 +30,59 @@ test('storingenoverzicht gebruikt alle detailwaarden correct en cacheveilig', ()
   assert.ok(endPos > markerPos, 'einde van het storingenoverzicht kon niet worden bepaald');
   const overviewBlock = frontend.slice(markerPos, endPos);
 
-  const orderedValues = [
-    'fault.code',
-    'fault.name',
-    'fault.category',
-    'fault.brand',
-    'fault.model',
-    'overviewText(fault.description)',
-    'overviewText(fault.message)',
-    'overviewList(fault.symptoms)',
-    'overviewList(fault.causes)',
-    'overviewText(fault.solution1)',
-    'overviewText(fault.solution2)',
-    'overviewList(fault.solutions)',
-    'overviewText(fault.notes)',
-    'fault.active',
+  const orderedSourceValues = [
+    'code: overviewText(fault.code)',
+    'name: overviewText(fault.name)',
+    'category: overviewText(fault.category)',
+    'brand: overviewText(fault.brand)',
+    'model: overviewText(fault.model)',
+    'description: overviewText(fault.description)',
+    'message: overviewText(fault.message)',
+    'symptoms: overviewList(fault.symptoms)',
+    'causes: overviewList(fault.causes)',
+    'solution1: overviewText(fault.solution1)',
+    'solution2: overviewText(fault.solution2)',
+    'solutions: overviewList(fault.solutions)',
+    'notes: overviewText(fault.notes)',
+    'active: fault.active !== false',
   ];
   let previous = -1;
-  for (const value of orderedValues) {
+  for (const value of orderedSourceValues) {
+    const position = overviewBlock.indexOf(value, previous + 1);
+    assert.ok(position > previous, `${value} ontbreekt of staat in de verkeerde overzichtsmapping`);
+    previous = position;
+  }
+
+  const orderedRenderedValues = [
+    'overview.code', 'overview.name', 'overview.category', 'overview.brand', 'overview.model',
+    'overview.description', 'overview.message', 'overview.symptoms', 'overview.causes',
+    'overview.solution1', 'overview.solution2', 'overview.solutions', 'overview.notes', 'overview.active',
+  ];
+  previous = -1;
+  for (const value of orderedRenderedValues) {
     const position = overviewBlock.indexOf(value, previous + 1);
     assert.ok(position > previous, `${value} ontbreekt of staat in de verkeerde overzichtskolom`);
     previous = position;
   }
   assert.match(frontend, /colspan="15"/);
 
+  assert.match(frontend, /machinepark-fault-overview-live-sync-v1/);
+  assert.match(frontend, /window\.machineparkSyncFaultOverview = syncFaultOverviewFromCentral/);
+  assert.match(frontend, /faultOverviewSyncing = loadFaultLibrary\(true\)/);
+  assert.match(frontend, /if \(state\.view === 'faults'\) \{\s*renderFaultLibrary\(\);\s*syncFaultOverviewFromCentral\(\)\.catch\(\(\) => \{\}\);/s);
+  assert.match(frontend, /refresh\.onclick = async \(\) => \{ await syncFaultOverviewFromCentral\(\); \}/);
+
+  // De globale live-sync blijft dezelfde centrale storingenlijst continu verversen.
+  assert.match(index, /LIVE_SYNC_INTERVAL_MS = 3000/);
+  assert.match(index, /window\.machineparkLoadFaultLibrary\(true\)/);
+  assert.match(index, /window\.machineparkRenderFaultLibrary\(\)/);
+
   assert.match(css, /\.fault-table\{min-width:2600px\}/);
   assert.match(css, /\.fault-overview-cell\{/);
   const build = pkg.scripts.build;
   assert.ok(build.includes('python3 build-fault-overview-all-fields.py'));
   assert.ok(build.indexOf('build-fault-excel-fields-seed.py') < build.indexOf('build-fault-overview-all-fields.py'));
-  assert.ok(build.indexOf('build-fault-overview-all-fields.py') < build.indexOf('build-manual-library.py'));
+  assert.ok(build.indexOf('build-fault-overview-all-fields.py') < build.indexOf('build-auto-live-sync.py'));
   assert.equal(pkg.version, '1.68.9');
 
   assert.match(sw, /const CACHE='machinepark-v1\.68\.9-assets-[a-f0-9]{12}'/);
