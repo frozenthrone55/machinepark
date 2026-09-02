@@ -57,7 +57,9 @@ if MARKER not in index:
     index_path.write_text(index, encoding='utf-8')
 
 sw = sw_path.read_text(encoding='utf-8')
-if "'/fault-library.js'" not in sw or "'/fault-library.css'" not in sw:
+# Ook een reeds versiegebonden URL telt als bestaande asset. Zo blijft een tweede
+# build idempotent en ontstaan er geen dubbele cache-items.
+if "'/fault-library.js" not in sw or "'/fault-library.css" not in sw:
     anchor = "  '/offline-first.js',\n"
     if sw.count(anchor) != 1:
         raise SystemExit('Buildvalidatie mislukt: service-worker assetanker voor storingsbibliotheek ontbreekt')
