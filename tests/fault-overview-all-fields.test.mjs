@@ -19,6 +19,13 @@ test('storingenoverzicht toont alle invulbare velden als kolommen', () => {
 });
 
 test('overzichtsrij gebruikt de detailwaarden in exact dezelfde kolomvolgorde', () => {
+  const marker = '// machinepark-fault-overview-all-fields-v1';
+  const markerPos = frontend.indexOf(marker);
+  assert.ok(markerPos >= 0, 'marker van het volledige storingenoverzicht ontbreekt');
+  const endPos = frontend.indexOf("    }).join('');", markerPos);
+  assert.ok(endPos > markerPos, 'einde van het storingenoverzicht kon niet worden bepaald');
+  const overviewBlock = frontend.slice(markerPos, endPos);
+
   const orderedValues = [
     'fault.code',
     'fault.name',
@@ -38,12 +45,11 @@ test('overzichtsrij gebruikt de detailwaarden in exact dezelfde kolomvolgorde', 
 
   let previous = -1;
   for (const value of orderedValues) {
-    const position = frontend.indexOf(value, previous + 1);
+    const position = overviewBlock.indexOf(value, previous + 1);
     assert.ok(position > previous, `${value} ontbreekt of staat in de verkeerde overzichtskolom`);
     previous = position;
   }
 
-  assert.match(frontend, /machinepark-fault-overview-all-fields-v1/);
   assert.match(frontend, /colspan="15"/);
 });
 
