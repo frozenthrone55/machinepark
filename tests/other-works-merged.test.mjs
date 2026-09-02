@@ -12,7 +12,7 @@ test('Andere werken heeft geen apart tabblad meer', () => {
 });
 
 test('Werkzaamheden krijgt een derde registratieknop voor Andere werken', () => {
-  assert.match(patch, /id=\\"workAddOtherWork\\"/);
+  assert.match(patch, /id="workAddOtherWork"/);
   assert.match(patch, /\+ Andere werken registreren/);
   assert.match(patch, /addOtherWork\.onclick=\(\)=>openOtherWork\(\)/);
 });
