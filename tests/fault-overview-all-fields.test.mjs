@@ -62,7 +62,8 @@ test('storingenoverzicht gebruikt alle detailwaarden correct en cacheveilig', ()
   assert.ok(build.indexOf('build-fault-overview-all-fields.py') < build.indexOf('build-manual-library.py'));
   assert.equal(pkg.version, '1.68.9');
 
-  assert.match(sw, /const CACHE='machinepark-v1\.68\.9-fault-overview-v2'/);
+  assert.match(sw, /const CACHE='machinepark-v1\.68\.9-assets-[a-f0-9]{12}'/);
+  assert.match(sw, /'\/fault-library\.js'/);
   assert.doesNotMatch(sw, /machinepark-v1\.65-offline-first/);
   assert.match(sw, /keys\.filter\(k=>k!==CACHE\).*caches\.delete\(k\)/);
 });
