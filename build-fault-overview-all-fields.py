@@ -48,12 +48,9 @@ if SYNC_MARKER not in frontend:
         "  window.machineparkRenderFaultLibrary = renderFaultLibrary;\n\n  // machinepark-fault-overview-live-sync-v1\n  let faultOverviewSyncing = null;\n  async function syncFaultOverviewFromCentral() {\n    if (!canViewFaultLibrary() || navigator.onLine === false) return faultLibrary;\n    if (faultOverviewSyncing) return faultOverviewSyncing;\n    faultOverviewSyncing = loadFaultLibrary(true)\n      .then((faults) => {\n        if (state.view === 'faults') renderFaultLibrary();\n        return faults;\n      })\n      .finally(() => { faultOverviewSyncing = null; });\n    return faultOverviewSyncing;\n  }\n  window.machineparkSyncFaultOverview = syncFaultOverviewFromCentral;\n",
         'centrale storingenoverzicht-sync helper',
     )
-    frontend = replace_once(
-        frontend,
-        "    if (state.view === 'faults') renderFaultLibrary();",
-        "    if (state.view === 'faults') {\n      renderFaultLibrary();\n      syncFaultOverviewFromCentral().catch(() => {});\n    }",
-        'directe centrale refresh bij openen Storingen',
-    )
+    old_render_all = "  const baseRenderAllForFaults = renderAll;\n  renderAll = function() {\n    baseRenderAllForFaults();\n    if (state.view === 'faults') renderFaultLibrary();\n  };"
+    new_render_all = "  const baseRenderAllForFaults = renderAll;\n  renderAll = function() {\n    baseRenderAllForFaults();\n    if (state.view === 'faults') {\n      renderFaultLibrary();\n      syncFaultOverviewFromCentral().catch(() => {});\n    }\n  };"
+    frontend = replace_once(frontend, old_render_all, new_render_all, 'directe centrale refresh bij openen Storingen')
     frontend = replace_once(
         frontend,
         "    if (refresh) refresh.onclick = async () => { faultLibraryLoaded = false; await loadFaultLibrary(true); renderFaultLibrary(); };",
