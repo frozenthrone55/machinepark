@@ -26,7 +26,19 @@ jobs:
         run: npm run build
       - name: Code-audit
         run: npm run audit
-      - name: Test storingenoverzicht
+      - name: Test storingenkolommen
+        continue-on-error: true
+        run: node --test --test-name-pattern='storingenoverzicht toont alle invulbare velden' tests/fault-overview-all-fields.test.mjs
+      - name: Test storingenveldmapping
+        continue-on-error: true
+        run: node --test --test-name-pattern='overzichtsrij gebruikt de detailwaarden' tests/fault-overview-all-fields.test.mjs
+      - name: Test storingenoverzichtopmaak
+        continue-on-error: true
+        run: node --test --test-name-pattern='brede tabel blijft horizontaal bruikbaar' tests/fault-overview-all-fields.test.mjs
+      - name: Test storingen-cacheverversing
+        continue-on-error: true
+        run: node --test --test-name-pattern='service worker ververst oudere' tests/fault-overview-all-fields.test.mjs
+      - name: Test storingenoverzicht volledig
         run: node --test tests/fault-overview-all-fields.test.mjs
       - name: Overige automatische tests
         run: node --test $(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'fault-overview-all-fields.test.mjs' -print | sort)
