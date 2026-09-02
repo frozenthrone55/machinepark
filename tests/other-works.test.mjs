@@ -14,22 +14,22 @@ test('Andere werken wordt op dezelfde breakdown-opslag gebouwd met eigen discrim
 });
 
 test('Plaatsing is standaard en nieuwe namen worden uit eerdere registraties hergebruikt', () => {
-  assert.match(patch, /const names = \['Plaatsing'\]/);
+  assert.match(patch, /const names=\['Plaatsing'\]/);
   assert.match(patch, /Nieuwe naam toevoegen/);
-  assert.match(patch, /otherWorkTypeNames/);
+  assert.match(patch, /function typeNames/);
   assert.match(patch, /item\.workTypeName/);
 });
 
 test('Andere werken krijgt eigen tab en wordt met gekozen naam in Werkzaamheden getoond', () => {
   assert.match(patch, /view-otherworks/);
   assert.match(patch, /Andere werken registreren/);
-  assert.match(patch, /renderCombinedWorkWithOther/);
+  assert.match(patch, /machineparkRenderCombinedWork=renderCombined/);
   assert.match(patch, /other-work-badge/);
   assert.match(patch, /data-other-work-details/);
 });
 
 test('Andere werken behoudt concept-, werkbon- en depannageveldenroute', () => {
-  assert.match(patch, /isOtherWorkDraftHeader/);
+  assert.match(patch, /isOtherDraftHeader/);
   assert.match(patch, /machineparkPrepareOtherWorkModal/);
   assert.match(patch, /openBreakdown\(\)/);
   assert.match(patch, /header\?\.serviceKind === 'other'/);
