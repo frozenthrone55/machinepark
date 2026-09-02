@@ -33,8 +33,8 @@ if MARKER not in frontend:
     frontend = replace_once(frontend, old_row, new_row, 'volledige storingenoverzicht-rij')
 
     colspan_count = frontend.count('colspan="6"')
-    if colspan_count != 3:
-        raise SystemExit(f'Buildvalidatie mislukt: verwacht 3x storingen-colspan 6, gevonden {colspan_count}x')
+    if colspan_count != 4:
+        raise SystemExit(f'Buildvalidatie mislukt: verwacht 4x storingen-colspan 6, gevonden {colspan_count}x')
     frontend = frontend.replace('colspan="6"', 'colspan="15"')
 
 if '.fault-table{min-width:980px}' in css:
