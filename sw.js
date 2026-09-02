@@ -1,4 +1,4 @@
-const CACHE='machinepark-v1.65-offline-first';
+const CACHE='machinepark-v1.68.9-fault-overview-v2';
 const ASSETS=[
   '/',
   '/index.html',
