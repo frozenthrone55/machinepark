@@ -325,23 +325,37 @@
     </div>`;
   }
 
-  function serviceVisitForm({visit=null,header=null,items=[]}={}) {
-    const location = visit?.location || header?.locationLabel || '';
-    const locationKey = visit?.locationKey || header?.locationKey || '';
-    const date = visit?.date || header?.date || todayISO();
-    const time = visit?.time || header?.time || nowLocalTime();
-    const technician = header?.technician ?? (visit?.technician === '—' ? '' : visit?.technician || '');
-    const sessionSource = { date, workSessions:Array.isArray(header?.workSessions) ? header.workSessions : [] };
-    const workSessionsHtml = typeof window.machineparkServiceWorkSessionsEditor === 'function'
-      ? window.machineparkServiceWorkSessionsEditor(sessionSource, 'servicevisit')
-      : `<div class="field full"><label>Werkdagen en tijd</label><input name="workSessionDate" type="date" required value="${svEsc(date)}"><input name="workSessionMinutes" type="number" min="1" step="1" required placeholder="minuten"></div>`;
-    return `<div class="form-grid"><div class="service-visit-form-note"><strong>Eén bezoek, één klantverslag.</strong> Onderhoud en depannage worden definitief als aparte records per toestel opgeslagen. Onderdelen blijven per toestel bewaard en worden alleen in het klantverslag samengevoegd.</div>
-      ${visit ? `<div class="service-visit-existing"><strong>Aanvulling op ${svEsc(visit.number)} · huidige versie v${svEsc(visit.revision)}</strong><div class="muted" style="font-size:11px;margin-top:3px">Bestaande registraties blijven ongewijzigd. Na afsluiten wordt dit hetzelfde verslag met een hogere versie.</div></div>` : ''}
-      <div class="field full"><label>Locatie *</label><div class="maintenance-location-autocomplete"><input id="serviceVisitLocationSearch" type="search" required autocomplete="off" placeholder="Typ locatie of toestelnummer…" value="${svEsc(location)}" ${visit ? 'readonly' : ''}><input id="serviceVisitLocationKey" name="locationKey" type="hidden" value="${svEsc(locationKey)}"><div id="serviceVisitLocationSuggestions" class="maintenance-location-suggestions"></div></div><div id="serviceVisitLocationCount" class="muted" style="font-size:11px;margin-top:4px">${location ? `Locatie: ${svEsc(location)}` : 'Typ een locatie of toestelnummer en kies de locatie uit de lijst.'}</div></div>
-      <div class="field"><label>Datum *</label><input name="date" type="date" required value="${svEsc(date)}" ${visit ? 'readonly' : ''}></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${svEsc(time)}" ${visit ? 'readonly' : ''}></div>
+  function draftLocationList(report=null,header=null) {
+    const fromReport=(report?.visits||[]).map(visit=>({key:visit.locationKey||svKey(visit.location),label:visit.location||'—',visitId:visit.id}));
+    const fromHeader=Array.isArray(header?.locations)?header.locations.map(loc=>({key:String(loc?.key||''),label:String(loc?.label||''),visitId:String(loc?.visitId||'')})).filter(loc=>loc.key&&loc.label):[];
+    if(fromHeader.length)return fromHeader;
+    if(fromReport.length)return fromReport;
+    if(header?.locationKey&&header?.locationLabel)return[{key:header.locationKey,label:header.locationLabel,visitId:header.appendToVisitId||''}];
+    return[];
+  }
+
+  function serviceVisitForm({report=null,visit=null,header=null,items=[]}={}) {
+    const locations=draftLocationList(report,header);
+    const activeKey=header?.activeLocationKey||locations[0]?.key||visit?.locationKey||'';
+    const active=locations.find(loc=>loc.key===activeKey)||locations[0]||null;
+    const location=active?.label||visit?.location||header?.locationLabel||'';
+    const locationKey=active?.key||visit?.locationKey||header?.locationKey||'';
+    const date=report?.date||visit?.date||header?.date||todayISO();
+    const time=report?.time||visit?.time||header?.time||nowLocalTime();
+    const technician=header?.technician??(report?.technician==='—'?'':report?.technician||visit?.technician==='—'?'':visit?.technician||'');
+    const sessionSource={date,workSessions:Array.isArray(header?.workSessions)?header.workSessions:[]};
+    const workSessionsHtml=typeof window.machineparkServiceWorkSessionsEditor==='function'
+      ?window.machineparkServiceWorkSessionsEditor(sessionSource,'servicevisit')
+      :`<div class="field full"><label>Werkdagen en tijd</label><input name="workSessionDate" type="date" required value="${svEsc(date)}"><input name="workSessionMinutes" type="number" min="1" step="1" required placeholder="minuten"></div>`;
+    const chips=locations.map(loc=>`<button type="button" class="service-report-location-chip ${loc.key===locationKey?'active':''}" data-sv-location-switch="${svEsc(loc.key)}"><span>${svEsc(loc.label)}</span>${loc.visitId?'<small>Bestaande locatie</small>':'<small>Concept</small>'}</button>`).join('');
+    return `<div class="form-grid"><div class="service-visit-form-note"><strong>Eén serviceverslag, meerdere locaties.</strong> Elke locatie behoudt intern haar eigen servicebezoek. Onderhoud en depannage blijven aparte records per toestel; onderdelen blijven per toestel gekoppeld en worden in het klantverslag per locatie én totaal samengevoegd.</div>
+      ${report?`<div class="service-visit-existing"><strong>Aanvulling op ${svEsc(report.number)} · huidige versie v${svEsc(report.revision)}</strong><div class="muted" style="font-size:11px;margin-top:3px">Je kunt een toestel aan een bestaande locatie toevoegen of een volledig nieuwe locatie aan hetzelfde verslag toevoegen.</div></div>`:''}
+      <div class="field full service-report-location-manager"><div class="service-report-location-manager-head"><div><label>Locaties in dit verslag *</label><div class="muted" style="font-size:11px">Wissel tussen locaties om de toestellen en werkzaamheden in te vullen.</div></div><button type="button" class="btn small primary" id="serviceReportAddLocation">+ Locatie toevoegen</button></div><div id="serviceReportLocationChips" class="service-report-location-chips">${chips||'<span class="muted">Nog geen locatie gekozen.</span>'}</div></div>
+      <div class="field full" id="serviceReportLocationPicker"><label>${locations.length?'Actieve locatie':'Eerste locatie'} *</label><div class="maintenance-location-autocomplete"><input id="serviceVisitLocationSearch" type="search" autocomplete="off" placeholder="Typ locatie of toestelnummer…" value="${svEsc(location)}"><input id="serviceVisitLocationKey" name="locationKey" type="hidden" value="${svEsc(locationKey)}"><div id="serviceVisitLocationSuggestions" class="maintenance-location-suggestions"></div></div><div id="serviceVisitLocationCount" class="muted" style="font-size:11px;margin-top:4px">${location?`Locatie: ${svEsc(location)}`:'Typ een locatie of toestelnummer en kies de locatie uit de lijst.'}</div></div>
+      <div class="field"><label>Datum *</label><input name="date" type="date" required value="${svEsc(date)}"></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${svEsc(time)}"></div>
       <div class="field"><label>Technieker</label><input name="technician" value="${svEsc(technician)}"></div>${workSessionsHtml}
-      <div class="field full"><div class="section-title">Toestellen op deze locatie</div><div class="muted" style="font-size:11px">Kies per toestel Onderhoud, Depannage of beide. Open indien nodig meteen de passende handleidingen.</div></div>
-      <div id="serviceVisitDevices" class="service-visit-device-list"><div class="empty" style="padding:24px">Toestellen laden…</div></div></div>`;
+      <div class="field full"><div class="section-title">Toestellen op actieve locatie</div><div class="muted" style="font-size:11px">Kies per toestel Onderhoud, Depannage of beide. Handleidingen, werkbonnen, storingen, foto's en onderdelen blijven aan dit toestel gekoppeld.</div></div>
+      <div id="serviceVisitDevices" class="service-visit-device-list"><div class="empty" style="padding:24px">${location?'Toestellen laden…':'Kies eerst een locatie.'}</div></div></div>`;
   }
 
   async function showManuals(button) {
