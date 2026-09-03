@@ -449,7 +449,7 @@
 
   function stockUpdates(items) {
     const totals={};items.forEach(item=>(item.usedParts||[]).forEach(u=>{const id=String(u?.partId||'').trim(),qty=Number(u?.qty||0);if(id&&qty>0)totals[id]=(totals[id]||0)+qty;}));
-    const now=new Date().toISOString(),updates=[];for(const[id,qty]of Object.entries(totals)){const p=(state.parts||[]).find(x=>x.id===id);if(!p)throw new Error(`Onderdeel ${id} bestaat niet meer.`);if(Number(p.stock||0)<qty)throw new Error(`Onvoldoende voorraad voor ${p.artNr||p.description||id} (${Number(p.stock||0)} beschikbaar, ${qty} nodig).`);updates.push({...p,stock:Number(p.stock||0)-qty,updatedAt:now});}return updates;
+    const now=new Date().toISOString(),updates=[];for(const[id,qty]of Object.entries(totals)){const p=(state.parts||[]).find(x=>x.id===id);if(!p)throw new Error(`Onderdeel ${id} bestaat niet meer.`);updates.push({...p,stock:Number(p.stock||0)-qty,updatedAt:now});}return updates;
   }
 
   function finalRecord(header,item,visit,revision,number,now,batchSize) {
