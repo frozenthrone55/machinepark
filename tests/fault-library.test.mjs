@@ -32,7 +32,7 @@ test('storingskennis bevat symptomen oorzaken oplossingen en opmerkingen', () =>
     assert.ok(endpoint.includes(needle), `Ontbrekend storingsveld: ${needle}`);
   }
   assert.match(builtSource, /Mogelijke oorzaken/);
-  assert.match(builtSource, /Controle \/ oplossingen/);
+  assert.match(builtSource, /(?:Extra controle|Controle) \/ oplossingen/);
 });
 
 test('storingsbibliotheek is gekoppeld aan depannages met een momentopname', () => {
