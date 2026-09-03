@@ -18,7 +18,8 @@ for number, match in enumerate(script_re.finditer(html), start=1):
     if re.search(r'\bsrc\s*=', attrs, re.IGNORECASE):
         continue
     type_match = re.search(r'\btype\s*=\s*["\']([^"\']+)["\']', attrs, re.IGNORECASE)
-    if type_match and type_match.group(1).lower() not in {
+    script_type = type_match.group(1).lower() if type_match else 'text/javascript'
+    if script_type not in {
         'text/javascript',
         'application/javascript',
         'module',
@@ -28,7 +29,8 @@ for number, match in enumerate(script_re.finditer(html), start=1):
         continue
 
     checked += 1
-    with tempfile.NamedTemporaryFile('w', suffix='.mjs', encoding='utf-8', delete=False) as temp:
+    suffix = '.mjs' if script_type == 'module' else '.js'
+    with tempfile.NamedTemporaryFile('w', suffix=suffix, encoding='utf-8', delete=False) as temp:
         temp.write(body)
         temp_path = Path(temp.name)
     try:
