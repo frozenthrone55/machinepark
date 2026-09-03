@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const build = readFileSync(new URL('../build-mail-pdf.py', import.meta.url), 'utf8');
+const devicePrintBuild = readFileSync(new URL('../build-print-device-details.py', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('Mail PDF staat naast de bestaande afdrukknoppen', () => {
@@ -29,4 +30,15 @@ test('Mail PDF heeft een desktopfallback zonder te doen alsof mailto een bijlage
 
 test('Mail PDF wordt in de normale build uitgevoerd', () => {
   assert.ok(pkg.scripts.build.includes('python3 build-mail-pdf.py'));
+});
+
+test('Mail PDF wordt altijd aan de echte document-body toegevoegd', () => {
+  assert.ok(build.includes('body_pos = index.rfind("</body>")'));
+  assert.ok(build.includes('index = index[:body_pos] + script + index[body_pos:]'));
+});
+
+test('toesteldetail-print bevat geen verborgen body-afsluiter die feature-injectie kan kapen', () => {
+  assert.equal(devicePrintBuild.includes('</main></body></html>'), false);
+  assert.ok(devicePrintBuild.includes('popup.document.close()'));
+  assert.ok(devicePrintBuild.includes("if index.count('</body>') != 1:"));
 });
