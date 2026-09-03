@@ -590,22 +590,51 @@
     const now=new Date().toISOString(),updates=[];for(const[id,qty]of Object.entries(totals)){const p=(state.parts||[]).find(x=>x.id===id);if(!p)throw new Error(`Onderdeel ${id} bestaat niet meer.`);updates.push({...p,stock:Number(p.stock||0)-qty,updatedAt:now});}return updates;
   }
 
-  function finalRecord(header,item,visit,revision,number,now,batchSize) {
-    const record={...item};['isDraft','draftRole','draftKind','draftBatchId','draftServiceKind','draftSchema'].forEach(k=>delete record[k]);
-    const serviceVisitId=visit?.id||header.targetVisitId||uid('sv');
-    const date=visit?.date||header.date||'',time=visit?.time||header.time||'',technician=header.technician||'',workSessions=(Array.isArray(header.workSessions)?header.workSessions:[]).filter(row=>row?.date&&Number(row?.minutes)>0).map(row=>({date:String(row.date),minutes:Math.max(1,Math.round(Number(row.minutes)||0))})),totalMinutes=workSessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
-    return {...record,date,time,technician,workSessions,hours:totalMinutes/60,batchId:serviceVisitId,batchSize,updatedAt:now,serviceVisitId,serviceVisitNumber:number,serviceVisitLocation:visit?.location||header.locationLabel||'',serviceVisitLocationKey:visit?.locationKey||header.locationKey||svKey(header.locationLabel||''),serviceVisitDate:date,serviceVisitTime:time,serviceVisitTechnician:technician,serviceVisitStatus:'closed',serviceVisitClosedAt:now,serviceVisitRevision:revision};
+  function finalRecord(header,item,{visit,serviceVisitId,visitNumberValue,visitRevision,reportId,reportNumberValue,reportRevision,now,batchSize}) {
+    const record={...item};['isDraft','draftRole','draftKind','draftBatchId','draftServiceKind','draftLocationKey','draftLocationLabel','draftSchema','targetVisitId'].forEach(k=>delete record[k]);
+    const date=header.date||visit?.date||'',time=header.time||visit?.time||'',technician=header.technician||'';
+    const locationKey=item.draftLocationKey||visit?.locationKey||'',locationLabel=item.draftLocationLabel||visit?.location||'';
+    const locationSessions=header.locationSessions?.[locationKey]||header.workSessions||[];
+    const workSessions=(Array.isArray(locationSessions)?locationSessions:[]).filter(row=>row?.date&&Number(row?.minutes)>0).map(row=>({date:String(row.date),minutes:Math.max(1,Math.round(Number(row.minutes)||0))}));
+    const totalMinutes=workSessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
+    return {...record,date,time,technician,workSessions,hours:totalMinutes/60,batchId:serviceVisitId,batchSize,updatedAt:now,
+      serviceVisitId,serviceVisitNumber:visitNumberValue,serviceVisitLocation:locationLabel,serviceVisitLocationKey:locationKey,serviceVisitDate:date,serviceVisitTime:time,serviceVisitTechnician:technician,serviceVisitStatus:'closed',serviceVisitClosedAt:now,serviceVisitRevision:visitRevision,
+      serviceReportId:reportId,serviceReportNumber:reportNumberValue,serviceReportDate:date,serviceReportTime:time,serviceReportTechnician:technician,serviceReportStatus:'closed',serviceReportClosedAt:now,serviceReportRevision:reportRevision};
   }
 
-  function finalizeDraftTransaction(header,allItems,selected,visit) {
-    const updates=stockUpdates(selected),now=new Date().toISOString(),serviceVisitId=visit?.id||header.targetVisitId||uid('sv'),number=visit?.number||visitNumber(serviceVisitId,header.date),revision=visit?Math.max(1,Number(visit.revision)||1)+1:1,batchSize=selected.length;
-    const finals=selected.map(item=>finalRecord({...header,targetVisitId:serviceVisitId},item,visit,revision,number,now,batchSize));
-    return new Promise((resolve,reject)=>{let tr;try{tr=db.transaction(['maintenance','breakdowns','parts'],'readwrite');}catch(e){reject(e);return;}const ms=tr.objectStore('maintenance'),bs=tr.objectStore('breakdowns'),ps=tr.objectStore('parts');updates.forEach(p=>ps.put(p));(header.draftHeaderStore==='maintenance'?ms:bs).delete(header.id);allItems.forEach(i=>(i.draftServiceKind==='maintenance'?ms:bs).delete(i.id));finals.forEach(i=>(i.type!==undefined?ms:bs).put(i));tr.oncomplete=()=>{scheduleCentralSync();resolve({id:serviceVisitId,number,revision,finals});};tr.onerror=()=>reject(tr.error||new Error('Servicebezoek afsluiten mislukt.'));tr.onabort=()=>reject(tr.error||new Error('Servicebezoek afsluiten afgebroken.'));});
+  function finalizeDraftTransaction(header,allItems,selected,report) {
+    const updates=stockUpdates(selected),now=new Date().toISOString(),reportId=report?.id||header.appendToReportId||uid('sr'),reportNumberValue=report?.number||reportNumber(reportId,header.date),reportRevision=report?Math.max(1,Number(report.revision)||1)+1:1;
+    const groups=new Map();
+    for(const item of selected){const key=String(item.draftLocationKey||header.locationKey||'');if(!key)continue;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
+    const finals=[];
+    const visits=[];
+    for(const [key,items] of groups){
+      const loc=(header.locations||[]).find(x=>x.key===key)||{key,label:items[0]?.draftLocationLabel||''};
+      const existing=(report?.visits||[]).find(v=>String(v.locationKey||svKey(v.location))===key)||null;
+      const serviceVisitId=existing?.id||loc.visitId||uid('sv');
+      const visitNumberValue=existing?.number||visitNumber(serviceVisitId,header.date);
+      const visitRevision=existing?Math.max(1,Number(existing.revision)||1)+1:1;
+      const visitCtx={id:serviceVisitId,location:loc.label,locationKey:key,date:header.date,time:header.time};
+      const built=items.map(item=>finalRecord(header,item,{visit:visitCtx,serviceVisitId,visitNumberValue,visitRevision,reportId,reportNumberValue,reportRevision,now,batchSize:items.length}));
+      finals.push(...built);visits.push({id:serviceVisitId,number:visitNumberValue,location:loc.label,locationKey:key,revision:visitRevision,count:built.length});
+    }
+    return new Promise((resolve,reject)=>{let tr;try{tr=db.transaction(['maintenance','breakdowns','parts'],'readwrite');}catch(e){reject(e);return;}const ms=tr.objectStore('maintenance'),bs=tr.objectStore('breakdowns'),ps=tr.objectStore('parts');updates.forEach(p=>ps.put(p));(header.draftHeaderStore==='maintenance'?ms:bs).delete(header.id);allItems.forEach(i=>(i.draftServiceKind==='maintenance'?ms:bs).delete(i.id));finals.forEach(i=>(i.type!==undefined?ms:bs).put(i));tr.oncomplete=()=>{scheduleCentralSync();resolve({id:reportId,number:reportNumberValue,revision:reportRevision,visits,finals});};tr.onerror=()=>reject(tr.error||new Error('Serviceverslag afsluiten mislukt.'));tr.onabort=()=>reject(tr.error||new Error('Serviceverslag afsluiten afgebroken.'));});
   }
 
   async function finalizeActiveVisit() {
-    const current=activeVisitDraft;if(!current||current.finalizing)return;current.finalizing=true;clearTimeout(visitAutosaveTimer);setDraftStatus('Servicebezoek afsluiten…','busy');
-    try{current.touched=true;const saved=await queueDraftSave({force:true});if(!saved||activeVisitDraft!==current)return;const selected=saved.items;if(!saved.header.locationKey&&!saved.header.locationLabel)throw new Error('Kies eerst een locatie.');if(!Array.isArray(saved.header.workSessions)||!saved.header.workSessions.length)throw new Error('Vul minstens één werkdag en geldige werktijd in.');if(!selected.length)throw new Error('Kies minstens één onderhoud of depannage.');const missing=selected.find(i=>i.draftServiceKind==='breakdowns'&&!String(i.issue||'').trim());if(missing)throw new Error(`Vul het probleem / de melding in voor ${svDeviceShort(missing.deviceId)}.`);const visit=saved.header.appendToVisitId?serviceVisitById(saved.header.appendToVisitId):null;const result=await finalizeDraftTransaction(saved.header,saved.items,selected,visit);activeVisitDraft=null;baseCloseModal();await refresh();toast(`Serviceverslag ${result.number} opgeslagen · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceVisitDetails(result.id),0);}catch(e){current.finalizing=false;setDraftStatus(e?.message||'Afsluiten mislukt','error');throw e;}
+    const current=activeVisitDraft;if(!current||current.finalizing)return;current.finalizing=true;clearTimeout(visitAutosaveTimer);setDraftStatus('Serviceverslag afsluiten…','busy');
+    try{
+      current.touched=true;const saved=await queueDraftSave({force:true});if(!saved||activeVisitDraft!==current)return;
+      const selected=saved.items,locations=saved.header.locations||[];
+      if(!locations.length)throw new Error('Voeg minstens één locatie toe.');
+      if(!selected.length)throw new Error('Kies minstens één onderhoud of depannage.');
+      const usedLocationKeys=new Set(selected.map(item=>item.draftLocationKey||saved.header.locationKey).filter(Boolean));
+      const emptyLocation=locations.find(loc=>!usedLocationKeys.has(loc.key));if(emptyLocation)throw new Error(`Kies minstens één onderhoud of depannage op ${emptyLocation.label} of verwijder die locatie uit het concept.`);
+      const missing=selected.find(i=>i.draftServiceKind==='breakdowns'&&!String(i.issue||'').trim());if(missing)throw new Error(`Vul het probleem / de melding in voor ${svDeviceShort(missing.deviceId)}.`);
+      const report=saved.header.appendToReportId?serviceReportById(saved.header.appendToReportId):null;
+      const result=await finalizeDraftTransaction(saved.header,saved.items,selected,report);
+      activeVisitDraft=null;baseCloseModal();await refresh();toast(`Serviceverslag ${result.number} opgeslagen · ${result.visits.length} locatie${result.visits.length===1?'':'s'} · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceReportDetails(result.id),0);
+    }catch(e){current.finalizing=false;setDraftStatus(e?.message||'Afsluiten mislukt','error');throw e;}
   }
 
   function headerStoreForUser() { return svCan('breakdowns.add') ? 'breakdowns' : 'maintenance'; }
