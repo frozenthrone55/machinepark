@@ -5,10 +5,10 @@ import { readFileSync } from 'node:fs';
 const build = readFileSync(new URL('../build-mail-pdf-direct.py', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-test('Mail PDF gebruikt directe jsPDF-opbouw in plaats van html2canvas voor de actieve klikroute', () => {
+test('Mail PDF gebruikt directe jsPDF-opbouw voor de actieve klikroute', () => {
   assert.ok(build.includes('jspdf/2.5.1/jspdf.umd.min.js'));
   assert.ok(build.includes("doc.output('blob')"));
-  assert.equal(build.includes('html2canvas'), false);
+  assert.equal(build.includes('html2pdf.bundle.min.js'), false);
   assert.ok(build.includes("document.addEventListener('click'"));
   assert.ok(build.includes('event.stopImmediatePropagation()'));
 });
