@@ -104,12 +104,15 @@ test('gezamenlijk verslag ondersteunt afdruk en Mail PDF', () => {
   assert.match(mail, /context\.kind === 'serviceVisit'/);
 });
 
-test('servicebezoek bouwt na Werkzaamheden en wordt syntax-gecontroleerd', () => {
+test('servicebezoek bouwt na Werkzaamheden, wordt syntax-gecontroleerd en cacheveilig versiegebonden', () => {
   const chain = pkg.scripts.build;
   assert.ok(chain.indexOf('build-work-activities.py') < chain.indexOf('build-service-visits.py'));
   assert.ok(chain.includes('node --check service-visits.js'));
   assert.match(build, /service-visits\.js/);
   assert.match(build, /service-visits\.css/);
+  assert.match(build, /hashlib\.sha256/);
+  assert.match(build, /service_js_url = f'\/service-visits\.js\?v=\{service_hash\}'/);
+  assert.match(build, /service_css_url = f'\/service-visits\.css\?v=\{service_hash\}'/);
 });
 
 test('servicebezoek volgt bestaande regel dat voorraad negatief mag worden', () => {
