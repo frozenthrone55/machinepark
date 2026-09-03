@@ -85,7 +85,7 @@ if MARKER not in index:
       .device-detail-photo img{display:block;width:100%;height:48mm;object-fit:contain;background:#fff}
       .device-detail-photo .badge{position:absolute;left:2mm;bottom:2mm;background:#fff}
       @media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-    </style></head><body><div class="print-head"><div><h1>Machinepark</h1><div class="subtitle">Toesteldetails · ${esc(label)}</div></div><div class="print-date">Afgedrukt ${new Date().toLocaleString('nl-BE')}</div></div><main>${clone.innerHTML}</main></body></html>`);
+    </style></head><body><div class="print-head"><div><h1>Machinepark</h1><div class="subtitle">Toesteldetails · ${esc(label)}</div></div><div class="print-date">Afgedrukt ${new Date().toLocaleString('nl-BE')}</div></div><main>${clone.innerHTML}</main>`);
     popup.document.close();
 
     await waitForPrintImages(popup.document);
@@ -130,9 +130,16 @@ required = [
     '.device-detail-photo-gallery',
     '.timeline-item',
     '.manual-device-section',
+    'popup.document.close()',
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: toesteldetails-afdrukfunctie ontbreekt ({needle})')
+
+# Laat in featurecode nooit een tweede letterlijke document-bodyafsluiter achter.
+# Latere buildstappen injecteren features voor de echte pagina-body en mogen een
+# HTML-string van het aparte afdrukvenster niet per ongeluk als doel zien.
+if index.count('</body>') != 1:
+    raise SystemExit('Buildvalidatie mislukt: toesteldetails introduceert een extra </body> in featurecode')
 
 print('[Machinepark] toesteldetails individueel afdrukbaar inclusief tijdlijn en foto’s, zonder handleidingen')
