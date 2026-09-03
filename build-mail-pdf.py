@@ -356,7 +356,10 @@ if MARKER not in index:
     if "</head>" not in index or "</body>" not in index:
         raise SystemExit("Buildvalidatie mislukt: HTML-afsluiters ontbreken voor Mail PDF")
     index = index.replace("</head>", style + "</head>", 1)
-    index = index.replace("</body>", script + "</body>", 1)
+    body_pos = index.rfind("</body>")
+    if body_pos < 0:
+        raise SystemExit("Buildvalidatie mislukt: echte HTML-bodyafsluiter ontbreekt voor Mail PDF")
+    index = index[:body_pos] + script + index[body_pos:]
     index_path.write_text(index, encoding="utf-8")
 
 required = [
@@ -371,9 +374,12 @@ required = [
     "service-detail-print-btn",
     "printDeviceDetails",
     "machineparkMailPdf",
+    "body_pos = index.rfind",
 ]
 for needle in required:
-    if needle not in index:
+    if needle not in index and needle != "body_pos = index.rfind":
         raise SystemExit(f"Buildvalidatie mislukt: Mail PDF ontbreekt ({needle})")
+if "body_pos = index.rfind" not in Path(__file__).read_text(encoding="utf-8"):
+    raise SystemExit("Buildvalidatie mislukt: Mail PDF wordt niet aan de echte document-body toegevoegd")
 
 print("[Machinepark] Mail PDF actief naast pagina-, onderhouds-, depannage- en toestelafdruk")
