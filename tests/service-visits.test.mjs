@@ -83,6 +83,11 @@ test('servicebezoek bouwt na Werkzaamheden en wordt syntax-gecontroleerd', () =>
   assert.match(build, /service-visits\.css/);
 });
 
+test('servicebezoek volgt bestaande regel dat voorraad negatief mag worden', () => {
+  assert.doesNotMatch(js, /if\(Number\(p\.stock\|\|0\)<qty\)throw new Error/);
+  assert.match(js, /stock:Number\(p\.stock\|\|0\)-qty/);
+});
+
 test('serviceconcepten passen binnen bestaande serverrechten voor onderhoud en depannage', () => {
   const base = {
     app:'Machinepark', schema:1,
