@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
-MARKER = 'data-machinepark-build-fix="navigation-runtime-v1"'
+MARKER = 'data-machinepark-build-fix="navigation-runtime-v2"'
 
 if MARKER not in index:
     script = r'''
@@ -39,7 +39,15 @@ if MARKER not in index:
     }
   }
 
-  window.switchView = function(view) {
+  function setStateView(view) {
+    try {
+      if (typeof state !== 'undefined' && state) state.view = view;
+    } catch (error) {
+      console.warn('[Machinepark] view-state kon niet worden bijgewerkt', error);
+    }
+  }
+
+  function activateView(view) {
     let nextView = String(view || '').trim();
     if (nextView === 'settings' && !window.machineparkIsAdmin) nextView = 'dashboard';
 
@@ -49,14 +57,15 @@ if MARKER not in index:
       return false;
     }
 
-    // De zichtbare navigatie wisselt altijd, ook als een optionele feature daarna
-    // zelf een renderfout heeft. Zo kan één feature nooit alle tabbladen blokkeren.
-    state.view = nextView;
+    // Wissel EERST de zichtbare DOM. Dit werkt zelfs wanneer de grote basis-JS
+    // eerder is uitgevallen en state/renderfuncties daardoor niet beschikbaar zijn.
     document.querySelectorAll('.view').forEach((node) => node.classList.remove('active'));
     target.classList.add('active');
     document.querySelectorAll('.nav [data-view]').forEach((button) => {
       button.classList.toggle('active', button.dataset.view === nextView);
     });
+
+    setStateView(nextView);
 
     const [title, subtitle] = safePageMeta(nextView);
     const titleNode = document.getElementById('pageTitle');
@@ -64,8 +73,12 @@ if MARKER not in index:
     if (titleNode) titleNode.textContent = title;
     if (subtitleNode) subtitleNode.textContent = subtitle;
 
-    safeCall('zoekbalk configureren', () => configureSearchForView(nextView));
-    safeCall('tabblad renderen', () => renderAll());
+    safeCall('zoekbalk configureren', () => {
+      if (typeof configureSearchForView === 'function') configureSearchForView(nextView);
+    });
+    safeCall('tabblad renderen', () => {
+      if (typeof renderAll === 'function') renderAll();
+    });
 
     if (nextView === 'faults') {
       safeCall('storingen renderen', window.machineparkRenderFaultLibrary);
@@ -76,11 +89,32 @@ if MARKER not in index:
     }
 
     return true;
-  };
+  }
 
-  // Houd de globale function-binding en window-property gelijk voor zowel
-  // inline onclick-handlers als de click/touch navigatiebridge.
-  try { switchView = window.switchView; } catch (_) {}
+  window.machineparkNavigate = activateView;
+  window.switchView = activateView;
+
+  // Houd de globale function-binding en window-property gelijk voor inline onclick.
+  try { switchView = activateView; } catch (_) {}
+
+  // Capture vóór alle oudere click/touch handlers en inline onclick. Daardoor kan
+  // een oude of kapotte listener de navigatie niet meer terug naar Dashboard sturen.
+  function handleNavigationEvent(event) {
+    const source = event.target && event.target.nodeType === 1
+      ? event.target
+      : event.target?.parentElement;
+    const button = source?.closest?.('.nav [data-view]');
+    if (!button) return;
+    if (button.style.display === 'none') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    activateView(button.dataset.view);
+  }
+
+  document.addEventListener('click', handleNavigationEvent, true);
+  document.addEventListener('touchend', handleNavigationEvent, { capture: true, passive: false });
 
   window.machineparkOriginalSwitchView = originalSwitchView;
 })();
@@ -95,17 +129,22 @@ if MARKER not in index:
 
 required = [
     MARKER,
-    'window.switchView = function(view)',
+    'window.switchView = activateView',
+    'window.machineparkNavigate = activateView',
     "document.getElementById(`view-${nextView}`)",
     "document.querySelectorAll('.nav [data-view]')",
     "faults: ['Storingen'",
     "manuals: ['Handleidingen'",
     'window.machineparkRenderFaultLibrary',
     'window.machineparkRenderManualLibrary',
-    "safeCall('tabblad renderen'",
+    "if (typeof renderAll === 'function') renderAll()",
+    "document.addEventListener('click', handleNavigationEvent, true)",
+    "document.addEventListener('touchend', handleNavigationEvent, { capture: true, passive: false })",
+    'event.stopImmediatePropagation()',
+    "if (typeof state !== 'undefined' && state) state.view = view",
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: navigatie-runtime ontbreekt ({needle})')
 
-print('[Machinepark] tabnavigatie runtime gehard tegen featurefouten')
+print('[Machinepark] tabnavigatie runtime v2: capture-handler + DOM-first fallback actief')
