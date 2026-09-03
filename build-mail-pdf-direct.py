@@ -106,7 +106,7 @@ if MARKER not in index:
     if (!body) return null;
     if (button.matches('.service-visit-mail-btn')) {
       const recordId = button.dataset.serviceVisitMailId || '';
-      return { source:body, kind:'serviceVisit', recordId, title:`Serviceverslag ${recordId}` };
+      return { source:body, kind:'serviceVisit', recordId, title:`Serviceverslag ${button.dataset.serviceVisitLabel || recordId}` };
     }
     const foot = button.closest('.modal-foot') || document.querySelector('#modal .modal-foot');
     const servicePrint = foot?.querySelector('.service-detail-print-btn[data-service-print-id]');
