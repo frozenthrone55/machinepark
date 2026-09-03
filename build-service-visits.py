@@ -48,7 +48,10 @@ for needle in required:
 
 for needle in [
     'serviceVisitId',
-    'Servicebezoeken per locatie',
+    'serviceReportId',
+    'serviceReportNumber',
+    'Serviceverslagen',
+    'Eén serviceverslag, meerdere locaties.',
     'Concept bewaren',
     'machineparkManualListHtml',
     'machineparkServiceVisitPdfModel',
