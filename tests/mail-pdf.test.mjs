@@ -41,13 +41,15 @@ test('Mail PDF wordt altijd aan de echte document-body toegevoegd', () => {
   assert.ok(build.includes('index = index[:body_pos] + script + index[body_pos:]'));
 });
 
-test('Mail PDF renderbron blijft binnen het html2pdf capturevlak', () => {
-  assert.ok(renderFix.includes('position:relative;'));
-  assert.ok(renderFix.includes('left:auto;'));
-  assert.ok(renderFix.includes('z-index:auto;'));
+test('Mail PDF bron blijft gemount en html2canvas zet alleen de clone in het capturevlak', () => {
   assert.ok(renderFix.includes('left:-12000px'));
   assert.ok(renderFix.includes('document.body.appendChild(stage);'));
-  assert.ok(renderFix.includes('Mail PDF renderstage capture-veilig gemaakt'));
+  assert.ok(renderFix.includes('onclone: (clonedDoc) =>'));
+  assert.ok(renderFix.includes("clonedDoc.querySelector('.machinepark-pdf-stage')"));
+  assert.ok(renderFix.includes("clonedStage.style.position = 'static'"));
+  assert.ok(renderFix.includes("clonedStage.style.left = '0'"));
+  assert.ok(renderFix.includes("clonedStage.style.top = '0'"));
+  assert.ok(renderFix.includes("clonedStage.style.zIndex = 'auto'"));
 });
 
 test('toesteldetail-print bevat geen verborgen body-afsluiter die feature-injectie kan kapen', () => {
