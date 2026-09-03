@@ -7,7 +7,7 @@ MARKER = 'data-machinepark-build-fix="print-device-details-v1"'
 
 if MARKER not in index:
     script = r'''
-<script data-machinepark-build-fix="print-device-details-v1">
+<script __BUILD_MARKER__>
 (() => {
   function canPrintDeviceDetails() {
     if (window.machineparkAccessReady && typeof window.machineparkHasPermission === 'function') {
@@ -114,7 +114,7 @@ if MARKER not in index:
   window.showDeviceHistory = showDeviceHistory;
 })();
 </script>
-'''
+'''.replace('__BUILD_MARKER__', MARKER)
     if '</body>' not in index:
         raise SystemExit('Buildvalidatie mislukt: </body> ontbreekt voor toesteldetails afdrukken')
     index = index.replace('</body>', script + '</body>', 1)
