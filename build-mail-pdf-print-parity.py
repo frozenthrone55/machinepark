@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 
-DIRECT_MARKER = 'data-machinepark-build-fix="mail-pdf-direct-v3"'
+DIRECT_MARKER = 'data-machinepark-' + 'build-fix=' + '"mail-pdf-direct-v3"'
 MARKER = 'data-machinepark-build-fix="mail-pdf-print-parity-v1"'
 
 if DIRECT_MARKER not in index:
