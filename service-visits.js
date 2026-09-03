@@ -73,6 +73,43 @@
   }
   const serviceVisitById = id => serviceVisits().find(v => v.id === id) || null;
 
+  function serviceReports() {
+    const rows = [...(state.maintenance || []), ...(state.breakdowns || [])].filter(item => item?.isDraft !== true && item?.serviceVisitId);
+    const ids = new Set(rows.map(item => item.serviceReportId || item.serviceVisitId).filter(Boolean));
+    return [...ids].map(id => {
+      const reportRows = rows.filter(item => (item.serviceReportId || item.serviceVisitId) === id);
+      const visitIds = [...new Set(reportRows.map(item => item.serviceVisitId).filter(Boolean))];
+      const visits = visitIds.map(visitId => serviceVisitById(visitId)).filter(Boolean);
+      const first = reportRows[0] || {};
+      const revisions = reportRows.map(item => Math.max(1, Number(item.serviceReportRevision || item.serviceVisitRevision) || 1));
+      const closed = reportRows.map(item => item.serviceReportClosedAt || item.serviceVisitClosedAt || item.updatedAt || '').filter(Boolean).sort();
+      const technicians = [...new Set(reportRows.map(item => String(item.serviceReportTechnician || item.serviceVisitTechnician || item.technician || '').trim()).filter(Boolean))];
+      return {
+        id,
+        number:first.serviceReportNumber || first.serviceVisitNumber || id,
+        revision:Math.max(1,...revisions),
+        date:first.serviceReportDate || first.serviceVisitDate || first.date || '',
+        time:first.serviceReportTime || first.serviceVisitTime || first.time || '',
+        technician:technicians.join(', ') || '—',
+        closedAt:closed.at(-1) || '',
+        visits:visits.sort((a,b)=>String(a.location||'').localeCompare(String(b.location||''),'nl',{numeric:true,sensitivity:'base'})),
+        records:visits.flatMap(v=>v.records),
+        locationCount:visits.length,
+        deviceCount:new Set(reportRows.map(item=>item.deviceId).filter(Boolean)).size,
+        maintenanceCount:reportRows.filter(item=>item.type !== undefined).length,
+        breakdownCount:reportRows.filter(item=>item.type === undefined).length,
+      };
+    }).filter(report=>report.visits.length).sort((a,b)=>String(b.closedAt||`${b.date}T${b.time||'00:00'}`).localeCompare(String(a.closedAt||`${a.date}T${a.time||'00:00'}`)));
+  }
+  const serviceReportById = id => serviceReports().find(report => report.id === id) || null;
+  const serviceReportForVisit = visitId => serviceReports().find(report => report.visits.some(visit => visit.id === visitId)) || null;
+
+  function reportNumber(id,date) {
+    const year=String(date||todayISO()).slice(0,4)||String(new Date().getFullYear());
+    const suffix=String(id||'').replace(/^sr[_-]?/i,'').replace(/[^a-z0-9]+/gi,'').slice(-8).toUpperCase()||Date.now().toString(36).slice(-8).toUpperCase();
+    return `SR-${year}-${suffix}`;
+  }
+
   function svPartLabel(partId) {
     const part = (state.parts || []).find(item => item.id === partId);
     return part ? ([part.artNr, part.description].filter(Boolean).join(' · ') || partId) : `Onbekend onderdeel (${partId || '—'})`;
