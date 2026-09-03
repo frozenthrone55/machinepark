@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parent
 INDEX_PATH = ROOT / 'index.html'
 MARKER = '// iOS/Chrome-safe navigation bridge. This is registered before database startup.'
 NEW_MARKER = '// Machinepark DOM-first navigation bridge v3. Registered before database startup.'
+COMPAT_ANCHOR = '// iOS/Chrome-safe navigation bridge. DOM-first compatibility anchor.'
 
 index = INDEX_PATH.read_text(encoding='utf-8')
 
@@ -19,6 +20,7 @@ if NEW_MARKER not in index:
     script_end += len('</script>')
 
     replacement = r'''<script>
+// iOS/Chrome-safe navigation bridge. DOM-first compatibility anchor.
 // Machinepark DOM-first navigation bridge v3. Registered before database startup.
 (function(){
   function showNavigationView(view){
@@ -97,6 +99,7 @@ if NEW_MARKER not in index:
 
 built = INDEX_PATH.read_text(encoding='utf-8')
 required = [
+    COMPAT_ANCHOR,
     NEW_MARKER,
     'window.machineparkEarlyNavigate=navigate',
     "document.querySelectorAll('.view').forEach",
