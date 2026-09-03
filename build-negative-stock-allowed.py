@@ -18,7 +18,7 @@ def replace_exact(old: str, new: str, label: str, expected: int = 1):
 # De voorraadmutaties zelf blijven gewoon aftrekken en mogen dus onder nul gaan.
 replace_exact(
     "const usage=collectUsage(),err=checkUsage(usage,old.usedParts||[]);if(err){alert(err);return}",
-    "const usage=collectUsage()",
+    "const usage=collectUsage();",
     "voorraadblokkade bij service wijzigen",
     expected=2,
 )
@@ -71,6 +71,7 @@ required = [
     "stock:Number(p.stock||0)-q",
     "stock:Number(p.stock||0)-qty",
     "const stock=stockNum===null?(old?Number(old.stock||0):0):Math.round(stockNum);",
+    "const usage=collectUsage();",
 ]
 for needle in required:
     if needle not in index:
