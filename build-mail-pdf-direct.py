@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 
-BASE_MARKER = 'data-machinepark-build-fix="mail-pdf-v1"'
+BASE_MARKER = 'data-machinepark-' + 'build-fix=' + '"mail-pdf-v1"'
 MARKER = 'data-machinepark-build-fix="mail-pdf-direct-v2"'
 
 if BASE_MARKER not in index:
