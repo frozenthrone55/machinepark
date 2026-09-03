@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 
-MARKER = 'data-machinepark-build-fix="mail-pdf-v1"'
+MARKER = 'data-machinepark-' + 'build-fix=' + '"mail-pdf-v1"'
 if MARKER not in index:
     raise SystemExit("Buildvalidatie mislukt: Mail PDF-code ontbreekt voor renderfix")
 
