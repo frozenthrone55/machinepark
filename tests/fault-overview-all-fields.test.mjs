@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const frontend = readFileSync(new URL('../fault-library.js', import.meta.url), 'utf8');
+const buildJs = readFileSync(new URL('../assets/machinepark-build.js', import.meta.url), 'utf8');
+const builtSource = `${index}\n${buildJs}`;
 const css = readFileSync(new URL('../fault-library.css', import.meta.url), 'utf8');
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -73,9 +75,9 @@ test('storingenoverzicht gebruikt alle actuele centrale detailwaarden correct en
   assert.match(frontend, /refresh\.onclick = async \(\) => \{ await syncFaultOverviewFromCentral\(\); \}/);
 
   // De globale live-sync blijft dezelfde centrale storingenlijst continu verversen.
-  assert.match(index, /LIVE_SYNC_INTERVAL_MS = 3000/);
-  assert.match(index, /window\.machineparkLoadFaultLibrary\(true\)/);
-  assert.match(index, /window\.machineparkRenderFaultLibrary\(\)/);
+  assert.match(builtSource, /LIVE_SYNC_INTERVAL_MS = 3000/);
+  assert.match(builtSource, /window\.machineparkLoadFaultLibrary\(true\)/);
+  assert.match(builtSource, /window\.machineparkRenderFaultLibrary\(\)/);
 
   assert.match(css, /\.fault-table\{min-width:2600px\}/);
   assert.match(css, /\.fault-overview-cell\{/);
