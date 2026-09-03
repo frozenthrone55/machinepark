@@ -27,12 +27,41 @@ test('onderdelen blijven per toestel en worden alleen voor klant samengevoegd', 
   assert.match(js, /devices:new Set/);
 });
 
-test('afgesloten servicebezoek kan zonder dupliceren worden aangevuld', () => {
+test('afgesloten serviceverslag kan met toestel of locatie worden aangevuld', () => {
   assert.match(js, /\+ Toestel toevoegen/);
-  assert.match(js, /appendToVisitId/);
+  assert.match(js, /\+ Locatie toevoegen/);
+  assert.match(js, /appendToReportId/);
+  assert.match(js, /serviceReportRevision/);
   assert.match(js, /serviceVisitRevision/);
-  assert.match(js, /Bestaande registraties blijven ongewijzigd/);
-  assert.match(js, /Math\.max\(1,Number\(visit\.revision\)\|\|1\)\+1/);
+  assert.match(js, /serviceReportForVisit/);
+});
+
+test('meerdere locaties delen één rapport maar behouden een eigen serviceVisitId', () => {
+  assert.match(js, /serviceReportId/);
+  assert.match(js, /serviceReportNumber/);
+  assert.match(js, /serviceReports\(\)/);
+  assert.match(js, /draftLocationKey/);
+  assert.match(js, /locations,activeLocationKey/);
+  assert.match(js, /groups=new Map\(\)/);
+  assert.match(js, /existing\?\.id\|\|loc\.visitId\|\|uid\('sv'\)/);
+  assert.match(js, /reportId=report\?\.id\|\|header\.appendToReportId\|\|uid\('sr'\)/);
+});
+
+test('concept bewaart locaties en werktijd apart per locatie', () => {
+  assert.match(js, /locationSessions/);
+  assert.match(js, /captureActiveLocationSessions/);
+  assert.match(js, /renderActiveLocationSessions/);
+  assert.match(js, /serviceReportLocationChips/);
+  assert.match(js, /serviceReportAddLocation/);
+  assert.match(js, /data-sv-location-remove/);
+});
+
+test('pdf groepeert per locatie en toont ook totaalonderdelen over alle locaties', () => {
+  assert.match(js, /mergedReportParts/);
+  assert.match(js, /reportHtml/);
+  assert.match(js, /LOCATIE ·/);
+  assert.match(js, /Totaal gebruikte onderdelen · alle locaties/);
+  assert.match(css, /service-report-location/);
 });
 
 test('volledig servicebezoek heeft concept autosave en boekt voorraad pas bij afsluiten', () => {
