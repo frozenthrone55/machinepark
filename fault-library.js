@@ -393,6 +393,9 @@
     });
   }
 
+  window.machineparkAugmentBreakdownFaultCards = augmentBreakdownCards;
+  window.machineparkFaultRefFromCard = card => card?.querySelector('.fault-inline-tools')?._machineparkFaultSnapshot || null;
+
   const baseInitBreakdownLocationFormForFaults = initBreakdownLocationForm;
   initBreakdownLocationForm = function() {
     const result = baseInitBreakdownLocationFormForFaults();
