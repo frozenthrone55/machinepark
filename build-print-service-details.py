@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 
-MARKER = 'data-machinepark-build-fix="print-service-details-v1"'
+MARKER = 'data-machinepark-build-fix="print-service-details-v2"'
 
 if MARKER not in index:
     style = f'''
@@ -147,6 +147,8 @@ if MARKER not in index:
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn service-detail-print-btn';
+    btn.dataset.servicePrintKind = kind;
+    btn.dataset.servicePrintId = id;
     btn.textContent = '🖨 Afdrukken';
     btn.onclick = () => printServiceRecord(kind, id);
     foot.insertBefore(btn, foot.querySelector('.btn.primary') || null);
@@ -167,6 +169,7 @@ if MARKER not in index:
   }};
 
   window.printMachineparkServiceRecord = printServiceRecord;
+  window.machineparkServicePrintHtml = servicePrintHtml;
 }})();
 </script>
 '''
@@ -190,9 +193,12 @@ required = [
     "lines.join(String.fromCharCode(10))",
     "previousShowMaintenanceDetails",
     "previousOpenBreakdown",
+    'btn.dataset.servicePrintKind = kind',
+    'btn.dataset.servicePrintId = id',
+    'window.machineparkServicePrintHtml = servicePrintHtml',
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f"Buildvalidatie mislukt: individuele verslagafdruk ontbreekt ({needle})")
 
-print("[Machinepark] individuele onderhouds- en depannageverslagen afdrukbaar zonder uur")
+print("[Machinepark] individuele onderhouds- en depannageverslagen afdrukbaar; context gedeeld met Mail PDF")
