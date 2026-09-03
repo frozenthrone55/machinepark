@@ -33,6 +33,15 @@ replace_exact(
     "voorraadblokkade bij depannage per locatie",
 )
 
+# Concepten hebben een eigen afrondroute en moeten dezelfde voorraadregel volgen.
+# Een bestaand onderdeel wordt altijd afgetrokken, ook als het resultaat negatief wordt.
+draft_shortage_guard = "      if (Number(part.stock || 0) < qty) throw new Error(`Onvoldoende voorraad voor ${part.artNr || part.description || id} (${Number(part.stock || 0)} beschikbaar, ${qty} nodig).`);\n"
+replace_exact(
+    draft_shortage_guard,
+    "",
+    "voorraadblokkade bij serviceconcept afronden",
+)
+
 # 2) Onderdelen manueel beheren: elk echt voorraadveld mag negatief worden.
 # Minimumvoorraad blijft wel >= 0; alleen inputs met name="stock" worden aangepast.
 index, stock_input_count = re.subn(
@@ -70,6 +79,7 @@ replace_exact(
 required = [
     "stock:Number(p.stock||0)-q",
     "stock:Number(p.stock||0)-qty",
+    "updates.push({ ...part, stock:Number(part.stock || 0) - qty, updatedAt:now });",
     "const stock=stockNum===null?(old?Number(old.stock||0):0):Math.round(stockNum);",
     "const usage=collectUsage();",
 ]
@@ -81,6 +91,7 @@ for forbidden in [
     "const usage=collectUsage(),err=checkUsage(usage,old.usedParts||[]);if(err){alert(err);return}",
     "const err=checkMaintenanceBatchUsage(items);if(err){alert(err);return}",
     "const err=checkBreakdownBatchUsage(items);if(err){alert(err);return}",
+    "if (Number(part.stock || 0) < qty) throw new Error(`Onvoldoende voorraad voor ${part.artNr || part.description || id}",
     "Negatieve voorraad bij nieuw onderdeel",
 ]:
     if forbidden in index:
@@ -90,4 +101,4 @@ if re.search(r'<input\b[^>]*\bname="stock"[^>]*\bmin="0"', index):
     raise SystemExit("Negatieve voorraad: minstens één voorraadveld blokkeert nog waarden onder nul")
 
 INDEX.write_text(index, encoding="utf-8")
-print(f"[Machinepark] negatieve voorraad toegestaan bij onderhoud, depannage, manuele stock en Excel-stocktelling ({stock_input_count} voorraadvelden vrijgegeven)")
+print(f"[Machinepark] negatieve voorraad toegestaan bij onderhoud, depannage, concepten, manuele stock en Excel-stocktelling ({stock_input_count} voorraadvelden vrijgegeven)")
