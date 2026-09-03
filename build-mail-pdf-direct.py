@@ -5,14 +5,14 @@ index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 
 BASE_MARKER = 'data-machinepark-' + 'build-fix=' + '"mail-pdf-v1"'
-MARKER = 'data-machinepark-build-fix="mail-pdf-direct-v3"'
+MARKER = 'data-machinepark-build-fix="mail-pdf-direct-v4"'
 
 if BASE_MARKER not in index:
     raise SystemExit("Buildvalidatie mislukt: basis Mail PDF ontbreekt voor directe PDF-route")
 
 if MARKER not in index:
     feature = r'''
-<script data-machinepark-build-fix="mail-pdf-direct-v3">
+<script data-machinepark-build-fix="mail-pdf-direct-v4">
 (() => {
   const JSPDF_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
   const MAIL_SELECTOR = '.page-mail-btn,.service-detail-mail-btn,.device-detail-mail-btn';
@@ -32,7 +32,10 @@ if MARKER not in index:
       .replace(/[–—]/g, '-')
       .replace(/[‘’]/g, "'")
       .replace(/[“”]/g, '"')
-      .replace(/•/g, '-');
+      .replace(/[·•]/g, '.')
+      .replace(/[×✕✖]/g, 'x')
+      .replace(/…/g, '...')
+      .replace(/[\u2009\u202f]/g, ' ');
   }
 
   function safeFilename(value) {
@@ -143,18 +146,53 @@ if MARKER not in index:
     return lines.length ? lines.join('\n') : '—';
   }
 
+  function serviceOneOffParts(record) {
+    const items = Array.isArray(record?.oneOffParts) ? record.oneOffParts : [];
+    const lines = items.map(item => {
+      const qty = Math.max(1, Math.round(Number(item?.qty) || 1));
+      const text = [
+        cleanText(item?.supplier),
+        cleanText(item?.supplierCode),
+        cleanText(item?.description)
+      ].filter(Boolean).join(' . ');
+      return text ? `${qty} x ${text}` : '';
+    }).filter(Boolean);
+    return lines.length ? lines.join('\n') : '—';
+  }
+
+  function serviceWorkSummary(kind, record) {
+    const sessions = Array.isArray(record?.workSessions) ? record.workSessions : [];
+    const sessionMinutes = sessions.reduce((sum, row) => sum + Math.max(0, Math.round(Number(row?.minutes) || 0)), 0);
+    const minutes = sessionMinutes || Math.max(0, Math.round(Number(record?.hours || 0) * 60));
+    const collection = kind === 'maintenance' ? state.maintenance : state.breakdowns;
+    let count = Math.max(1, Math.round(Number(record?.batchSize) || 1));
+    if (record?.batchId && Array.isArray(collection)) {
+      const grouped = collection.filter(item => item?.batchId === record.batchId).length;
+      if (grouped > 0) count = grouped;
+    }
+    return `${minutes} min / ${count} toestel${count === 1 ? '' : 'len'}`;
+  }
+
+  function servicePhotos(record) {
+    return (Array.isArray(record?.photos) ? record.photos : [])
+      .filter(src => typeof src === 'string' && src.trim());
+  }
+
   function serviceModel(context) {
     const list = context.serviceKind === 'maintenance' ? state.maintenance : state.breakdowns;
     const record = list.find(item => item.id === context.recordId);
     if (!record) return null;
     const maintenance = context.serviceKind === 'maintenance';
     const title = maintenance ? 'Onderhoudsverslag' : 'Depannageverslag';
+    const oneOff = serviceOneOffParts(record);
     const fields = maintenance ? [
       { label:'Datum', value:serviceDate(record) },
       { label:'Type onderhoud', value:record.type || '—' },
       { label:'Toestel', value:serviceDevice(record), full:true },
       { label:'Technieker', value:record.technician || '—' },
-      { label:'Gebruikte onderdelen', value:serviceParts(record), full:true },
+      { label:'Werkminuten / toestellen', value:serviceWorkSummary('maintenance', record) },
+      { label:'Gebruikte onderdelen', value:serviceParts(record, true), full:true },
+      ...(oneOff !== '—' ? [{ label:'Eenmalige onderdelen', value:oneOff, full:true }] : []),
       { label:'Uitgevoerde werkzaamheden / notitie', value:record.notes || '—', full:true },
     ] : [
       { label:'Datum', value:serviceDate(record) },
@@ -162,17 +200,16 @@ if MARKER not in index:
       { label:'Prioriteit', value:record.priority || '—' },
       { label:'Status', value:record.status || '—' },
       { label:'Technieker', value:record.technician || '—' },
-      { label:'Werkuren', value:Number(record.hours || 0) ? `${Number(record.hours)} uur` : '—' },
+      { label:'Werkminuten / toestellen', value:serviceWorkSummary('breakdowns', record) },
       { label:'Probleem / melding', value:record.issue || '—', full:true },
       { label:'Diagnose', value:record.diagnosis || '—', full:true },
       { label:'Oplossing / uitgevoerde werken', value:record.solution || '—', full:true },
       { label:'Gebruikte onderdelen', value:serviceParts(record, true), full:true },
+      ...(oneOff !== '—' ? [{ label:'Eenmalige onderdelen', value:oneOff, full:true }] : []),
     ];
-    const photos = Array.isArray(record.photos)
-      ? record.photos.filter(src => typeof src === 'string' && src.startsWith('data:image/'))
-      : [];
+    const photos = servicePhotos(record);
     return {
-      headerTitle: `Machinepark · ${title}`,
+      headerTitle: `Machinepark . ${title}`,
       subtitle: serviceDevice(record),
       rightText: serviceDate(record),
       filenameTitle: title,
@@ -250,20 +287,19 @@ if MARKER not in index:
   }
 
   function addHeader(doc, model) {
-    doc.setTextColor(23, 63, 53);
+    doc.setTextColor(20);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
+    doc.setFontSize(20);
     doc.text(pdfSafeText(model.headerTitle), 15, 18);
     if (model.subtitle) {
-      doc.setTextColor(40);
       doc.setFontSize(10.5);
-      doc.text(pdfSafeText(model.subtitle), 15, 25.5);
+      doc.text(pdfSafeText(model.subtitle), 15, 26);
     }
-    doc.setTextColor(85);
+    doc.setTextColor(70);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
+    doc.setFontSize(9);
     if (model.rightText) doc.text(pdfSafeText(model.rightText), 195, 18, { align:'right' });
-    doc.setDrawColor(23, 63, 53);
+    doc.setDrawColor(34);
     doc.setLineWidth(.6);
     doc.line(15, 31, 195, 31);
     doc.setTextColor(20);
@@ -452,10 +488,13 @@ if MARKER not in index:
     const pages = doc.getNumberOfPages();
     for (let page = 1; page <= pages; page += 1) {
       doc.setPage(page);
+      doc.setDrawColor(185);
+      doc.line(15, 286, 195, 286);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(85);
-      doc.text(`Pagina ${page} / ${pages}`, 195, 290, { align:'right' });
+      doc.text('Afgedrukt vanuit Machinepark', 15, 291);
+      doc.text(`Pagina ${page} / ${pages}`, 195, 291, { align:'right' });
     }
   }
 
@@ -567,6 +606,14 @@ required = [
     'servicePrintKind',
     'devicePrintId',
     'serviceModel(context)',
+    'serviceOneOffParts(record)',
+    "serviceWorkSummary('maintenance', record)",
+    "serviceWorkSummary('breakdowns', record)",
+    "label:'Werkminuten / toestellen'",
+    "label:'Eenmalige onderdelen'",
+    'servicePhotos(record)',
+    ".replace(/[·•]/g, '.')",
+    ".replace(/[×✕✖]/g, 'x')",
     'deviceModel(context)',
     "photoTitle: 'Foto’s bij verslag'",
     "photoTitle: 'Foto’s toestel'",
