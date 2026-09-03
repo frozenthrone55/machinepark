@@ -148,6 +148,46 @@
       .sort((a,b)=>a.label.localeCompare(b.label,'nl',{numeric:true,sensitivity:'base'}));
   }
 
+  function mergedReportParts(report) {
+    const merged=new Map();
+    for(const visit of report?.visits||[]) {
+      for(const part of mergedVisitParts(visit)) {
+        const key=`${part.kind}:${svKey(part.label)}`;
+        if(!merged.has(key)) merged.set(key,{kind:part.kind,label:part.label,qty:0,locations:new Set(),devices:new Set()});
+        const target=merged.get(key);target.qty+=Number(part.qty||0);target.locations.add(visit.location||'—');(part.devices||[]).forEach(device=>target.devices.add(`${visit.location||'—'} · ${device}`));
+      }
+    }
+    return [...merged.values()].map(row=>({...row,locations:[...row.locations],devices:[...row.devices]})).sort((a,b)=>a.label.localeCompare(b.label,'nl',{numeric:true,sensitivity:'base'}));
+  }
+
+  function reportPhotos(report) {
+    return (report?.visits||[]).flatMap(visit=>visitPhotos(visit).map(photo=>({...photo,label:`${visit.location||'—'} · ${photo.label}`})));
+  }
+
+  function reportWorkSessions(report) {
+    const rows=[];
+    for(const visit of report?.visits||[]) {
+      for(const row of visitWorkSessions(visit)) rows.push({...row,location:visit.location||'—'});
+    }
+    return rows.sort((a,b)=>a.date.localeCompare(b.date)||String(a.location).localeCompare(String(b.location),'nl'));
+  }
+
+  function reportHtml(report) {
+    const totalParts=mergedReportParts(report),sessions=reportWorkSessions(report),totalMinutes=sessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
+    return `<div class="service-visit-report service-report">
+      <div class="service-visit-report-head"><h3>Serviceverslag ${svEsc(report.number)}</h3><div>${report.locationCount} locatie${report.locationCount===1?'':'s'} · ${report.deviceCount} toestel${report.deviceCount===1?'':'len'}</div></div>
+      <div class="service-visit-report-meta">
+        <div><small>Datum / uur</small><strong>${svEsc(svDateText(report.date))}${report.time?` · ${svEsc(report.time)}`:''}</strong></div>
+        <div><small>Technieker</small><strong>${svEsc(report.technician||'—')}</strong></div>
+        <div><small>Status</small><strong>Afgesloten</strong></div>
+        <div><small>Versie</small><strong>v${svEsc(report.revision)}</strong></div>
+      </div>
+      <div><div class="section-title">Werkdagen en tijd</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · ${svEsc(row.location)} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal: ${svEsc(totalMinutes)} min</strong></div></div></div>
+      ${(report.visits||[]).map((visit,index)=>`<section class="service-report-location"><div class="service-report-location-head"><span>Locatie ${index+1}</span><h4>${svEsc(visit.location||'—')}</h4></div>${visitReportHtml(visit)}</section>`).join('')}
+      <div><div class="section-title">Totaal gebruikte onderdelen · alle locaties</div><table class="service-visit-merged-parts"><thead><tr><th>Onderdeel</th><th>Aantal</th><th>Locaties / toestellen</th></tr></thead><tbody>${totalParts.length?totalParts.map(p=>`<tr><td>${svEsc(p.label)}</td><td><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join(''):'<tr><td colspan="3">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
+    </div>`;
+  }
+
   function workOrderText(workOrder) {
     if (!workOrder || !Array.isArray(workOrder.fields) || !workOrder.fields.length) return '';
     const rows = workOrder.fields.map(field => {
