@@ -15,7 +15,7 @@ if MARKER not in index:
 <script data-machinepark-build-fix="mail-pdf-direct-v4">
 (() => {
   const JSPDF_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-  const MAIL_SELECTOR = '.page-mail-btn,.service-detail-mail-btn,.device-detail-mail-btn';
+  const MAIL_SELECTOR = '.page-mail-btn,.service-detail-mail-btn,.device-detail-mail-btn,.service-visit-mail-btn';
   const PAGE_BOTTOM = 282;
   let jsPdfPromise = null;
 
@@ -104,6 +104,10 @@ if MARKER not in index:
     }
     const body = document.querySelector('#modal .modal-body');
     if (!body) return null;
+    if (button.matches('.service-visit-mail-btn')) {
+      const recordId = button.dataset.serviceVisitMailId || '';
+      return { source:body, kind:'serviceVisit', recordId, title:`Serviceverslag ${recordId}` };
+    }
     const foot = button.closest('.modal-foot') || document.querySelector('#modal .modal-foot');
     const servicePrint = foot?.querySelector('.service-detail-print-btn[data-service-print-id]');
     if (servicePrint) {
@@ -503,6 +507,7 @@ if MARKER not in index:
     const doc = new JsPDF({ unit:'mm', format:'a4', orientation:'portrait', compress:true });
     let model = null;
     if (context.kind === 'service') model = serviceModel(context);
+    if (context.kind === 'serviceVisit' && typeof window.machineparkServiceVisitPdfModel === 'function') model = window.machineparkServiceVisitPdfModel(context.recordId);
     if (context.kind === 'device') model = deviceModel(context);
 
     if (model) {
@@ -628,6 +633,8 @@ required = [
     'blob.size < 1200',
     'event.stopImmediatePropagation()',
     'machineparkDirectMailPdf',
+    'service-visit-mail-btn',
+    'machineparkServiceVisitPdfModel',
 ]
 for needle in required:
     if needle not in index:
