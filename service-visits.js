@@ -642,12 +642,17 @@
   async function openServiceVisit(id='',draftId='') {
     if(!svCanCreate()){toast('Deze rol mag geen onderhoud of depannage registreren.');return;}
     if(typeof window.machineparkSyncOnlineNow==='function'&&navigator.onLine&&draftId){try{await window.machineparkSyncOnlineNow({quiet:true});await refreshVisitState();}catch(_){}}
-    const header=draftId?visitDraftHeader(draftId):null,items=header?visitDraftItems(header.id):[],visit=id?serviceVisitById(id):(header?.appendToVisitId?serviceVisitById(header.appendToVisitId):null);
-    if(id&&!visit){toast('Servicebezoek niet meer gevonden.');return;}if(!locationGroups().length){toast('Geen actieve toestellen met een locatie gevonden.');return;}
+    const header=draftId?visitDraftHeader(draftId):null,items=header?visitDraftItems(header.id):[];
+    const requestedReport=id?(serviceReportById(id)||serviceReportForVisit(id)):null;
+    const report=requestedReport||(header?.appendToReportId?serviceReportById(header.appendToReportId):null)||(header?.appendToVisitId?serviceReportForVisit(header.appendToVisitId):null);
+    if(id&&!report){toast('Serviceverslag niet meer gevonden.');return;}if(!locationGroups().length){toast('Geen actieve toestellen met een locatie gevonden.');return;}
     const draftHeaderStore=header?.draftHeaderStore||headerStoreForUser(),draftKey=header?.id||uid('svdraft');
-    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,appendToVisitId:visit?.id||header?.appendToVisitId||'',createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(header),touched:false,finalizing:false,restoring:Boolean(header)};
-    showModal(visit?`Toestel toevoegen · ${visit.number}`:(header?'Serviceconcept verderzetten':'Nieuw servicebezoek per locatie'),serviceVisitForm({visit,header,items}),'Servicebezoek afsluiten',async()=>finalizeActiveVisit());
-    setTimeout(()=>{initVisitForm({visit,header,items});decorateDraftModal();if(activeVisitDraft){activeVisitDraft.restoring=false;activeVisitDraft.touched=false;}},0);
+    const locations=draftLocationList(report,header);
+    const activeKey=header?.activeLocationKey||locations[0]?.key||'';
+    const activeVisit=report?.visits?.find(v=>String(v.locationKey||svKey(v.location))===activeKey)||report?.visits?.[0]||null;
+    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(header),touched:false,finalizing:false,restoring:Boolean(header)};
+    showModal(report?`Serviceverslag aanvullen · ${report.number}`:(header?'Serviceconcept verderzetten':'Nieuw serviceverslag'),serviceVisitForm({report,visit:activeVisit,header,items}),'Serviceverslag afsluiten',async()=>finalizeActiveVisit());
+    setTimeout(()=>{initVisitForm({report,visit:activeVisit,header,items});decorateDraftModal();if(activeVisitDraft){activeVisitDraft.restoring=false;activeVisitDraft.touched=false;}},0);
   }
 
   async function deleteVisitDraft(id) {
