@@ -472,7 +472,7 @@
   function renderLocationChips() {
     const box=document.getElementById('serviceReportLocationChips');if(!box||!activeVisitDraft)return;
     box.innerHTML=(activeVisitDraft.locations||[]).length
-      ?activeVisitDraft.locations.map(loc=>`<button type="button" class="service-report-location-chip ${loc.key===activeVisitDraft.activeLocationKey?'active':''}" data-sv-location-switch="${svEsc(loc.key)}"><span>${svEsc(loc.label)}</span>${loc.visitId?'<small>Bestaande locatie</small>':'<small>Concept</small>'}</button>`).join('')
+      ?activeVisitDraft.locations.map(loc=>`<span class="service-report-location-chip-wrap"><button type="button" class="service-report-location-chip ${loc.key===activeVisitDraft.activeLocationKey?'active':''}" data-sv-location-switch="${svEsc(loc.key)}"><span>${svEsc(loc.label)}</span>${loc.visitId?'<small>Bestaande locatie</small>':'<small>Concept</small>'}</button>${loc.visitId?'':`<button type="button" class="service-report-location-remove" data-sv-location-remove="${svEsc(loc.key)}" title="Locatie verwijderen">×</button>`}</span>`).join('')
       :'<span class="muted">Nog geen locatie gekozen.</span>';
   }
 
@@ -512,7 +512,11 @@
     input.addEventListener('input',()=>{hidden.value='';render();});
     input.addEventListener('keydown',e=>{if(e.key==='Escape')hide();if(e.key==='Enter'&&suggestions.classList.contains('show')){const first=suggestions.querySelector('[data-sv-location]');if(first){e.preventDefault();first.click();}}});
     suggestions.addEventListener('click',e=>{const choice=e.target.closest('[data-sv-location]');if(!choice)return;const group=locationGroups().find(g=>g.key===choice.dataset.svLocation);if(!group)return;hide();void switchDraftLocation(group);});
-    document.getElementById('serviceReportLocationChips')?.addEventListener('click',e=>{const chip=e.target.closest('[data-sv-location-switch]');if(!chip)return;const loc=(activeVisitDraft.locations||[]).find(x=>x.key===chip.dataset.svLocationSwitch);const group=loc?findGroup(loc.key,loc.label):null;if(group)void switchDraftLocation(group);});
+    document.getElementById('serviceReportLocationChips')?.addEventListener('click',e=>{
+      const remove=e.target.closest('[data-sv-location-remove]');
+      if(remove){const key=remove.dataset.svLocationRemove||'',loc=(activeVisitDraft.locations||[]).find(x=>x.key===key);if(!loc||loc.visitId)return;if(!confirm(`Locatie ${loc.label} uit dit concept verwijderen? De reeds afgesloten locaties worden niet geraakt.`))return;activeVisitDraft.items=(activeVisitDraft.items||[]).filter(item=>String(item.draftLocationKey||'')!==key);delete activeVisitDraft.locationSessions?.[key];activeVisitDraft.locations=activeVisitDraft.locations.filter(x=>x.key!==key);if(activeVisitDraft.activeLocationKey===key){activeVisitDraft.activeLocationKey=activeVisitDraft.locations[0]?.key||'';const next=activeVisitDraft.locations[0],group=next?findGroup(next.key,next.label):null;if(group)void switchDraftLocation(group,{capture:false});else renderDevices(null);}renderLocationChips();scheduleDraft();return;}
+      const chip=e.target.closest('[data-sv-location-switch]');if(!chip)return;const loc=(activeVisitDraft.locations||[]).find(x=>x.key===chip.dataset.svLocationSwitch);const group=loc?findGroup(loc.key,loc.label):null;if(group)void switchDraftLocation(group);
+    });
     if(add)add.onclick=async()=>{if(activeVisitDraft.activeLocationKey){captureActiveLocationSessions();activeVisitDraft.items=await collectItems();}activeVisitDraft.activeLocationKey='';hidden.value='';input.value='';renderLocationChips();renderDevices(null);input.focus();render();scheduleDraft();};
   }
 
