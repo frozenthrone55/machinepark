@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const build = readFileSync(new URL('../build-navigation-runtime.py', import.meta.url), 'utf8');
+const bootstrap = readFileSync(new URL('../build-navigation-bootstrap.py', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('navigatie-runtime houdt alle hoofdtabbladen bruikbaar', () => {
@@ -44,11 +45,24 @@ test('inline onclick en navigatiebridge gebruiken dezelfde switchView', () => {
   assert.ok(build.includes('try { switchView = activateView; }'));
 });
 
-test('navigatie-runtime wordt voor asset-extractie gebouwd', () => {
+test('inline fallback blijft onafhankelijk van de externe featurebundel', () => {
+  assert.ok(bootstrap.includes('machinepark-navigation-bootstrap-v1'));
+  assert.ok(bootstrap.includes('data-machinepark-navigation-bootstrap="v1"'));
+  assert.ok(bootstrap.includes("document.querySelectorAll('.view').forEach"));
+  assert.ok(bootstrap.includes("target.classList.add('active')"));
+  assert.ok(bootstrap.includes("document.addEventListener('click', interceptNavigation, true)"));
+  assert.ok(bootstrap.includes('event.stopImmediatePropagation()'));
+  assert.ok(bootstrap.includes('window.machineparkInlineNavigate = navigate'));
+  assert.ok(bootstrap.includes("if 'data-machinepark-build-fix=' in bootstrap_block"));
+});
+
+test('navigatie-runtime en inline fallback worden voor asset-extractie gebouwd', () => {
   const command = pkg.scripts.build;
   const navigationPos = command.indexOf('python3 build-navigation-runtime.py');
+  const bootstrapPos = command.indexOf('python3 build-navigation-bootstrap.py');
   const extractionPos = command.indexOf('python3 scripts/extract-build-assets.py');
   assert.ok(navigationPos >= 0, 'build-navigation-runtime.py ontbreekt in npm build');
-  assert.ok(extractionPos > navigationPos, 'navigatie-runtime moet vóór asset-extractie draaien');
+  assert.ok(bootstrapPos > navigationPos, 'inline fallback moet na de volledige navigatie-runtime worden toegevoegd');
+  assert.ok(extractionPos > bootstrapPos, 'inline fallback moet vóór asset-extractie worden toegevoegd');
   assert.ok(command.includes('node --check assets/machinepark-build.js'));
 });
