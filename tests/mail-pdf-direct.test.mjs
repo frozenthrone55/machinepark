@@ -13,12 +13,24 @@ test('Mail PDF gebruikt directe jsPDF-opbouw voor de actieve klikroute', () => {
   assert.ok(build.includes('event.stopImmediatePropagation()'));
 });
 
-test('directe Mail PDF haalt echte scherminhoud uit details, tabellen en formuliervelden', () => {
-  assert.ok(build.includes('labelledDetailLines(context.source)'));
-  assert.ok(build.includes('tableLines(context.source)'));
-  assert.ok(build.includes('genericLines(context.source)'));
-  assert.ok(build.includes("source.querySelectorAll('[class*=\"detail-field\"]')"));
-  assert.ok(build.includes("source.querySelectorAll('table tr')"));
+test('Mail PDF gebruikt dezelfde recordcontext als de afdrukknoppen', () => {
+  assert.ok(build.includes('servicePrintKind'));
+  assert.ok(build.includes('servicePrintId'));
+  assert.ok(build.includes('devicePrintId'));
+  assert.ok(build.includes('serviceModel(context)'));
+  assert.ok(build.includes('deviceModel(context)'));
+});
+
+test('Mail PDF volgt de afdrukopbouw met velden, tijdlijn en fotos', () => {
+  assert.ok(build.includes('addFields(doc, model'));
+  assert.ok(build.includes('addTimeline(doc, model'));
+  assert.ok(build.includes('await addPhotos(doc, model'));
+  assert.ok(build.includes("photoTitle: 'Foto’s bij verslag'"));
+  assert.ok(build.includes("photoTitle: 'Foto’s toestel'"));
+  assert.ok(build.includes('photoColumns: 2'));
+  assert.ok(build.includes('photoColumns: 3'));
+  assert.ok(build.includes('doc.addImage('));
+  assert.ok(build.includes("context.source.querySelectorAll('.device-detail-photo img')"));
 });
 
 test('mobiele Mail PDF kan niet onbeperkt op PDF maken blijven hangen', () => {
@@ -32,7 +44,7 @@ test('mobiele Mail PDF kan niet onbeperkt op PDF maken blijven hangen', () => {
 
 test('lege of ongeldige PDF wordt niet gedeeld', () => {
   assert.ok(build.includes("useful.length < 5"));
-  assert.ok(build.includes('blob.size < 1000'));
+  assert.ok(build.includes('blob.size < 1200'));
   assert.ok(build.includes("throw new Error('De PDF bevat geen geldige inhoud. Probeer opnieuw.')"));
 });
 
