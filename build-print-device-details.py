@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
-MARKER = 'data-machinepark-build-fix="print-device-details-v1"'
+MARKER = 'data-machinepark-build-fix="print-device-details-v2"'
 
 if MARKER not in index:
     script = r'''
@@ -106,6 +106,7 @@ if MARKER not in index:
       button.type = 'button';
       button.id = 'printDeviceDetails';
       button.className = 'btn';
+      button.dataset.devicePrintId = id;
       button.textContent = '🖨 Afdrukken';
       button.onclick = () => window.printDeviceDetails(id);
       foot.insertBefore(button, foot.firstChild);
@@ -131,15 +132,13 @@ required = [
     '.timeline-item',
     '.manual-device-section',
     'popup.document.close()',
+    'button.dataset.devicePrintId = id',
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: toesteldetails-afdrukfunctie ontbreekt ({needle})')
 
-# Laat in featurecode nooit een tweede letterlijke document-bodyafsluiter achter.
-# Latere buildstappen injecteren features voor de echte pagina-body en mogen een
-# HTML-string van het aparte afdrukvenster niet per ongeluk als doel zien.
 if index.count('</body>') != 1:
     raise SystemExit('Buildvalidatie mislukt: toesteldetails introduceert een extra </body> in featurecode')
 
-print('[Machinepark] toesteldetails individueel afdrukbaar inclusief tijdlijn en foto’s, zonder handleidingen')
+print('[Machinepark] toesteldetails individueel afdrukbaar inclusief tijdlijn en foto’s; context gedeeld met Mail PDF')
