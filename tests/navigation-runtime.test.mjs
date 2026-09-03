@@ -9,8 +9,27 @@ test('navigatie-runtime houdt alle hoofdtabbladen bruikbaar', () => {
   for (const view of ['dashboard', 'devices', 'maintenance', 'breakdowns', 'parts', 'faults', 'manuals', 'settings']) {
     assert.ok(build.includes(`${view}: [`), `metadata ontbreekt voor ${view}`);
   }
-  assert.ok(build.includes('window.switchView = function(view)'));
+  assert.ok(build.includes('window.switchView = activateView'));
+  assert.ok(build.includes('window.machineparkNavigate = activateView'));
   assert.ok(build.includes("document.querySelectorAll('.nav [data-view]')"));
+});
+
+test('zichtbare tab wisselt ook als basis-JavaScript niet beschikbaar is', () => {
+  const domSwitch = build.indexOf("document.querySelectorAll('.view').forEach");
+  const stateSwitch = build.indexOf('setStateView(nextView)');
+  assert.ok(domSwitch >= 0, 'DOM-viewwissel ontbreekt');
+  assert.ok(stateSwitch > domSwitch, 'DOM moet vóór state worden gewisseld');
+  assert.ok(build.includes("if (typeof state !== 'undefined' && state) state.view = view"));
+  assert.ok(build.includes("if (typeof renderAll === 'function') renderAll()"));
+});
+
+test('capture-handler omzeilt oude of kapotte navigatielisteners', () => {
+  assert.ok(build.includes("document.addEventListener('click', handleNavigationEvent, true)"));
+  assert.ok(build.includes("document.addEventListener('touchend', handleNavigationEvent, { capture: true, passive: false })"));
+  assert.ok(build.includes('event.preventDefault()'));
+  assert.ok(build.includes('event.stopPropagation()'));
+  assert.ok(build.includes('event.stopImmediatePropagation()'));
+  assert.ok(build.includes('activateView(button.dataset.view)'));
 });
 
 test('een ontbrekende of kapotte feature blokkeert de navigatie niet', () => {
@@ -22,7 +41,7 @@ test('een ontbrekende of kapotte feature blokkeert de navigatie niet', () => {
 });
 
 test('inline onclick en navigatiebridge gebruiken dezelfde switchView', () => {
-  assert.ok(build.includes('try { switchView = window.switchView; }'));
+  assert.ok(build.includes('try { switchView = activateView; }'));
 });
 
 test('navigatie-runtime wordt voor asset-extractie gebouwd', () => {
