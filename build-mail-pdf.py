@@ -8,7 +8,7 @@ MARKER = 'data-machinepark-build-fix="mail-pdf-v1"'
 
 if MARKER not in index:
     style = r'''
-<style data-machinepark-build-fix="mail-pdf-v1">
+<style __BUILD_MARKER__>
 .page-print-row{gap:8px;flex-wrap:wrap}
 .page-mail-btn,.service-detail-mail-btn,.device-detail-mail-btn{display:inline-flex;align-items:center;gap:7px}
 .machinepark-pdf-stage{
@@ -45,10 +45,10 @@ if MARKER not in index:
   .page-mail-btn,.service-detail-mail-btn,.device-detail-mail-btn{display:none!important}
 }
 </style>
-'''.replace('data-machinepark-build-fix=\\"mail-pdf-v1\\"', 'data-machinepark-build-fix="mail-pdf-v1"')
+'''.replace('__BUILD_MARKER__', MARKER)
 
     script = r'''
-<script data-machinepark-build-fix="mail-pdf-v1">
+<script __BUILD_MARKER__>
 (() => {
   const HTML2PDF_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.14.0/html2pdf.bundle.min.js';
   let html2PdfPromise = null;
@@ -351,7 +351,7 @@ if MARKER not in index:
   window.machineparkMailPdf = mailPdf;
 })();
 </script>
-'''.replace('data-machinepark-build-fix=\\"mail-pdf-v1\\"', 'data-machinepark-build-fix="mail-pdf-v1"')
+'''.replace('__BUILD_MARKER__', MARKER)
 
     if "</head>" not in index or "</body>" not in index:
         raise SystemExit("Buildvalidatie mislukt: HTML-afsluiters ontbreken voor Mail PDF")
