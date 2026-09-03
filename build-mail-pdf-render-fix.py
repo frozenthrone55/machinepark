@@ -8,28 +8,29 @@ MARKER = 'data-machinepark-' + 'build-fix=' + '"mail-pdf-v1"'
 if MARKER not in index:
     raise SystemExit("Buildvalidatie mislukt: Mail PDF-code ontbreekt voor renderfix")
 
-old_position = """  position:fixed;\n  left:-12000px;\n  top:0;"""
-new_position = """  position:relative;\n  left:auto;\n  top:auto;"""
-if index.count(old_position) != 1:
-    raise SystemExit(f"Buildvalidatie mislukt: Mail PDF offscreen-position {index.count(old_position)}x gevonden")
-index = index.replace(old_position, new_position, 1)
+# Houd de PDF-bron in de echte DOM zodat layout/computed styles beschikbaar zijn.
+# De bron blijft voor de gebruiker buiten beeld; alleen de html2canvas-kopie wordt
+# tijdens het renderen naar de normale oorsprong verplaatst.
+anchor = """          scrollX: 0,\n          scrollY: 0"""
+replacement = """          scrollX: 0,\n          scrollY: 0,\n          onclone: (clonedDoc) => {\n            const clonedStage = clonedDoc.querySelector('.machinepark-pdf-stage');\n            if (!clonedStage) return;\n            clonedStage.style.position = 'static';\n            clonedStage.style.left = '0';\n            clonedStage.style.top = '0';\n            clonedStage.style.zIndex = 'auto';\n            clonedStage.style.transform = 'none';\n            clonedStage.style.visibility = 'visible';\n          }"""
 
-old_z_index = "  z-index:-1;"
-if index.count(old_z_index) != 1:
-    raise SystemExit(f"Buildvalidatie mislukt: Mail PDF negatieve z-index {index.count(old_z_index)}x gevonden")
-index = index.replace(old_z_index, "  z-index:auto;", 1)
+if index.count(anchor) != 1:
+    raise SystemExit(f"Buildvalidatie mislukt: Mail PDF html2canvas-anker {index.count(anchor)}x gevonden")
+index = index.replace(anchor, replacement, 1)
 
-old_mount = "    document.body.appendChild(stage);\n    return stage;"
-if index.count(old_mount) != 1:
-    raise SystemExit(f"Buildvalidatie mislukt: Mail PDF DOM-mount {index.count(old_mount)}x gevonden")
-index = index.replace(old_mount, "    return stage;", 1)
-
-if "left:-12000px" in index:
-    raise SystemExit("Buildvalidatie mislukt: Mail PDF staat nog buiten het capturevlak")
-if "document.body.appendChild(stage);" in index:
-    raise SystemExit("Buildvalidatie mislukt: Mail PDF renderstage wordt nog zichtbaar gemount")
-if "position:relative;\n  left:auto;\n  top:auto;" not in index or "z-index:auto;" not in index:
-    raise SystemExit("Buildvalidatie mislukt: Mail PDF renderstage is niet capture-veilig")
+required = [
+    "left:-12000px",
+    "document.body.appendChild(stage);",
+    "onclone: (clonedDoc) =>",
+    "clonedDoc.querySelector('.machinepark-pdf-stage')",
+    "clonedStage.style.position = 'static'",
+    "clonedStage.style.left = '0'",
+    "clonedStage.style.top = '0'",
+    "clonedStage.style.zIndex = 'auto'",
+]
+for needle in required:
+    if needle not in index:
+        raise SystemExit(f"Buildvalidatie mislukt: Mail PDF renderfix ontbreekt ({needle})")
 
 index_path.write_text(index, encoding="utf-8")
-print("[Machinepark] Mail PDF renderstage capture-veilig gemaakt (geen negatieve offscreen-positie)")
+print("[Machinepark] Mail PDF renderstage blijft gemount; html2canvas-kopie wordt binnen capturevlak geplaatst")
