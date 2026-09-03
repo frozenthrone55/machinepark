@@ -125,5 +125,5 @@ test('service worker cachet de modulaire frontend-assets', () => {
 
 test('scriptsmap bevat alleen de vaste build-, audit- en finalizetooling', () => {
   const scripts = readdirSync(new URL('../scripts/', import.meta.url)).sort();
-  assert.deepEqual(scripts, ['audit-codebase.py', 'build-machinepark.py', 'extract-build-assets.py']);
+  assert.deepEqual(scripts, ['audit-codebase.py', 'build-machinepark.py', 'check-inline-scripts.py', 'extract-build-assets.py']);
 });
