@@ -1,0 +1,104 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { assertSnapshotWriteAllowed } from '../netlify/functions/_shared/permissions.mjs';
+
+const js = readFileSync(new URL('../service-visits.js', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../service-visits.css', import.meta.url), 'utf8');
+const build = readFileSync(new URL('../build-service-visits.py', import.meta.url), 'utf8');
+const mail = readFileSync(new URL('../build-mail-pdf-direct.py', import.meta.url), 'utf8');
+const manuals = readFileSync(new URL('../manual-library.js', import.meta.url), 'utf8');
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+
+test('servicebezoek groepeert onderhoud en depannage via één serviceVisitId', () => {
+  assert.match(js, /serviceVisitId/);
+  assert.match(js, /serviceVisitNumber/);
+  assert.match(js, /serviceVisitLocation/);
+  assert.match(js, /state\.maintenance/);
+  assert.match(js, /state\.breakdowns/);
+  assert.match(js, /Werkzaamheden per toestel/);
+});
+
+test('onderdelen blijven per toestel en worden alleen voor klant samengevoegd', () => {
+  assert.match(js, /perRecordPartsText/);
+  assert.match(js, /mergedVisitParts/);
+  assert.match(js, /Onderdelen blijven gekoppeld aan dit toestel/);
+  assert.match(js, /Onderdelen · samengevoegd voor klant/);
+  assert.match(js, /devices:new Set/);
+});
+
+test('afgesloten servicebezoek kan zonder dupliceren worden aangevuld', () => {
+  assert.match(js, /\+ Toestel toevoegen/);
+  assert.match(js, /appendToVisitId/);
+  assert.match(js, /serviceVisitRevision/);
+  assert.match(js, /Bestaande registraties blijven ongewijzigd/);
+  assert.match(js, /Math\.max\(1,Number\(visit\.revision\)\|\|1\)\+1/);
+});
+
+test('volledig servicebezoek heeft concept autosave en boekt voorraad pas bij afsluiten', () => {
+  assert.match(js, /AUTOSAVE_DELAY = 1400/);
+  assert.match(js, /Concept bewaren/);
+  assert.match(js, /draftKind:'serviceVisit'/);
+  assert.match(js, /scheduleDraft/);
+  assert.match(js, /saveDraftInternal/);
+  assert.match(js, /stockUpdates\(selected\)/);
+  assert.match(js, /db\.transaction\(\['maintenance','breakdowns','parts'\]/);
+  assert.match(js, /machineparkSyncOnlineNow/);
+});
+
+test('handleidingen zijn per toestel beschikbaar in onderhoud en depannage binnen servicebezoek', () => {
+  assert.match(js, /data-sv-manuals/);
+  assert.match(js, /📘 Handleidingen/);
+  assert.match(js, /machineparkManualListHtml/);
+  assert.match(manuals, /window\.machineparkManualsForDevice/);
+  assert.match(manuals, /window\.machineparkManualListHtml/);
+});
+
+test('gezamenlijk verslag ondersteunt afdruk en Mail PDF', () => {
+  assert.match(js, /service-visit-print-btn/);
+  assert.match(js, /service-visit-mail-btn/);
+  assert.match(js, /machineparkServiceVisitPdfModel/);
+  assert.match(css, /service-visit-print-sheet/);
+  assert.match(mail, /service-visit-mail-btn/);
+  assert.match(mail, /machineparkServiceVisitPdfModel/);
+  assert.match(mail, /context\.kind === 'serviceVisit'/);
+});
+
+test('servicebezoek bouwt na Werkzaamheden en wordt syntax-gecontroleerd', () => {
+  const chain = pkg.scripts.build;
+  assert.ok(chain.indexOf('build-work-activities.py') < chain.indexOf('build-service-visits.py'));
+  assert.ok(chain.includes('node --check service-visits.js'));
+  assert.match(build, /service-visits\.js/);
+  assert.match(build, /service-visits\.css/);
+});
+
+test('serviceconcepten passen binnen bestaande serverrechten voor onderhoud en depannage', () => {
+  const base = {
+    app:'Machinepark', schema:1,
+    devices:[{id:'d1',assetCode:'WCL-1',status:'Actief'}],
+    parts:[{id:'p1',artNr:'P1',stock:5}],
+    maintenance:[], breakdowns:[],
+  };
+  const roleConfig = {
+    version:1,
+    roles:[{
+      id:'techniek', label:'Techniek',
+      permissions:{'maintenance.add':true,'breakdowns.add':true},
+    }],
+  };
+  const header = {id:'svdraft1',isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:'svdraft1',draftHeaderStore:'breakdowns'};
+  const maintenance = {id:'m1',isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId:'svdraft1',draftServiceKind:'maintenance',deviceId:'d1',usedParts:[{partId:'p1',qty:1}]};
+  const breakdown = {id:'b1',isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId:'svdraft1',draftServiceKind:'breakdowns',deviceId:'d1',issue:'Storing',usedParts:[]};
+  const draft = {...base, maintenance:[maintenance], breakdowns:[header,breakdown]};
+  assert.doesNotThrow(() => assertSnapshotWriteAllowed(base,draft,'techniek',roleConfig));
+
+  const final = {
+    ...base,
+    parts:[{...base.parts[0],stock:4}],
+    maintenance:[{...maintenance,isDraft:undefined,draftRole:undefined,draftKind:undefined,draftBatchId:undefined,draftServiceKind:undefined,serviceVisitId:'sv1'}],
+    breakdowns:[{...breakdown,isDraft:undefined,draftRole:undefined,draftKind:undefined,draftBatchId:undefined,draftServiceKind:undefined,serviceVisitId:'sv1'}],
+  };
+  delete final.maintenance[0].isDraft; delete final.maintenance[0].draftRole; delete final.maintenance[0].draftKind; delete final.maintenance[0].draftBatchId; delete final.maintenance[0].draftServiceKind;
+  delete final.breakdowns[0].isDraft; delete final.breakdowns[0].draftRole; delete final.breakdowns[0].draftKind; delete final.breakdowns[0].draftBatchId; delete final.breakdowns[0].draftServiceKind;
+  assert.doesNotThrow(() => assertSnapshotWriteAllowed(draft,final,'techniek',roleConfig));
+});
