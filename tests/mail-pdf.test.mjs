@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const build = readFileSync(new URL('../build-mail-pdf.py', import.meta.url), 'utf8');
+const renderFix = readFileSync(new URL('../build-mail-pdf-render-fix.py', import.meta.url), 'utf8');
 const devicePrintBuild = readFileSync(new URL('../build-print-device-details.py', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -28,13 +29,25 @@ test('Mail PDF heeft een desktopfallback zonder te doen alsof mailto een bijlage
   assert.ok(build.includes('voeg de gedownloade PDF toe als bijlage'));
 });
 
-test('Mail PDF wordt in de normale build uitgevoerd', () => {
-  assert.ok(pkg.scripts.build.includes('python3 build-mail-pdf.py'));
+test('Mail PDF en renderfix worden in de normale build uitgevoerd', () => {
+  const basePos = pkg.scripts.build.indexOf('python3 build-mail-pdf.py');
+  const fixPos = pkg.scripts.build.indexOf('python3 build-mail-pdf-render-fix.py');
+  assert.ok(basePos >= 0);
+  assert.ok(fixPos > basePos);
 });
 
 test('Mail PDF wordt altijd aan de echte document-body toegevoegd', () => {
   assert.ok(build.includes('body_pos = index.rfind("</body>")'));
   assert.ok(build.includes('index = index[:body_pos] + script + index[body_pos:]'));
+});
+
+test('Mail PDF renderbron blijft binnen het html2pdf capturevlak', () => {
+  assert.ok(renderFix.includes('position:relative;'));
+  assert.ok(renderFix.includes('left:auto;'));
+  assert.ok(renderFix.includes('z-index:auto;'));
+  assert.ok(renderFix.includes('left:-12000px'));
+  assert.ok(renderFix.includes('document.body.appendChild(stage);'));
+  assert.ok(renderFix.includes('Mail PDF renderstage capture-veilig gemaakt'));
 });
 
 test('toesteldetail-print bevat geen verborgen body-afsluiter die feature-injectie kan kapen', () => {
