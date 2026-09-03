@@ -6,7 +6,13 @@ INDEX = ROOT / "index.html"
 
 # Eenmalige correctie van de bestaande foutieve inventarisreeks.
 # Dit is bewust GEEN algemene formatteringsregel: toekomstige toestelcodes blijven vrij invoerbaar.
-LEGACY_CODE_FIXES = {f"WCL{number}": f"WCL0{number}" for number in range(501, 560)}
+# Zowel de oorspronkelijke WCL501-vorm als de eerder fout gepadde WCL0501-vorm
+# worden hersteld naar de bedoelde CL0501-vorm.
+LEGACY_CODE_FIXES = {}
+for number in range(501, 560):
+    corrected = f"CL0{number}"
+    LEGACY_CODE_FIXES[f"WCL{number}"] = corrected
+    LEGACY_CODE_FIXES[f"WCL0{number}"] = corrected
 MIGRATION_MARKER = "const LEGACY_DEVICE_CODE_FIXES=Object.freeze("
 
 index = INDEX.read_text(encoding="utf-8")
@@ -47,14 +53,16 @@ if startup_replacement not in index:
     index = index.replace(startup_anchor, startup_replacement, 1)
 
 # Buildvalidatie: huidige bekende foutieve reeks is gecorrigeerd, zonder generieke toekomstige formattering.
-for old_code, new_code in LEGACY_CODE_FIXES.items():
-    if f'"assetCode":"{old_code}"' in index:
-        raise SystemExit(f"Legacy toestelcode-correctie mislukt voor {old_code}")
-    if f'"assetCode":"{new_code}"' not in index:
-        raise SystemExit(f"Gecorrigeerde toestelcode ontbreekt: {new_code}")
+for number in range(501, 560):
+    target = f"CL0{number}"
+    for old_code in (f"WCL{number}", f"WCL0{number}"):
+        if f'"assetCode":"{old_code}"' in index:
+            raise SystemExit(f"Legacy toestelcode-correctie mislukt voor {old_code}")
+    if f'"assetCode":"{target}"' not in index:
+        raise SystemExit(f"Gecorrigeerde toestelcode ontbreekt: {target}")
 
 if "assetCode:val(fd,'assetCode')" not in index:
     raise SystemExit("Vrije invoer van toekomstige toestelcodes is onverwacht gewijzigd")
 
 INDEX.write_text(index, encoding="utf-8")
-print(f"[Machinepark] {len(LEGACY_CODE_FIXES)} bestaande WCL-codes voorbereid voor eenmalige correctie")
+print("[Machinepark] bestaande WCL501-WCL559/WCL0501-WCL0559 codes voorbereid voor eenmalige correctie naar CL0501-CL0559")
