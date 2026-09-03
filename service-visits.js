@@ -111,10 +111,21 @@
       .sort((a,b)=>a.label.localeCompare(b.label,'nl',{numeric:true,sensitivity:'base'}));
   }
 
+  function workOrderText(workOrder) {
+    if (!workOrder || !Array.isArray(workOrder.fields) || !workOrder.fields.length) return '';
+    const rows = workOrder.fields.map(field => {
+      const raw = field?.type === 'checkbox' ? (field.value ? 'Ja' : 'Nee') : field?.value;
+      return `${field?.label || 'Veld'}: ${raw === '' || raw === null || raw === undefined ? '—' : String(raw)}`;
+    });
+    return `Werkbon · ${workOrder.templateName || 'Werkbon'} · v${workOrder.templateVersion || 1}\n${rows.join('\n')}`;
+  }
+
   function recordSummary(kind, item, plain = false) {
     const lines = kind === 'maintenance'
       ? [`Type onderhoud: ${item.type || '—'}`, `Uitgevoerde werkzaamheden / notitie: ${item.notes || '—'}`]
       : [`Prioriteit: ${item.priority || '—'} · Status: ${item.status || '—'}`, `Probleem / melding: ${item.issue || '—'}`, `Diagnose: ${item.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${item.solution || '—'}`];
+    if (item.workOrder) lines.push(workOrderText(item.workOrder));
+    if (kind === 'breakdowns' && item.faultRef) lines.push(`Gekoppelde storing: ${[item.faultRef.code,item.faultRef.name].filter(Boolean).join(' — ') || '—'}`);
     lines.push(`Onderdelen op dit toestel: ${perRecordPartsText(item)}`);
     if (plain) return lines.join('\n');
     return `<div class="service-visit-report-record"><h4><span class="badge ${kind === 'maintenance' ? 'blue' : 'danger'}">${kind === 'maintenance' ? 'Onderhoud' : 'Depannage'}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div></div>`;
@@ -211,11 +222,11 @@
     const canB = svCan('breakdowns.add') && !existing.has('breakdowns');
     const machine = [device.brand,device.model].filter(Boolean).join(' ') || 'Geen toestelomschrijving';
     const loc = svLocationForDevice(device);
-    return `<div class="service-visit-device" data-service-visit-device="${svEsc(device.id)}">
+    return `<div class="service-visit-device breakdown-machine-card" data-service-visit-device="${svEsc(device.id)}" data-breakdown-device="${svEsc(device.id)}">
       <div class="service-visit-device-head"><div><strong>${svEsc(device.assetCode || device.model || 'Toestel')}</strong><small>${svEsc(machine)}${device.serial ? ` · S/N ${svEsc(device.serial)}` : ''}${loc ? ` · ${svEsc(loc)}` : ''}</small><div class="sv-manual-panel manual-inline-panel"></div></div>
-        <div class="service-visit-kind-picks"><button type="button" class="btn small sv-manual-btn" data-sv-manuals="${svEsc(device.id)}">📘 Handleidingen</button><label class="${canM ? '' : 'disabled'}"><input type="checkbox" data-kind="maintenance" ${mChecked ? 'checked' : ''} ${canM ? '' : 'disabled'}> Onderhoud${existing.has('maintenance') ? ' · al in verslag' : ''}</label><label class="${canB ? '' : 'disabled'}"><input type="checkbox" data-kind="breakdowns" ${bChecked ? 'checked' : ''} ${canB ? '' : 'disabled'}> Depannage${existing.has('breakdowns') ? ' · al in verslag' : ''}</label></div></div>
+        <div class="service-visit-kind-picks"><button type="button" class="btn small sv-manual-btn" data-sv-manuals="${svEsc(device.id)}">📘 Handleidingen</button><label class="${canM ? '' : 'disabled'}"><input type="checkbox" data-kind="maintenance" ${mChecked ? 'checked' : ''} ${canM ? '' : 'disabled'}> Onderhoud${existing.has('maintenance') ? ' · al in verslag' : ''}</label><label class="${canB ? '' : 'disabled'}"><input type="checkbox" class="breakdown-machine-check" data-kind="breakdowns" ${bChecked ? 'checked' : ''} ${canB ? '' : 'disabled'}> Depannage${existing.has('breakdowns') ? ' · al in verslag' : ''}</label></div></div>
       <div class="service-visit-kind-panel ${mChecked ? 'active' : ''}" data-panel-kind="maintenance"><h4>Onderhoud · ${svEsc(device.assetCode || device.model || 'Toestel')}</h4><div class="service-visit-grid"><div><label>Type onderhoud *</label><select class="sv-maintenance-type">${['Halfjaarlijks','Jaarlijks','Op afroep','Maandelijks'].map(v=>`<option ${m.type===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="full"><label>Uitgevoerde werkzaamheden / notitie</label><textarea class="sv-maintenance-notes">${svEsc(m.notes || '')}</textarea></div>${partSection('maintenance',m)}</div></div>
-      <div class="service-visit-kind-panel ${bChecked ? 'active' : ''}" data-panel-kind="breakdowns"><h4>Depannage · ${svEsc(device.assetCode || device.model || 'Toestel')}</h4><div class="service-visit-grid"><div><label>Prioriteit</label><select class="sv-breakdown-priority">${['Laag','Normaal','Hoog','Kritiek'].map(v=>`<option ${String(b.priority || 'Normaal')===v?'selected':''}>${v}</option>`).join('')}</select></div><div><label>Status</label><select class="sv-breakdown-status">${['Open','In behandeling','Opgelost'].map(v=>`<option ${String(b.status || 'Open')===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="full"><label>Probleem / melding *</label><textarea class="sv-breakdown-issue">${svEsc(b.issue || '')}</textarea></div><div class="full"><label>Diagnose</label><textarea class="sv-breakdown-diagnosis">${svEsc(b.diagnosis || '')}</textarea></div><div class="full"><label>Oplossing / uitgevoerde werken</label><textarea class="sv-breakdown-solution">${svEsc(b.solution || '')}</textarea></div>${partSection('breakdowns',b)}</div></div>
+      <div class="service-visit-kind-panel ${bChecked ? 'active' : ''}" data-panel-kind="breakdowns"><h4>Depannage · ${svEsc(device.assetCode || device.model || 'Toestel')}</h4><div class="service-visit-grid"><div><label>Prioriteit</label><select class="sv-breakdown-priority">${['Laag','Normaal','Hoog','Kritiek'].map(v=>`<option ${String(b.priority || 'Normaal')===v?'selected':''}>${v}</option>`).join('')}</select></div><div><label>Status</label><select class="sv-breakdown-status">${['Open','In behandeling','Opgelost'].map(v=>`<option ${String(b.status || 'Open')===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="full"><label>Probleem / melding *</label><textarea class="sv-breakdown-issue breakdown-machine-issue">${svEsc(b.issue || '')}</textarea></div><div class="full"><label>Diagnose</label><textarea class="sv-breakdown-diagnosis">${svEsc(b.diagnosis || '')}</textarea></div><div class="full"><label>Oplossing / uitgevoerde werken</label><textarea class="sv-breakdown-solution breakdown-machine-solution">${svEsc(b.solution || '')}</textarea></div>${partSection('breakdowns',b)}</div></div>
     </div>`;
   }
 
@@ -225,12 +236,15 @@
     const date = visit?.date || header?.date || todayISO();
     const time = visit?.time || header?.time || nowLocalTime();
     const technician = header?.technician ?? (visit?.technician === '—' ? '' : visit?.technician || '');
-    const minutes = Math.max(0,Math.round(Number(header?.visitMinutes) || 0));
+    const sessionSource = { date, workSessions:Array.isArray(header?.workSessions) ? header.workSessions : [] };
+    const workSessionsHtml = typeof window.machineparkServiceWorkSessionsEditor === 'function'
+      ? window.machineparkServiceWorkSessionsEditor(sessionSource, 'servicevisit')
+      : `<div class="field full"><label>Werkdagen en tijd</label><input name="workSessionDate" type="date" required value="${svEsc(date)}"><input name="workSessionMinutes" type="number" min="1" step="1" required placeholder="minuten"></div>`;
     return `<div class="form-grid"><div class="service-visit-form-note"><strong>Eén bezoek, één klantverslag.</strong> Onderhoud en depannage worden definitief als aparte records per toestel opgeslagen. Onderdelen blijven per toestel bewaard en worden alleen in het klantverslag samengevoegd.</div>
       ${visit ? `<div class="service-visit-existing"><strong>Aanvulling op ${svEsc(visit.number)} · huidige versie v${svEsc(visit.revision)}</strong><div class="muted" style="font-size:11px;margin-top:3px">Bestaande registraties blijven ongewijzigd. Na afsluiten wordt dit hetzelfde verslag met een hogere versie.</div></div>` : ''}
       <div class="field full"><label>Locatie *</label><div class="maintenance-location-autocomplete"><input id="serviceVisitLocationSearch" type="search" required autocomplete="off" placeholder="Typ locatie of toestelnummer…" value="${svEsc(location)}" ${visit ? 'readonly' : ''}><input id="serviceVisitLocationKey" name="locationKey" type="hidden" value="${svEsc(locationKey)}"><div id="serviceVisitLocationSuggestions" class="maintenance-location-suggestions"></div></div><div id="serviceVisitLocationCount" class="muted" style="font-size:11px;margin-top:4px">${location ? `Locatie: ${svEsc(location)}` : 'Typ een locatie of toestelnummer en kies de locatie uit de lijst.'}</div></div>
       <div class="field"><label>Datum *</label><input name="date" type="date" required value="${svEsc(date)}" ${visit ? 'readonly' : ''}></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${svEsc(time)}" ${visit ? 'readonly' : ''}></div>
-      <div class="field"><label>Technieker</label><input name="technician" value="${svEsc(technician)}"></div><div class="field"><label>Werktijd voor deze ronde (minuten)</label><input name="visitMinutes" type="number" min="0" step="1" value="${minutes}"></div>
+      <div class="field"><label>Technieker</label><input name="technician" value="${svEsc(technician)}"></div>${workSessionsHtml}
       <div class="field full"><div class="section-title">Toestellen op deze locatie</div><div class="muted" style="font-size:11px">Kies per toestel Onderhoud, Depannage of beide. Open indien nodig meteen de passende handleidingen.</div></div>
       <div id="serviceVisitDevices" class="service-visit-device-list"><div class="empty" style="padding:24px">Toestellen laden…</div></div></div>`;
   }
@@ -266,7 +280,7 @@
       const addOne=event.target.closest('.sv-add-oneoff');if(addOne){const list=addOne.closest('.service-visit-oneoff')?.querySelector('.service-visit-oneoff-list');if(list){list.insertAdjacentHTML('beforeend',oneOffRowHtml());list.lastElementChild?.querySelector('.sv-oneoff-supplier')?.focus();}return;}
       const removeOne=event.target.closest('.sv-remove-oneoff');if(removeOne){const list=removeOne.closest('.service-visit-oneoff-list'),rows=list?.querySelectorAll('.service-visit-oneoff-row')||[];if(rows.length>1)removeOne.closest('.service-visit-oneoff-row')?.remove();else removeOne.closest('.service-visit-oneoff-row')?.querySelectorAll('input').forEach(i=>i.value=i.type==='number'?'1':'');}
     });
-    root.addEventListener('change',event=>{const toggle=event.target.closest('[data-kind]');if(toggle){const panel=toggle.closest('.service-visit-device')?.querySelector(`[data-panel-kind="${toggle.dataset.kind}"]`);panel?.classList.toggle('active',toggle.checked);}});
+    root.addEventListener('change',event=>{const toggle=event.target.closest('[data-kind]');if(toggle){const panel=toggle.closest('.service-visit-device')?.querySelector(`[data-panel-kind="${toggle.dataset.kind}"]`);panel?.classList.toggle('active',toggle.checked);panel?.querySelectorAll('[data-workorder-editor] input,[data-workorder-editor] select,[data-workorder-editor] textarea').forEach(el=>{el.disabled=!toggle.checked;});}});
     root.addEventListener('input',event=>{const input=event.target.closest('.sv-usage-list .usage-search');if(!input)return;const row=input.closest('.usage-row'),menu=row?.querySelector('.usage-suggestions'),hidden=row?.querySelector('.usage-part');if(hidden)hidden.value='';const q=input.value.trim();if(!menu)return;if(!q){menu.innerHTML='';menu.classList.remove('show');return;}menu.innerHTML=usageSuggestionsHtml(q);menu.classList.add('show');});
     root.addEventListener('keydown',event=>{const input=event.target.closest('.sv-usage-list .usage-search');if(!input)return;const menu=input.closest('.usage-row')?.querySelector('.usage-suggestions');if(event.key==='Escape')menu?.classList.remove('show');if(event.key==='Enter'&&menu?.classList.contains('show')){const first=menu.querySelector('.usage-suggestion');if(first){event.preventDefault();first.click();}}});
     root.addEventListener('focusout',event=>{const input=event.target.closest('.sv-usage-list .usage-search');if(input)setTimeout(()=>closeSuggestions(input.closest('.usage-row')),140);});
@@ -282,6 +296,30 @@
     box.innerHTML=(group.devices||[]).map(d=>deviceCard(d,visit,draftItems)).join('')||'<div class="empty" style="padding:24px">Geen actieve toestellen op deze locatie gevonden.</div>';
     if(count)count.textContent=`${group.devices?.length||0} actief toestel${group.devices?.length===1?'':'len'} op ${group.label}`;
     bindVisitInteractions(box);
+    void attachVisitExtras(draftItems);
+  }
+
+  async function attachVisitExtras(draftItems=[]) {
+    const drafts=itemMap(draftItems);
+    if(typeof window.machineparkLoadWorkOrderTemplates==='function'){try{await window.machineparkLoadWorkOrderTemplates();}catch(_){}}
+    document.querySelectorAll('#serviceVisitDevices .service-visit-device').forEach(card=>{
+      const deviceId=card.dataset.serviceVisitDevice||'',device=(state.devices||[]).find(d=>d.id===deviceId)||{};
+      for(const kind of ['maintenance','breakdowns']){
+        const panel=card.querySelector(`[data-panel-kind="${kind}"]`);
+        if(!panel||panel.querySelector('[data-workorder-editor]')||typeof window.machineparkMakeWorkOrderEditor!=='function')continue;
+        const saved=drafts.get(`${kind}:${deviceId}`)?.workOrder||null;
+        const editor=window.machineparkMakeWorkOrderEditor(device,saved);
+        panel.querySelector('.service-visit-grid')?.appendChild(editor);
+        const enabled=Boolean(card.querySelector(`[data-kind="${kind}"]`)?.checked);
+        editor.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=!enabled;});
+      }
+    });
+    if(typeof window.machineparkAugmentBreakdownFaultCards==='function')window.machineparkAugmentBreakdownFaultCards();
+    document.querySelectorAll('#serviceVisitDevices .service-visit-device').forEach(card=>{
+      const saved=drafts.get(`breakdowns:${card.dataset.serviceVisitDevice||''}`)?.faultRef;
+      const holder=card.querySelector('.fault-inline-tools');
+      if(saved&&holder){holder._machineparkFaultSnapshot=saved;const selected=holder.querySelector('.fault-picker-selected');if(selected)selected.textContent=`Gekoppeld: ${[saved.code,saved.name].filter(Boolean).join(' — ')}`;}
+    });
   }
 
   function initVisitForm({visit=null,header=null,items=[]}={}) {
@@ -319,7 +357,11 @@
   function collectHeader() {
     const form=document.getElementById('modalForm'),existing=activeVisitDraft?.header||null,now=new Date().toISOString();
     const locationLabel=String(document.getElementById('serviceVisitLocationSearch')?.value||'').trim();
-    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:String(document.getElementById('serviceVisitLocationKey')?.value||''),locationLabel,date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),visitMinutes:Math.max(0,Math.round(Number(form?.elements.visitMinutes?.value)||0)),appendToVisitId:activeVisitDraft.appendToVisitId||'',createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:1};
+    const fd=new FormData(form);
+    const workSessions=typeof window.machineparkCollectWorkSessions==='function'
+      ? window.machineparkCollectWorkSessions(fd)
+      : [{date:String(fd.get('workSessionDate')||''),minutes:Math.max(0,Math.round(Number(fd.get('workSessionMinutes'))||0))}].filter(row=>row.date&&row.minutes>0);
+    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:String(document.getElementById('serviceVisitLocationKey')?.value||''),locationLabel,date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:1};
   }
 
   async function collectItems() {
@@ -332,9 +374,11 @@
         if(!checked)continue;
         const panel=card.querySelector(`[data-panel-kind="${kind}"]`),old=oldMap.get(`${kind}:${deviceId}`)||null,id=old?.id||uid(kind==='maintenance'?'mntdraft':'brkdraft');
         const photos=await collectPhotos(panel,kind,id,old?.photos||[]);
-        const base={...(old||{}),id,isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftServiceKind:kind,deviceId,usedParts:collectUsed(panel),oneOffParts:collectOneOff(panel),photos,createdAt:old?.createdAt||now,updatedAt:now,draftSchema:1};
+        const editor=panel?.querySelector('[data-workorder-editor]');
+        const workOrder=editor&&typeof window.machineparkCollectWorkOrder==='function'?window.machineparkCollectWorkOrder(editor):old?.workOrder||null;
+        const base={...(old||{}),id,isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftServiceKind:kind,deviceId,usedParts:collectUsed(panel),oneOffParts:collectOneOff(panel),photos,workOrder,createdAt:old?.createdAt||now,updatedAt:now,draftSchema:1};
         if(kind==='maintenance')out.push({...base,type:panel?.querySelector('.sv-maintenance-type')?.value||'Halfjaarlijks',notes:panel?.querySelector('.sv-maintenance-notes')?.value.trim()||''});
-        else out.push({...base,priority:panel?.querySelector('.sv-breakdown-priority')?.value||'Normaal',status:panel?.querySelector('.sv-breakdown-status')?.value||'Open',issue:panel?.querySelector('.sv-breakdown-issue')?.value.trim()||'',diagnosis:panel?.querySelector('.sv-breakdown-diagnosis')?.value.trim()||'',solution:panel?.querySelector('.sv-breakdown-solution')?.value.trim()||''});
+        else out.push({...base,priority:panel?.querySelector('.sv-breakdown-priority')?.value||'Normaal',status:panel?.querySelector('.sv-breakdown-status')?.value||'Open',issue:panel?.querySelector('.sv-breakdown-issue')?.value.trim()||'',diagnosis:panel?.querySelector('.sv-breakdown-diagnosis')?.value.trim()||'',solution:panel?.querySelector('.sv-breakdown-solution')?.value.trim()||'',faultRef:typeof window.machineparkFaultRefFromCard==='function'?window.machineparkFaultRefFromCard(card):old?.faultRef||null});
       }
     }
     return out;
@@ -393,8 +437,8 @@
   function finalRecord(header,item,visit,revision,number,now,batchSize) {
     const record={...item};['isDraft','draftRole','draftKind','draftBatchId','draftServiceKind','draftSchema'].forEach(k=>delete record[k]);
     const serviceVisitId=visit?.id||header.targetVisitId||uid('sv');
-    const date=visit?.date||header.date||'',time=visit?.time||header.time||'',technician=header.technician||'',minutes=Math.max(0,Math.round(Number(header.visitMinutes)||0));
-    return {...record,date,time,technician,workSessions:minutes>0?[{date,minutes}]:[],hours:minutes/60,batchId:serviceVisitId,batchSize,updatedAt:now,serviceVisitId,serviceVisitNumber:number,serviceVisitLocation:visit?.location||header.locationLabel||'',serviceVisitLocationKey:visit?.locationKey||header.locationKey||svKey(header.locationLabel||''),serviceVisitDate:date,serviceVisitTime:time,serviceVisitTechnician:technician,serviceVisitStatus:'closed',serviceVisitClosedAt:now,serviceVisitRevision:revision};
+    const date=visit?.date||header.date||'',time=visit?.time||header.time||'',technician=header.technician||'',workSessions=(Array.isArray(header.workSessions)?header.workSessions:[]).filter(row=>row?.date&&Number(row?.minutes)>0).map(row=>({date:String(row.date),minutes:Math.max(1,Math.round(Number(row.minutes)||0))})),totalMinutes=workSessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
+    return {...record,date,time,technician,workSessions,hours:totalMinutes/60,batchId:serviceVisitId,batchSize,updatedAt:now,serviceVisitId,serviceVisitNumber:number,serviceVisitLocation:visit?.location||header.locationLabel||'',serviceVisitLocationKey:visit?.locationKey||header.locationKey||svKey(header.locationLabel||''),serviceVisitDate:date,serviceVisitTime:time,serviceVisitTechnician:technician,serviceVisitStatus:'closed',serviceVisitClosedAt:now,serviceVisitRevision:revision};
   }
 
   function finalizeDraftTransaction(header,allItems,selected,visit) {
@@ -405,7 +449,7 @@
 
   async function finalizeActiveVisit() {
     const current=activeVisitDraft;if(!current||current.finalizing)return;current.finalizing=true;clearTimeout(visitAutosaveTimer);setDraftStatus('Servicebezoek afsluiten…','busy');
-    try{current.touched=true;const saved=await queueDraftSave({force:true});if(!saved||activeVisitDraft!==current)return;const selected=saved.items;if(!saved.header.locationKey&&!saved.header.locationLabel)throw new Error('Kies eerst een locatie.');if(!selected.length)throw new Error('Kies minstens één onderhoud of depannage.');const missing=selected.find(i=>i.draftServiceKind==='breakdowns'&&!String(i.issue||'').trim());if(missing)throw new Error(`Vul het probleem / de melding in voor ${svDeviceShort(missing.deviceId)}.`);const visit=saved.header.appendToVisitId?serviceVisitById(saved.header.appendToVisitId):null;const result=await finalizeDraftTransaction(saved.header,saved.items,selected,visit);activeVisitDraft=null;baseCloseModal();await refresh();toast(`Serviceverslag ${result.number} opgeslagen · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceVisitDetails(result.id),0);}catch(e){current.finalizing=false;setDraftStatus(e?.message||'Afsluiten mislukt','error');throw e;}
+    try{current.touched=true;const saved=await queueDraftSave({force:true});if(!saved||activeVisitDraft!==current)return;const selected=saved.items;if(!saved.header.locationKey&&!saved.header.locationLabel)throw new Error('Kies eerst een locatie.');if(!Array.isArray(saved.header.workSessions)||!saved.header.workSessions.length)throw new Error('Vul minstens één werkdag en geldige werktijd in.');if(!selected.length)throw new Error('Kies minstens één onderhoud of depannage.');const missing=selected.find(i=>i.draftServiceKind==='breakdowns'&&!String(i.issue||'').trim());if(missing)throw new Error(`Vul het probleem / de melding in voor ${svDeviceShort(missing.deviceId)}.`);const visit=saved.header.appendToVisitId?serviceVisitById(saved.header.appendToVisitId):null;const result=await finalizeDraftTransaction(saved.header,saved.items,selected,visit);activeVisitDraft=null;baseCloseModal();await refresh();toast(`Serviceverslag ${result.number} opgeslagen · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceVisitDetails(result.id),0);}catch(e){current.finalizing=false;setDraftStatus(e?.message||'Afsluiten mislukt','error');throw e;}
   }
 
   function headerStoreForUser() { return svCan('breakdowns.add') ? 'breakdowns' : 'maintenance'; }
