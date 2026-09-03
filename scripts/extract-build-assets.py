@@ -137,9 +137,13 @@ if fault_sw_js_count != 1 or fault_sw_css_count != 1:
     raise SystemExit('Buildvalidatie mislukt: service worker bevat niet exact één versiegebonden storingsasset')
 SW_PATH.write_text(sw, encoding='utf-8')
 
-marker_match = marker_re.search(JS_PATH.read_text(encoding='utf-8'))
+js_built = JS_PATH.read_text(encoding='utf-8')
+marker_match = marker_re.search(js_built)
 if marker_match:
-    raise SystemExit(f'Buildvalidatie mislukt: buildmarker onverwacht in gegenereerde JS: {marker_match.group(0)}')
+    start = max(0, marker_match.start() - 180)
+    end = min(len(js_built), marker_match.end() + 180)
+    context = js_built[start:end].replace('\n', '\\n')
+    raise SystemExit(f'Buildvalidatie mislukt: buildmarker onverwacht in gegenereerde JS: {marker_match.group(0)} · context: {context}')
 if 'photo-lightbox-v2' not in js_content or 'machineparkOpenPhotoLightbox' not in js_content:
     raise SystemExit('Buildvalidatie mislukt: foto-lightbox ontbreekt in de gegenereerde featurebundel')
 
