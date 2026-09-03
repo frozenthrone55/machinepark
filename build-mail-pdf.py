@@ -45,7 +45,7 @@ if MARKER not in index:
   .page-mail-btn,.service-detail-mail-btn,.device-detail-mail-btn{display:none!important}
 }
 </style>
-'''
+'''.replace('data-machinepark-build-fix=\\"mail-pdf-v1\\"', 'data-machinepark-build-fix="mail-pdf-v1"')
 
     script = r'''
 <script data-machinepark-build-fix="mail-pdf-v1">
@@ -351,7 +351,7 @@ if MARKER not in index:
   window.machineparkMailPdf = mailPdf;
 })();
 </script>
-'''
+'''.replace('data-machinepark-build-fix=\\"mail-pdf-v1\\"', 'data-machinepark-build-fix="mail-pdf-v1"')
 
     if "</head>" not in index or "</body>" not in index:
         raise SystemExit("Buildvalidatie mislukt: HTML-afsluiters ontbreken voor Mail PDF")
