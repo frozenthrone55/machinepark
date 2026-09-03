@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const build = readFileSync(new URL('../build-mail-pdf-direct.py', import.meta.url), 'utf8');
+const parity = readFileSync(new URL('../build-mail-pdf-print-parity.py', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('Mail PDF gebruikt directe jsPDF-opbouw voor de actieve klikroute', () => {
@@ -33,6 +34,14 @@ test('Mail PDF volgt de afdrukopbouw met velden, tijdlijn en fotos', () => {
   assert.ok(build.includes("context.source.querySelectorAll('.device-detail-photo img')"));
 });
 
+test('Mail PDF gebruikt veilige punten en dezelfde depannagevelden als Afdrukken', () => {
+  assert.ok(parity.includes(".replace(/·/g, '.')"));
+  assert.ok(parity.includes("label:'Werkminuten / toestellen'"));
+  assert.ok(parity.includes('serviceBreakdownWorkSummary(record)'));
+  assert.ok(parity.includes("label:'Eenmalige onderdelen'"));
+  assert.ok(parity.includes('serviceOneOffParts(record)'));
+});
+
 test('mobiele Mail PDF kan niet onbeperkt op PDF maken blijven hangen', () => {
   assert.ok(build.includes('withTimeout('));
   assert.ok(build.includes("12000, 'PDF-bibliotheek reageert niet. Probeer opnieuw.'"));
@@ -48,11 +57,13 @@ test('lege of ongeldige PDF wordt niet gedeeld', () => {
   assert.ok(build.includes("throw new Error('De PDF bevat geen geldige inhoud. Probeer opnieuw.')"));
 });
 
-test('directe Mail PDF draait na de bestaande mail-renderfix', () => {
+test('directe Mail PDF en print-pariteit draaien na de bestaande mail-renderfix', () => {
   const basePos = pkg.scripts.build.indexOf('python3 build-mail-pdf.py');
   const renderPos = pkg.scripts.build.indexOf('python3 build-mail-pdf-render-fix.py');
   const directPos = pkg.scripts.build.indexOf('python3 build-mail-pdf-direct.py');
+  const parityPos = pkg.scripts.build.indexOf('python3 build-mail-pdf-print-parity.py');
   assert.ok(basePos >= 0);
   assert.ok(renderPos > basePos);
   assert.ok(directPos > renderPos);
+  assert.ok(parityPos > directPos);
 });
