@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parent
 INDEX = ROOT / "index.html"
@@ -32,12 +33,15 @@ replace_exact(
     "voorraadblokkade bij depannage per locatie",
 )
 
-# 2) Onderdelen manueel beheren: negatieve voorraad rechtstreeks kunnen opslaan.
-replace_exact(
-    '<input name="stock" type="number" step="1" min="0" value="${p.stock??0}">',
-    '<input name="stock" type="number" step="1" value="${p.stock??0}">',
-    "minimum nul op voorraadveld",
+# 2) Onderdelen manueel beheren: elk echt voorraadveld mag negatief worden.
+# Minimumvoorraad blijft wel >= 0; alleen inputs met name="stock" worden aangepast.
+index, stock_input_count = re.subn(
+    r'(<input\b[^>]*\bname="stock"[^>]*?)\smin="0"([^>]*>)',
+    r'\1\2',
+    index,
 )
+if stock_input_count < 1:
+    raise SystemExit("Negatieve voorraad: geen voorraadveld met min=0 gevonden")
 
 # 3) Excel-stocktelling: negatieve voorraad is een geldige voorraadstand.
 negative_import_guard = "if(!old&&stockNum!==null&&stockNum<0){records.push({artNr,key,action:'skip',reason:'Negatieve voorraad bij nieuw onderdeel',stock:null});continue}"
@@ -67,7 +71,6 @@ required = [
     "stock:Number(p.stock||0)-q",
     "stock:Number(p.stock||0)-qty",
     "const stock=stockNum===null?(old?Number(old.stock||0):0):Math.round(stockNum);",
-    '<input name="stock" type="number" step="1" value="${p.stock??0}">',
 ]
 for needle in required:
     if needle not in index:
@@ -78,10 +81,12 @@ for forbidden in [
     "const err=checkMaintenanceBatchUsage(items);if(err){alert(err);return}",
     "const err=checkBreakdownBatchUsage(items);if(err){alert(err);return}",
     "Negatieve voorraad bij nieuw onderdeel",
-    '<input name="stock" type="number" step="1" min="0"',
 ]:
     if forbidden in index:
         raise SystemExit(f"Negatieve voorraad: blokkade is nog aanwezig: {forbidden}")
 
+if re.search(r'<input\b[^>]*\bname="stock"[^>]*\bmin="0"', index):
+    raise SystemExit("Negatieve voorraad: minstens één voorraadveld blokkeert nog waarden onder nul")
+
 INDEX.write_text(index, encoding="utf-8")
-print("[Machinepark] negatieve voorraad toegestaan bij onderhoud, depannage, manuele stock en Excel-stocktelling")
+print(f"[Machinepark] negatieve voorraad toegestaan bij onderhoud, depannage, manuele stock en Excel-stocktelling ({stock_input_count} voorraadvelden vrijgegeven)")
