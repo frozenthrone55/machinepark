@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
-MARKER = 'data-machinepark-build-fix="breakdown-details-v1"'
+MARKER = 'data-machinepark-build-fix="breakdown-details-v2"'
 
 
 def replace_once(old, new, label):
@@ -27,7 +27,7 @@ if MARKER not in index:
     )
 
     feature = r'''
-<style data-machinepark-build-fix="breakdown-details-v1">
+<style data-machinepark-build-fix="breakdown-details-v2">
 .breakdown-detail-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .breakdown-detail-field{border:1px solid var(--line);border-radius:11px;background:#f9fbfa;padding:11px;min-width:0}
 .breakdown-detail-field.full{grid-column:1/-1}
@@ -40,7 +40,7 @@ if MARKER not in index:
 .breakdown-detail-photos img{display:block;width:100%;height:135px;object-fit:cover;border:1px solid var(--line);border-radius:10px;background:#f8faf9;cursor:zoom-in}
 @media(max-width:650px){.breakdown-detail-summary{grid-template-columns:1fr}.breakdown-detail-field.full{grid-column:1}.breakdown-detail-photos{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
-<script data-machinepark-build-fix="breakdown-details-v1">
+<script data-machinepark-build-fix="breakdown-details-v2">
 (() => {
   const detailEsc = value => esc(String(value ?? ''));
 
@@ -137,6 +137,8 @@ if MARKER not in index:
         const print = document.createElement('button');
         print.type = 'button';
         print.className = 'btn service-detail-print-btn';
+        print.dataset.servicePrintKind = 'breakdowns';
+        print.dataset.servicePrintId = id;
         print.textContent = '🖨 Afdrukken';
         print.onclick = () => window.printMachineparkServiceRecord('breakdowns', id);
         foot.insertBefore(print, primary || null);
@@ -191,9 +193,11 @@ required = [
     'breakdown-detail-parts',
     'usedPartsText([part])',
     'Foto’s bij verslag',
+    "print.dataset.servicePrintKind = 'breakdowns'",
+    'print.dataset.servicePrintId = id',
 ]
 for needle in required:
     if needle not in index:
-        raise SystemExit(f'Buildvalidatie mislukt: depannagedetails ontbreken ({needle})')
+        raise SystemExit(f"Buildvalidatie mislukt: depannagedetails ontbreken ({needle})")
 
-print('[Machinepark] depannages openen in detailweergave met bewerken en verwijderen')
+print('[Machinepark] depannages openen in detailweergave met gedeelde afdruk/PDF-context')
