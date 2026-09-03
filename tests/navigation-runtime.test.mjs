@@ -2,9 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+const earlyBridge = readFileSync(new URL('../build-navigation-early-bridge.py', import.meta.url), 'utf8');
 const build = readFileSync(new URL('../build-navigation-runtime.py', import.meta.url), 'utf8');
 const bootstrap = readFileSync(new URL('../build-navigation-bootstrap.py', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+
+test('vroege bridge wisselt de DOM vóór de app-runtime', () => {
+  assert.ok(earlyBridge.includes('Machinepark DOM-first navigation bridge v3'));
+  assert.ok(earlyBridge.includes("document.querySelectorAll('.view').forEach"));
+  assert.ok(earlyBridge.includes("target.classList.add('active')"));
+  assert.ok(earlyBridge.includes('window.machineparkEarlyNavigate=navigate'));
+  assert.ok(earlyBridge.includes("e.stopImmediatePropagation()"));
+  assert.ok(earlyBridge.includes("},true);"));
+  assert.ok(earlyBridge.includes("{capture:true,passive:false}"));
+  const visualSwitch = earlyBridge.indexOf("target.classList.add('active')");
+  const fullRuntime = earlyBridge.indexOf("window.machineparkNavigate==='function'");
+  assert.ok(visualSwitch >= 0 && fullRuntime > visualSwitch, 'zichtbare view moet vóór volledige runtime wisselen');
+});
 
 test('navigatie-runtime houdt alle hoofdtabbladen bruikbaar', () => {
   for (const view of ['dashboard', 'devices', 'maintenance', 'breakdowns', 'parts', 'faults', 'manuals', 'settings']) {
@@ -56,12 +70,16 @@ test('inline fallback blijft onafhankelijk van de externe featurebundel', () => 
   assert.ok(bootstrap.includes("if 'data-machinepark-build-fix=' in bootstrap_block"));
 });
 
-test('navigatie-runtime en inline fallback worden voor asset-extractie gebouwd', () => {
+test('alle drie navigatielagen worden in juiste volgorde gebouwd', () => {
   const command = pkg.scripts.build;
+  const basePos = command.indexOf('python3 scripts/build-machinepark.py');
+  const earlyPos = command.indexOf('python3 build-navigation-early-bridge.py');
   const navigationPos = command.indexOf('python3 build-navigation-runtime.py');
   const bootstrapPos = command.indexOf('python3 build-navigation-bootstrap.py');
   const extractionPos = command.indexOf('python3 scripts/extract-build-assets.py');
-  assert.ok(navigationPos >= 0, 'build-navigation-runtime.py ontbreekt in npm build');
+  assert.ok(basePos >= 0, 'basisbuild ontbreekt');
+  assert.ok(earlyPos > basePos, 'vroege navigatiebridge moet direct na de basisbuild draaien');
+  assert.ok(navigationPos > earlyPos, 'volledige runtime moet na de vroege bridge worden toegevoegd');
   assert.ok(bootstrapPos > navigationPos, 'inline fallback moet na de volledige navigatie-runtime worden toegevoegd');
   assert.ok(extractionPos > bootstrapPos, 'inline fallback moet vóór asset-extractie worden toegevoegd');
   assert.ok(command.includes('node --check assets/machinepark-build.js'));
