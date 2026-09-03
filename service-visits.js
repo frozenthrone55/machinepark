@@ -343,7 +343,9 @@
     const date=report?.date||visit?.date||header?.date||todayISO();
     const time=report?.time||visit?.time||header?.time||nowLocalTime();
     const technician=header?.technician??(report?.technician==='—'?'':report?.technician||visit?.technician==='—'?'':visit?.technician||'');
-    const sessionSource={date,workSessions:Array.isArray(header?.workSessions)?header.workSessions:[]};
+    const headerLocationSessions=header?.locationSessions?.[locationKey];
+    const existingVisitSessions=visit?.records?.[0]?.item?.workSessions||[];
+    const sessionSource={date,workSessions:Array.isArray(headerLocationSessions)?headerLocationSessions:(Array.isArray(existingVisitSessions)?existingVisitSessions:[])};
     const workSessionsHtml=typeof window.machineparkServiceWorkSessionsEditor==='function'
       ?window.machineparkServiceWorkSessionsEditor(sessionSource,'servicevisit')
       :`<div class="field full"><label>Werkdagen en tijd</label><input name="workSessionDate" type="date" required value="${svEsc(date)}"><input name="workSessionMinutes" type="number" min="1" step="1" required placeholder="minuten"></div>`;
@@ -353,7 +355,7 @@
       <div class="field full service-report-location-manager"><div class="service-report-location-manager-head"><div><label>Locaties in dit verslag *</label><div class="muted" style="font-size:11px">Wissel tussen locaties om de toestellen en werkzaamheden in te vullen.</div></div><button type="button" class="btn small primary" id="serviceReportAddLocation">+ Locatie toevoegen</button></div><div id="serviceReportLocationChips" class="service-report-location-chips">${chips||'<span class="muted">Nog geen locatie gekozen.</span>'}</div></div>
       <div class="field full" id="serviceReportLocationPicker"><label>${locations.length?'Actieve locatie':'Eerste locatie'} *</label><div class="maintenance-location-autocomplete"><input id="serviceVisitLocationSearch" type="search" autocomplete="off" placeholder="Typ locatie of toestelnummer…" value="${svEsc(location)}"><input id="serviceVisitLocationKey" name="locationKey" type="hidden" value="${svEsc(locationKey)}"><div id="serviceVisitLocationSuggestions" class="maintenance-location-suggestions"></div></div><div id="serviceVisitLocationCount" class="muted" style="font-size:11px;margin-top:4px">${location?`Locatie: ${svEsc(location)}`:'Typ een locatie of toestelnummer en kies de locatie uit de lijst.'}</div></div>
       <div class="field"><label>Datum *</label><input name="date" type="date" required value="${svEsc(date)}"></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${svEsc(time)}"></div>
-      <div class="field"><label>Technieker</label><input name="technician" value="${svEsc(technician)}"></div>${workSessionsHtml}
+      <div class="field"><label>Technieker</label><input name="technician" value="${svEsc(technician)}"></div><div id="serviceReportLocationSessions" class="field full"><div class="section-title">Werktijd op actieve locatie</div>${workSessionsHtml}</div>
       <div class="field full"><div class="section-title">Toestellen op actieve locatie</div><div class="muted" style="font-size:11px">Kies per toestel Onderhoud, Depannage of beide. Handleidingen, werkbonnen, storingen, foto's en onderdelen blijven aan dit toestel gekoppeld.</div></div>
       <div id="serviceVisitDevices" class="service-visit-device-list"><div class="empty" style="padding:24px">${location?'Toestellen laden…':'Kies eerst een locatie.'}</div></div></div>`;
   }
@@ -439,6 +441,34 @@
     return (report?.visits||[]).find(visit => String(visit.locationKey||svKey(visit.location)) === String(key||'')) || null;
   }
 
+  function existingReportLocationSessions(report,key) {
+    const visit=visitForLocation(report,key);
+    const first=visit?.records?.[0]?.item;
+    return Array.isArray(first?.workSessions)?first.workSessions.map(row=>({date:String(row.date||''),minutes:Math.max(0,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0):[];
+  }
+
+  function captureActiveLocationSessions() {
+    if(!activeVisitDraft?.activeLocationKey)return;
+    const form=document.getElementById('modalForm');if(!form)return;
+    const fd=new FormData(form);
+    const rows=typeof window.machineparkCollectWorkSessions==='function'
+      ?window.machineparkCollectWorkSessions(fd)
+      :[];
+    activeVisitDraft.locationSessions=activeVisitDraft.locationSessions||{};
+    activeVisitDraft.locationSessions[activeVisitDraft.activeLocationKey]=rows;
+  }
+
+  function renderActiveLocationSessions(key) {
+    const host=document.getElementById('serviceReportLocationSessions');if(!host||!activeVisitDraft)return;
+    const date=String(document.getElementById('modalForm')?.elements.date?.value||todayISO());
+    const rows=activeVisitDraft.locationSessions?.[key]||existingReportLocationSessions(activeVisitDraft.report,key);
+    const source={date,workSessions:Array.isArray(rows)?rows:[]};
+    const editor=typeof window.machineparkServiceWorkSessionsEditor==='function'
+      ?window.machineparkServiceWorkSessionsEditor(source,'servicevisit')
+      :`<div class="field full"><label>Werkdagen en tijd</label><input name="workSessionDate" type="date" required value="${svEsc(date)}"><input name="workSessionMinutes" type="number" min="1" step="1" required placeholder="minuten"></div>`;
+    host.innerHTML=`<div class="section-title">Werktijd op ${svEsc((activeVisitDraft.locations||[]).find(loc=>loc.key===key)?.label||'actieve locatie')}</div>${editor}`;
+  }
+
   function renderLocationChips() {
     const box=document.getElementById('serviceReportLocationChips');if(!box||!activeVisitDraft)return;
     box.innerHTML=(activeVisitDraft.locations||[]).length
@@ -449,6 +479,7 @@
   async function switchDraftLocation(group,{capture=true}={}) {
     if(!activeVisitDraft||!group)return;
     if(capture&&activeVisitDraft.activeLocationKey&&activeVisitDraft.activeLocationKey!==group.key) {
+      captureActiveLocationSessions();
       activeVisitDraft.items=await collectItems();
     }
     let loc=(activeVisitDraft.locations||[]).find(item=>item.key===group.key);
@@ -458,6 +489,7 @@
     if(input){input.value=group.label;input.setCustomValidity('');}
     if(hidden)hidden.value=group.key;
     renderLocationChips();
+    renderActiveLocationSessions(group.key);
     const report=activeVisitDraft.report||null,existingVisit=visitForLocation(report,group.key);
     const items=locationItems(activeVisitDraft.items,group.key,activeVisitDraft.header?.locationKey||'');
     renderDevices(group,existingVisit,items);
@@ -481,7 +513,7 @@
     input.addEventListener('keydown',e=>{if(e.key==='Escape')hide();if(e.key==='Enter'&&suggestions.classList.contains('show')){const first=suggestions.querySelector('[data-sv-location]');if(first){e.preventDefault();first.click();}}});
     suggestions.addEventListener('click',e=>{const choice=e.target.closest('[data-sv-location]');if(!choice)return;const group=locationGroups().find(g=>g.key===choice.dataset.svLocation);if(!group)return;hide();void switchDraftLocation(group);});
     document.getElementById('serviceReportLocationChips')?.addEventListener('click',e=>{const chip=e.target.closest('[data-sv-location-switch]');if(!chip)return;const loc=(activeVisitDraft.locations||[]).find(x=>x.key===chip.dataset.svLocationSwitch);const group=loc?findGroup(loc.key,loc.label):null;if(group)void switchDraftLocation(group);});
-    if(add)add.onclick=async()=>{if(activeVisitDraft.activeLocationKey)activeVisitDraft.items=await collectItems();activeVisitDraft.activeLocationKey='';hidden.value='';input.value='';renderLocationChips();renderDevices(null);input.focus();render();scheduleDraft();};
+    if(add)add.onclick=async()=>{if(activeVisitDraft.activeLocationKey){captureActiveLocationSessions();activeVisitDraft.items=await collectItems();}activeVisitDraft.activeLocationKey='';hidden.value='';input.value='';renderLocationChips();renderDevices(null);input.focus();render();scheduleDraft();};
   }
 
   function collectUsed(panel){return [...(panel?.querySelectorAll('.sv-usage-list .usage-row')||[])].map(r=>({partId:r.querySelector('.usage-part')?.value||'',qty:Number(r.querySelector('.usage-qty')?.value||1)})).filter(u=>u.partId&&u.qty>0);}
@@ -507,11 +539,11 @@
     const form=document.getElementById('modalForm'),existing=activeVisitDraft?.header||null,now=new Date().toISOString();
     const active=(activeVisitDraft?.locations||[]).find(loc=>loc.key===activeVisitDraft?.activeLocationKey)||null;
     const fd=new FormData(form);
-    const workSessions=typeof window.machineparkCollectWorkSessions==='function'
-      ?window.machineparkCollectWorkSessions(fd)
-      :[{date:String(fd.get('workSessionDate')||''),minutes:Math.max(0,Math.round(Number(fd.get('workSessionMinutes'))||0))}].filter(row=>row.date&&row.minutes>0);
+    captureActiveLocationSessions();
+    const workSessions=activeVisitDraft.locationSessions?.[activeVisitDraft.activeLocationKey]||[];
+    const locationSessions={...(activeVisitDraft.locationSessions||{})};
     const locations=(activeVisitDraft?.locations||[]).map(loc=>({key:String(loc.key||''),label:String(loc.label||''),visitId:String(loc.visitId||'')})).filter(loc=>loc.key&&loc.label);
-    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:2};
+    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions,locationSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:2};
   }
 
   async function collectItems() {
@@ -650,7 +682,7 @@
     const locations=draftLocationList(report,header);
     const activeKey=header?.activeLocationKey||locations[0]?.key||'';
     const activeVisit=report?.visits?.find(v=>String(v.locationKey||svKey(v.location))===activeKey)||report?.visits?.[0]||null;
-    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(header),touched:false,finalizing:false,restoring:Boolean(header)};
+    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,locationSessions:{...(header?.locationSessions||{})},appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(header),touched:false,finalizing:false,restoring:Boolean(header)};
     showModal(report?`Serviceverslag aanvullen · ${report.number}`:(header?'Serviceconcept verderzetten':'Nieuw serviceverslag'),serviceVisitForm({report,visit:activeVisit,header,items}),'Serviceverslag afsluiten',async()=>finalizeActiveVisit());
     setTimeout(()=>{initVisitForm({report,visit:activeVisit,header,items});decorateDraftModal();if(activeVisitDraft){activeVisitDraft.restoring=false;activeVisitDraft.touched=false;}},0);
   }
