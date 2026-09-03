@@ -30,3 +30,22 @@
 .sv-photo-editor .service-photo-grid{margin-top:8px}
 @media(max-width:700px){.service-visit-drafts{padding:10px}.service-visit-draft-status{width:100%;order:3}}
 @media print{.service-visit-drafts,.service-visit-draft-status,.sv-manual-btn,.sv-manual-panel{display:none!important}}
+
+.service-report-location-manager{border:1px solid var(--line);border-radius:13px;padding:12px;background:#f8faf9}
+.service-report-location-manager-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.service-report-location-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.service-report-location-chip-wrap{display:inline-flex;align-items:stretch;position:relative}
+.service-report-location-chip{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 11px;display:grid;gap:2px;text-align:left;cursor:pointer;min-width:145px}
+.service-report-location-chip.active{border-color:#7ea598;background:#eef6f2;box-shadow:0 0 0 2px rgba(44,106,88,.08)}
+.service-report-location-chip span{font-weight:800;font-size:12px}.service-report-location-chip small{font-size:9px;color:var(--muted)}
+.service-report-location-remove{border:0;background:#fff1f1;color:var(--danger);width:28px;border-radius:0 10px 10px 0;cursor:pointer;font-weight:900;margin-left:-5px;border-left:1px solid #efd0d0}
+.service-report-location-sessions{border:1px solid #d8e2de;border-radius:12px;padding:11px;background:#fbfcfb}
+.service-report-location{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fbfcfb;break-inside:auto}
+.service-report-location+.service-report-location{margin-top:10px}
+.service-report-location-head{display:flex;align-items:baseline;gap:10px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:10px}
+.service-report-location-head span{font-size:10px;font-weight:850;text-transform:uppercase;color:var(--muted);letter-spacing:.05em}
+.service-report-location-head h4{margin:0;font-size:16px}
+.service-report-location .service-visit-report-head{display:none}
+.service-report-location .service-visit-report-meta{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:700px){.service-report-location-manager-head{align-items:flex-start}.service-report-location-manager-head .btn{width:100%}.service-report-location-chip-wrap,.service-report-location-chip{width:100%}.service-report-location .service-visit-report-meta{grid-template-columns:1fr 1fr}}
+@media print{.service-report-location{border-color:#bbb;break-inside:auto}.service-report-location-remove{display:none!important}.service-report-location-manager{display:none!important}}
