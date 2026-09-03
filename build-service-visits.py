@@ -22,12 +22,12 @@ if MARKER not in index:
     index = index.replace('</body>', f'<script src="/service-visits.js" {MARKER}></script>\\n</body>', 1)
     index_path.write_text(index, encoding='utf-8')
 
-asset_anchor = "  '/offline-first.js',\\n"
 if "'/service-visits.js'" not in sw or "'/service-visits.css'" not in sw:
-    if asset_anchor not in sw:
-        raise SystemExit('Buildvalidatie mislukt: service-worker assetanker ontbreekt voor servicebezoeken')
-    sw = sw.replace(asset_anchor, asset_anchor + "  '/service-visits.js',\\n  '/service-visits.css',\\n", 1)
-
+    api_pos = sw.find('const CACHEABLE_API')
+    assets_end = sw.rfind('];', 0, api_pos if api_pos >= 0 else len(sw))
+    if assets_end < 0:
+        raise SystemExit('Buildvalidatie mislukt: service-worker assetlijst ontbreekt voor servicebezoeken')
+    sw = sw[:assets_end] + "  '/service-visits.js',\\n  '/service-visits.css',\\n" + sw[assets_end:]
 sw = re.sub(
     r"const CACHE='machinepark-v1\\.68\\.9-[^']+';",
     "const CACHE='machinepark-v1.68.9-service-visits-v1';",
