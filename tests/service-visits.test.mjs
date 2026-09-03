@@ -54,6 +54,17 @@ test('handleidingen zijn per toestel beschikbaar in onderhoud en depannage binne
   assert.match(manuals, /window\.machineparkManualListHtml/);
 });
 
+test('bestaande werkbonnen storingskoppeling en meerdaagse werktijd blijven beschikbaar', () => {
+  assert.match(js, /machineparkMakeWorkOrderEditor/);
+  assert.match(js, /machineparkCollectWorkOrder/);
+  assert.match(js, /machineparkAugmentBreakdownFaultCards/);
+  assert.match(js, /machineparkFaultRefFromCard/);
+  assert.match(js, /machineparkServiceWorkSessionsEditor/);
+  assert.match(js, /machineparkCollectWorkSessions/);
+  assert.match(js, /Gekoppelde storing/);
+  assert.match(js, /Werkbon/);
+});
+
 test('gezamenlijk verslag ondersteunt afdruk en Mail PDF', () => {
   assert.match(js, /service-visit-print-btn/);
   assert.match(js, /service-visit-mail-btn/);
