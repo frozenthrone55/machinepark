@@ -70,15 +70,24 @@ test('inline fallback blijft onafhankelijk van de externe featurebundel', () => 
   assert.ok(bootstrap.includes("if 'data-machinepark-build-fix=' in bootstrap_block"));
 });
 
-test('alle drie navigatielagen worden in juiste volgorde gebouwd', () => {
+test('sync, auth en offline-builds blijven onaangeroerd vóór navigatie-hardening', () => {
   const command = pkg.scripts.build;
   const basePos = command.indexOf('python3 scripts/build-machinepark.py');
+  const offlinePos = command.indexOf('python3 build-offline-first.py');
+  const startupPos = command.indexOf('python3 build-startup-resilience.py');
+  const authRetryPos = command.indexOf('python3 build-central-auth-retry.py');
+  const autoLiveSyncPos = command.indexOf('python3 build-auto-live-sync.py');
   const earlyPos = command.indexOf('python3 build-navigation-early-bridge.py');
   const navigationPos = command.indexOf('python3 build-navigation-runtime.py');
   const bootstrapPos = command.indexOf('python3 build-navigation-bootstrap.py');
   const extractionPos = command.indexOf('python3 scripts/extract-build-assets.py');
+
   assert.ok(basePos >= 0, 'basisbuild ontbreekt');
-  assert.ok(earlyPos > basePos, 'vroege navigatiebridge moet direct na de basisbuild draaien');
+  assert.ok(offlinePos > basePos, 'offline-build moet na de basisbuild draaien');
+  assert.ok(startupPos > offlinePos, 'opstartresilience moet na offline-build draaien');
+  assert.ok(authRetryPos > startupPos, 'auth-retry moet na opstartresilience draaien');
+  assert.ok(autoLiveSyncPos > authRetryPos, 'live-sync moet na auth-retry draaien');
+  assert.ok(earlyPos > autoLiveSyncPos, 'navigatiebridge mag sync/auth-builds niet vooraf wijzigen');
   assert.ok(navigationPos > earlyPos, 'volledige runtime moet na de vroege bridge worden toegevoegd');
   assert.ok(bootstrapPos > navigationPos, 'inline fallback moet na de volledige navigatie-runtime worden toegevoegd');
   assert.ok(extractionPos > bootstrapPos, 'inline fallback moet vóór asset-extractie worden toegevoegd');
