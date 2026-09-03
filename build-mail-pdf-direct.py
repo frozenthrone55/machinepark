@@ -5,17 +5,18 @@ index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
 
 BASE_MARKER = 'data-machinepark-' + 'build-fix=' + '"mail-pdf-v1"'
-MARKER = 'data-machinepark-build-fix="mail-pdf-direct-v2"'
+MARKER = 'data-machinepark-build-fix="mail-pdf-direct-v3"'
 
 if BASE_MARKER not in index:
     raise SystemExit("Buildvalidatie mislukt: basis Mail PDF ontbreekt voor directe PDF-route")
 
 if MARKER not in index:
     feature = r'''
-<script data-machinepark-build-fix="mail-pdf-direct-v2">
+<script data-machinepark-build-fix="mail-pdf-direct-v3">
 (() => {
   const JSPDF_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
   const MAIL_SELECTOR = '.page-mail-btn,.service-detail-mail-btn,.device-detail-mail-btn';
+  const PAGE_BOTTOM = 282;
   let jsPdfPromise = null;
 
   function cleanText(value) {
@@ -59,15 +60,10 @@ if MARKER not in index:
   function loadJsPdf() {
     if (window.jspdf?.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
     if (jsPdfPromise) return jsPdfPromise;
-
     jsPdfPromise = withTimeout(new Promise((resolve, reject) => {
       let script = document.getElementById('machineparkJsPdfScript');
-      const ready = () => {
-        if (window.jspdf?.jsPDF) resolve(window.jspdf.jsPDF);
-        else reject(new Error('PDF-bibliotheek is niet beschikbaar.'));
-      };
+      const ready = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(new Error('PDF-bibliotheek is niet beschikbaar.'));
       const failed = () => reject(new Error('PDF-bibliotheek kon niet worden geladen. Controleer je internetverbinding.'));
-
       if (script) {
         if (script.dataset.loaded === '1') ready();
         else {
@@ -76,163 +72,377 @@ if MARKER not in index:
         }
         return;
       }
-
       script = document.createElement('script');
       script.id = 'machineparkJsPdfScript';
       script.src = JSPDF_SRC;
       script.async = true;
       script.crossOrigin = 'anonymous';
-      script.addEventListener('load', () => {
-        script.dataset.loaded = '1';
-        ready();
-      }, { once: true });
+      script.addEventListener('load', () => { script.dataset.loaded = '1'; ready(); }, { once: true });
       script.addEventListener('error', failed, { once: true });
       document.head.appendChild(script);
     }), 12000, 'PDF-bibliotheek reageert niet. Probeer opnieuw.').catch((error) => {
       jsPdfPromise = null;
       throw error;
     });
-
     return jsPdfPromise;
   }
 
   function activePageTitle(view) {
-    const labels = {
-      dashboard: 'Dashboard',
-      devices: 'Toestellen',
-      maintenance: 'Onderhoud',
-      breakdowns: 'Depannages',
-      parts: 'Onderdelen',
-      faults: 'Storingen',
-      manuals: 'Handleidingen',
-      settings: 'Beheer'
-    };
+    const labels = { dashboard:'Dashboard', devices:'Toestellen', maintenance:'Onderhoud', breakdowns:'Depannages', parts:'Onderdelen', faults:'Storingen', manuals:'Handleidingen', settings:'Beheer' };
     const key = String(view?.id || '').replace(/^view-/, '');
     return labels[key] || cleanText(document.getElementById('pageTitle')?.textContent) || 'Machinepark';
-  }
-
-  function modalTitle() {
-    const page = cleanText(document.getElementById('pageTitle')?.textContent);
-    const heading = cleanText(document.querySelector('#modal .modal-title, #modal .modal-head h1, #modal .modal-head h2, #modal .modal-head h3')?.textContent);
-    if (page && heading && !heading.toLowerCase().includes(page.toLowerCase())) return `${page} · ${heading}`;
-    return heading || page || 'Machinepark';
   }
 
   function getContext(button) {
     const row = button.closest('.page-print-row');
     if (row) {
       const view = button.closest('.view');
-      if (!view) return null;
-      return { source: view, title: activePageTitle(view), kind: 'page' };
+      return view ? { source:view, title:activePageTitle(view), kind:'page' } : null;
     }
     const body = document.querySelector('#modal .modal-body');
     if (!body) return null;
-    return { source: body, title: modalTitle(), kind: 'modal' };
+    const foot = button.closest('.modal-foot') || document.querySelector('#modal .modal-foot');
+    const servicePrint = foot?.querySelector('.service-detail-print-btn[data-service-print-id]');
+    if (servicePrint) {
+      return {
+        source: body,
+        kind: 'service',
+        serviceKind: servicePrint.dataset.servicePrintKind || 'breakdowns',
+        recordId: servicePrint.dataset.servicePrintId || ''
+      };
+    }
+    const devicePrint = foot?.querySelector('#printDeviceDetails[data-device-print-id]');
+    if (devicePrint) return { source:body, kind:'device', recordId:devicePrint.dataset.devicePrintId || '' };
+    const heading = cleanText(document.querySelector('#modal .modal-head h3')?.textContent) || 'Machinepark';
+    return { source:body, title:heading, kind:'modal' };
   }
 
-  function fieldValue(field) {
-    if (field instanceof HTMLSelectElement) {
-      return cleanText(field.selectedOptions?.[0]?.textContent || field.value);
+  function serviceDevice(record) {
+    try { return deviceName(record.deviceId, recordMoment(record)) || '—'; }
+    catch (_) {
+      const device = state.devices.find(item => item.id === record?.deviceId);
+      return [device?.assetCode, device?.brand, device?.model].filter(Boolean).join(' · ') || '—';
     }
-    if (field instanceof HTMLInputElement && (field.type === 'checkbox' || field.type === 'radio')) {
-      return field.checked ? (cleanText(field.value) || 'Ja') : '';
-    }
-    return cleanText(field.value);
   }
 
-  function labelledDetailLines(source) {
-    const nodes = [...source.querySelectorAll('[class*="detail-field"]')];
-    const lines = [];
-    for (const node of nodes) {
-      const label = cleanText(node.querySelector('label,.label,[class*="detail-label"]')?.textContent);
-      if (!label) continue;
-      const copy = node.cloneNode(true);
-      copy.querySelectorAll('label,.label,[class*="detail-label"],button,img,input[type="file"]').forEach(el => el.remove());
-      const sourceFields = [...node.querySelectorAll('input,textarea,select')];
-      const copyFields = [...copy.querySelectorAll('input,textarea,select')];
-      copyFields.forEach((field, index) => {
-        const value = fieldValue(sourceFields[index] || field);
-        field.replaceWith(document.createTextNode(value));
+  function serviceDate(record) {
+    if (!record?.date) return '—';
+    const date = new Date(`${record.date}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? String(record.date) : date.toLocaleDateString('nl-BE');
+  }
+
+  function serviceParts(record, multiline = false) {
+    const parts = Array.isArray(record?.usedParts) ? record.usedParts.filter(Boolean) : [];
+    if (!parts.length) return '—';
+    if (!multiline) {
+      try { return usedPartsText(parts) || '—'; } catch (_) { return '—'; }
+    }
+    const lines = parts.map(part => {
+      try { return usedPartsText([part]) || ''; } catch (_) { return ''; }
+    }).map(cleanText).filter(Boolean);
+    return lines.length ? lines.join('\n') : '—';
+  }
+
+  function serviceModel(context) {
+    const list = context.serviceKind === 'maintenance' ? state.maintenance : state.breakdowns;
+    const record = list.find(item => item.id === context.recordId);
+    if (!record) return null;
+    const maintenance = context.serviceKind === 'maintenance';
+    const title = maintenance ? 'Onderhoudsverslag' : 'Depannageverslag';
+    const fields = maintenance ? [
+      { label:'Datum', value:serviceDate(record) },
+      { label:'Type onderhoud', value:record.type || '—' },
+      { label:'Toestel', value:serviceDevice(record), full:true },
+      { label:'Technieker', value:record.technician || '—' },
+      { label:'Gebruikte onderdelen', value:serviceParts(record), full:true },
+      { label:'Uitgevoerde werkzaamheden / notitie', value:record.notes || '—', full:true },
+    ] : [
+      { label:'Datum', value:serviceDate(record) },
+      { label:'Toestel', value:serviceDevice(record) },
+      { label:'Prioriteit', value:record.priority || '—' },
+      { label:'Status', value:record.status || '—' },
+      { label:'Technieker', value:record.technician || '—' },
+      { label:'Werkuren', value:Number(record.hours || 0) ? `${Number(record.hours)} uur` : '—' },
+      { label:'Probleem / melding', value:record.issue || '—', full:true },
+      { label:'Diagnose', value:record.diagnosis || '—', full:true },
+      { label:'Oplossing / uitgevoerde werken', value:record.solution || '—', full:true },
+      { label:'Gebruikte onderdelen', value:serviceParts(record, true), full:true },
+    ];
+    const photos = Array.isArray(record.photos)
+      ? record.photos.filter(src => typeof src === 'string' && src.startsWith('data:image/'))
+      : [];
+    return {
+      headerTitle: `Machinepark · ${title}`,
+      subtitle: serviceDevice(record),
+      rightText: serviceDate(record),
+      filenameTitle: title,
+      fields,
+      photos,
+      photoTitle: 'Foto’s bij verslag',
+      photoColumns: 2,
+      photoMaxHeight: 105,
+      timelines: []
+    };
+  }
+
+  function fieldValueFromNode(node) {
+    const clone = node.cloneNode(true);
+    clone.querySelectorAll('label,button,img,input[type="file"],.device-photo-remove,.device-photo-overview,.manual-device-section').forEach(el => el.remove());
+    const originalFields = [...node.querySelectorAll('input,textarea,select')];
+    const cloneFields = [...clone.querySelectorAll('input,textarea,select')];
+    cloneFields.forEach((field, index) => {
+      const original = originalFields[index] || field;
+      let value = original.value || '';
+      if (original instanceof HTMLSelectElement) value = original.selectedOptions?.[0]?.textContent || original.value || '';
+      if (original instanceof HTMLInputElement && (original.type === 'checkbox' || original.type === 'radio')) value = original.checked ? (original.value || 'Ja') : '';
+      field.replaceWith(document.createTextNode(value));
+    });
+    return cleanText(clone.textContent) || '—';
+  }
+
+  function deviceModel(context) {
+    const device = state.devices.find(item => item.id === context.recordId);
+    if (!device) return null;
+    const label = [device.assetCode, device.brand, device.model].filter(Boolean).join(' · ') || 'Toestel';
+    const fields = [];
+    const grid = context.source.querySelector('.form-grid');
+    if (grid) {
+      [...grid.children].filter(node => node.classList?.contains('field')).forEach((node) => {
+        if (node.querySelector('.device-detail-photo-section') || node.classList.contains('manual-device-section')) return;
+        const fieldLabel = cleanText(node.querySelector(':scope > label')?.textContent || node.querySelector('label')?.textContent);
+        if (!fieldLabel) return;
+        fields.push({ label:fieldLabel, value:fieldValueFromNode(node), full:node.classList.contains('full') });
       });
-      const value = cleanText(copy.textContent) || '—';
-      lines.push(`${label}: ${value}`);
     }
-    return lines;
-  }
-
-  function tableLines(source) {
-    return [...source.querySelectorAll('table tr')].map((row) => {
-      const cells = [...row.querySelectorAll('th,td')]
-        .map(cell => cleanText(cell.textContent))
-        .filter(Boolean);
-      return cells.join(' | ');
-    }).filter(Boolean);
+    const photos = [...context.source.querySelectorAll('.device-detail-photo img')]
+      .map(img => img.dataset.fullSrc || img.currentSrc || img.src)
+      .filter(Boolean);
+    const timelines = [...context.source.querySelectorAll('.history-group')].map(group => ({
+      title: cleanText(group.querySelector('h4')?.textContent) || 'Historiek',
+      items: [...group.querySelectorAll('.timeline-item')].map(item => ({
+        label: cleanText(item.querySelector('.event-label')?.textContent),
+        date: cleanText(item.querySelector('.date')?.textContent),
+        title: cleanText(item.querySelector('strong')?.textContent),
+        text: cleanText(item.querySelector('p')?.textContent)
+      }))
+    })).filter(group => group.items.length);
+    return {
+      headerTitle: 'Machinepark',
+      subtitle: `Toesteldetails · ${label}`,
+      rightText: `Afgedrukt ${new Date().toLocaleString('nl-BE')}`,
+      filenameTitle: `Toesteldetails_${label}`,
+      fields,
+      photos,
+      photoTitle: 'Foto’s toestel',
+      photoColumns: 3,
+      photoMaxHeight: 48,
+      timelines
+    };
   }
 
   function genericLines(source) {
     const copy = source.cloneNode(true);
     copy.querySelectorAll(`${MAIL_SELECTOR},.page-print-row,.toolbar,.modal-foot,button,input[type="file"],script,style,img,.device-photo-remove,.device-photo-overview`).forEach(el => el.remove());
-
-    const sourceFields = [...source.querySelectorAll('input,textarea,select')];
-    const copyFields = [...copy.querySelectorAll('input,textarea,select')];
-    copyFields.forEach((field, index) => {
-      const value = fieldValue(sourceFields[index] || field);
-      field.replaceWith(document.createTextNode(value ? `${value}\n` : ''));
-    });
-
     copy.querySelectorAll('br').forEach(el => el.replaceWith(document.createTextNode('\n')));
     copy.querySelectorAll('th,td').forEach(el => el.appendChild(document.createTextNode(' | ')));
-    copy.querySelectorAll('tr,h1,h2,h3,h4,h5,p,li,label,.value,.card,.panel,.breakdown-detail-part').forEach(el => el.appendChild(document.createTextNode('\n')));
-
-    return String(copy.textContent || '')
-      .split(/\n+/)
-      .map(cleanText)
-      .filter(Boolean);
+    copy.querySelectorAll('tr,h1,h2,h3,h4,h5,p,li,label,.value,.card,.panel').forEach(el => el.appendChild(document.createTextNode('\n')));
+    return String(copy.textContent || '').split(/\n+/).map(cleanText).filter(Boolean);
   }
 
-  function extractLines(context) {
-    if (!context?.source) return [];
-    if (context.kind === 'modal') {
-      const detail = labelledDetailLines(context.source);
-      if (detail.length >= 2) return detail;
-    }
-    const table = tableLines(context.source);
-    if (table.length >= 2) return table;
-    return genericLines(context.source);
-  }
-
-  function addHeader(doc, title) {
+  function addHeader(doc, model) {
+    doc.setTextColor(23, 63, 53);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
-    doc.text('Machinepark', 15, 18);
-    doc.setFontSize(12);
-    doc.text(pdfSafeText(title), 15, 26);
+    doc.text(pdfSafeText(model.headerTitle), 15, 18);
+    if (model.subtitle) {
+      doc.setTextColor(40);
+      doc.setFontSize(10.5);
+      doc.text(pdfSafeText(model.subtitle), 15, 25.5);
+    }
+    doc.setTextColor(85);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.text(new Date().toLocaleString('nl-BE'), 195, 18, { align: 'right' });
-    doc.setDrawColor(80);
+    if (model.rightText) doc.text(pdfSafeText(model.rightText), 195, 18, { align:'right' });
+    doc.setDrawColor(23, 63, 53);
+    doc.setLineWidth(.6);
     doc.line(15, 31, 195, 31);
+    doc.setTextColor(20);
   }
 
-  function addContent(doc, lines, title) {
-    let y = 39;
-    const maxY = 282;
-    const lineHeight = 4.8;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
+  function newModelPage(doc, model) {
+    doc.addPage();
+    addHeader(doc, model);
+    return 39;
+  }
 
-    for (const raw of lines) {
-      const text = pdfSafeText(raw);
-      if (!text) continue;
-      const wrapped = doc.splitTextToSize(text, 180);
-      const needed = Math.max(1, wrapped.length) * lineHeight + 1.5;
-      if (y + needed > maxY) {
-        doc.addPage();
-        addHeader(doc, title);
+  function fieldMetrics(doc, field, width) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10.5);
+    const lines = doc.splitTextToSize(pdfSafeText(field.value || '—'), width);
+    return { lines, height:5 + Math.max(1, lines.length) * 4.8 + 3 };
+  }
+
+  function drawField(doc, field, x, y, width, metrics) {
+    doc.setTextColor(85);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text(pdfSafeText(field.label).toUpperCase(), x, y + 3);
+    doc.setTextColor(20);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10.5);
+    doc.text(metrics.lines, x, y + 8);
+  }
+
+  function addFields(doc, model, startY) {
+    let y = startY;
+    const fields = model.fields || [];
+    const fullWidth = 180;
+    const colWidth = 86;
+    const gap = 8;
+    for (let i = 0; i < fields.length;) {
+      const first = fields[i];
+      if (first.full) {
+        const m = fieldMetrics(doc, first, fullWidth);
+        if (y + m.height > PAGE_BOTTOM) y = newModelPage(doc, model);
+        drawField(doc, first, 15, y, fullWidth, m);
+        y += m.height + 3;
+        i += 1;
+        continue;
+      }
+      const second = fields[i + 1] && !fields[i + 1].full ? fields[i + 1] : null;
+      const m1 = fieldMetrics(doc, first, colWidth);
+      const m2 = second ? fieldMetrics(doc, second, colWidth) : { lines:[], height:0 };
+      const rowHeight = Math.max(m1.height, m2.height);
+      if (y + rowHeight > PAGE_BOTTOM) y = newModelPage(doc, model);
+      drawField(doc, first, 15, y, colWidth, m1);
+      if (second) drawField(doc, second, 15 + colWidth + gap, y, colWidth, m2);
+      y += rowHeight + 3;
+      i += second ? 2 : 1;
+    }
+    return y;
+  }
+
+  function addTimeline(doc, model, startY) {
+    let y = startY;
+    for (const group of model.timelines || []) {
+      if (y + 12 > PAGE_BOTTOM) y = newModelPage(doc, model);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text(pdfSafeText(group.title), 15, y + 5);
+      y += 10;
+      for (const item of group.items) {
+        const header = [item.label, item.date].filter(Boolean).join(' · ');
+        const body = [item.title, item.text].filter(Boolean).join('\n');
+        doc.setFontSize(9.5);
+        const bodyLines = doc.splitTextToSize(pdfSafeText(body || '—'), 168);
+        const height = 10 + Math.max(1, bodyLines.length) * 4.6;
+        if (y + height > PAGE_BOTTOM) y = newModelPage(doc, model);
+        doc.setDrawColor(190);
+        doc.roundedRect(18, y, 174, height, 2.5, 2.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(85);
+        if (header) doc.text(pdfSafeText(header), 22, y + 5);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
-        y = 39;
+        doc.setTextColor(30);
+        doc.text(bodyLines, 22, y + 10);
+        y += height + 4;
       }
+      y += 2;
+    }
+    return y;
+  }
+
+  async function imageData(src) {
+    if (!src) return null;
+    if (src.startsWith('data:image/')) return src;
+    try {
+      const response = await withTimeout(fetch(src, { credentials:'same-origin', cache:'force-cache' }), 6000, 'Foto laden duurt te lang.');
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      return await withTimeout(new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      }), 4000, 'Foto verwerken duurt te lang.');
+    } catch (error) {
+      console.warn('[Machinepark] Foto overgeslagen in PDF', error);
+      return null;
+    }
+  }
+
+  async function addPhotos(doc, model, startY) {
+    const photos = model.photos || [];
+    if (!photos.length) return startY;
+    let y = startY;
+    if (y + 14 > PAGE_BOTTOM) y = newModelPage(doc, model);
+    doc.setDrawColor(185);
+    doc.line(15, y, 195, y);
+    y += 7;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text(pdfSafeText(model.photoTitle || 'Foto’s'), 15, y);
+    y += 6;
+
+    const columns = Math.max(1, Number(model.photoColumns || 2));
+    const gap = 5;
+    const boxWidth = (180 - gap * (columns - 1)) / columns;
+    const maxHeight = Number(model.photoMaxHeight || 80);
+
+    for (let index = 0; index < photos.length; index += columns) {
+      const batch = photos.slice(index, index + columns);
+      const dataItems = await Promise.all(batch.map(imageData));
+      const row = dataItems.map((data) => {
+        if (!data) return { data:null, height:35 };
+        try {
+          const props = doc.getImageProperties(data);
+          const ratioHeight = boxWidth * (Number(props.height) / Math.max(1, Number(props.width)));
+          return { data, height:Math.min(maxHeight, Math.max(25, ratioHeight)) };
+        } catch (_) {
+          return { data:null, height:35 };
+        }
+      });
+      const rowHeight = Math.max(...row.map(item => item.height)) + 4;
+      if (y + rowHeight > PAGE_BOTTOM) y = newModelPage(doc, model);
+      row.forEach((item, col) => {
+        const x = 15 + col * (boxWidth + gap);
+        doc.setDrawColor(190);
+        doc.rect(x, y, boxWidth, rowHeight - 2);
+        if (!item.data) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(100);
+          doc.text('Foto kon niet worden geladen', x + boxWidth / 2, y + 12, { align:'center' });
+          doc.setTextColor(20);
+          return;
+        }
+        try {
+          const format = item.data.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+          const props = doc.getImageProperties(item.data);
+          const naturalHeight = boxWidth * (Number(props.height) / Math.max(1, Number(props.width)));
+          const drawHeight = Math.min(item.height, naturalHeight);
+          const drawWidth = Math.min(boxWidth - 4, drawHeight * (Number(props.width) / Math.max(1, Number(props.height))));
+          const actualHeight = drawWidth * (Number(props.height) / Math.max(1, Number(props.width)));
+          doc.addImage(item.data, format, x + (boxWidth - drawWidth) / 2, y + 2, drawWidth, actualHeight, undefined, 'FAST');
+        } catch (error) {
+          console.warn('[Machinepark] Foto kon niet in PDF worden geplaatst', error);
+        }
+      });
+      y += rowHeight + gap;
+    }
+    return y;
+  }
+
+  function addGenericContent(doc, model, lines) {
+    let y = 39;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    for (const raw of lines) {
+      const wrapped = doc.splitTextToSize(pdfSafeText(raw), 180);
+      const needed = Math.max(1, wrapped.length) * 4.8 + 1.5;
+      if (y + needed > PAGE_BOTTOM) y = newModelPage(doc, model);
       doc.text(wrapped, 15, y);
       y += needed;
     }
@@ -244,29 +454,39 @@ if MARKER not in index:
       doc.setPage(page);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.text(`Pagina ${page} / ${pages}`, 195, 290, { align: 'right' });
+      doc.setTextColor(85);
+      doc.text(`Pagina ${page} / ${pages}`, 195, 290, { align:'right' });
     }
   }
 
   async function createDirectPdf(context) {
-    const lines = extractLines(context);
-    const useful = lines.join(' ').replace(/\s+/g, ' ').trim();
-    if (useful.length < 5) throw new Error('Er is geen inhoud gevonden om in de PDF te zetten.');
-
     const JsPDF = await loadJsPdf();
-    const doc = new JsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-    addHeader(doc, context.title);
-    addContent(doc, lines, context.title);
-    addPageNumbers(doc);
+    const doc = new JsPDF({ unit:'mm', format:'a4', orientation:'portrait', compress:true });
+    let model = null;
+    if (context.kind === 'service') model = serviceModel(context);
+    if (context.kind === 'device') model = deviceModel(context);
 
-    const blob = doc.output('blob');
-    if (!(blob instanceof Blob) || blob.size < 1000) {
-      throw new Error('De PDF bevat geen geldige inhoud. Probeer opnieuw.');
+    if (model) {
+      if (!(model.fields?.length || model.timelines?.length || model.photos?.length)) throw new Error('Er is geen inhoud gevonden om in de PDF te zetten.');
+      addHeader(doc, model);
+      let y = addFields(doc, model, 39);
+      y = addTimeline(doc, model, y);
+      await addPhotos(doc, model, y);
+    } else {
+      const lines = genericLines(context.source);
+      const useful = lines.join(' ').replace(/\s+/g, ' ').trim();
+      if (useful.length < 5) throw new Error('Er is geen inhoud gevonden om in de PDF te zetten.');
+      model = { headerTitle:'Machinepark', subtitle:context.title || 'Machinepark', rightText:new Date().toLocaleString('nl-BE'), filenameTitle:context.title || 'Machinepark' };
+      addHeader(doc, model);
+      addGenericContent(doc, model, lines);
     }
 
+    addPageNumbers(doc);
+    const blob = doc.output('blob');
+    if (!(blob instanceof Blob) || blob.size < 1200) throw new Error('De PDF bevat geen geldige inhoud. Probeer opnieuw.');
     const stamp = new Date().toISOString().slice(0, 10);
-    const filename = `${safeFilename(`Machinepark_${context.title}_${stamp}`)}.pdf`;
-    return new File([blob], filename, { type: 'application/pdf', lastModified: Date.now() });
+    const filename = `${safeFilename(`Machinepark_${model.filenameTitle}_${stamp}`)}.pdf`;
+    return new File([blob], filename, { type:'application/pdf', lastModified:Date.now() });
   }
 
   function downloadFile(file) {
@@ -283,36 +503,25 @@ if MARKER not in index:
   async function shareFile(file, title) {
     const subject = `Machinepark - ${title}`;
     const text = `In bijlage vind je de PDF uit Machinepark: ${title}.`;
-    const shareData = { files: [file], title: subject, text };
-    const canShareFile = typeof navigator.share === 'function'
-      && (typeof navigator.canShare !== 'function' || navigator.canShare(shareData));
-
+    const shareData = { files:[file], title:subject, text };
+    const canShareFile = typeof navigator.share === 'function' && (typeof navigator.canShare !== 'function' || navigator.canShare(shareData));
     if (canShareFile) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch (error) {
+      try { await navigator.share(shareData); return; }
+      catch (error) {
         if (error?.name === 'AbortError') return;
         console.warn('[Machinepark] Directe PDF-deling mislukt; desktopfallback wordt gebruikt.', error);
       }
     }
-
     downloadFile(file);
     const body = `${text}\n\nDe PDF is op je toestel gedownload. Voeg het bestand ${file.name} toe als bijlage.`;
     notify('PDF gedownload. Je mailprogramma wordt geopend; voeg de gedownloade PDF toe als bijlage.');
-    setTimeout(() => {
-      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    }, 120);
+    setTimeout(() => { window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; }, 120);
   }
 
   async function directMailPdf(button) {
     if (!button || button.dataset.directPdfBusy === '1') return;
     const context = getContext(button);
-    if (!context) {
-      notify('Er is geen afdrukbare inhoud gevonden.');
-      return;
-    }
-
+    if (!context) { notify('Er is geen afdrukbare inhoud gevonden.'); return; }
     const original = button.textContent;
     button.dataset.directPdfBusy = '1';
     button.disabled = true;
@@ -320,7 +529,7 @@ if MARKER not in index:
     try {
       const file = await createDirectPdf(context);
       button.textContent = 'Delen…';
-      await shareFile(file, context.title);
+      await shareFile(file, context.title || context.kind);
     } catch (error) {
       console.error('[Machinepark] Directe Mail PDF mislukt', error);
       notify(error?.message || 'De PDF kon niet worden gemaakt.');
@@ -355,17 +564,26 @@ if MARKER not in index:
 required = [
     MARKER,
     'jspdf/2.5.1/jspdf.umd.min.js',
+    'servicePrintKind',
+    'devicePrintId',
+    'serviceModel(context)',
+    'deviceModel(context)',
+    "photoTitle: 'Foto’s bij verslag'",
+    "photoTitle: 'Foto’s toestel'",
+    'photoColumns: 2',
+    'photoColumns: 3',
+    'addTimeline(doc, model',
+    'await addPhotos(doc, model',
+    'doc.addImage(',
     'withTimeout(',
     '12000',
-    'extractLines(context)',
     "doc.output('blob')",
-    'blob.size < 1000',
+    'blob.size < 1200',
     'event.stopImmediatePropagation()',
     'machineparkDirectMailPdf',
-    "button.textContent = 'Delen…'",
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: directe Mail PDF-route ontbreekt ({needle})')
 
-print('[Machinepark] Mail PDF gebruikt directe jsPDF-opbouw zonder html2canvas; mobiel heeft timeout en lege-PDF-validatie')
+print('[Machinepark] Mail PDF volgt afdrukopbouw met 2-koloms velden, tijdlijn en dezelfde foto’s; mobiel zonder paginacanvas')
