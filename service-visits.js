@@ -431,17 +431,57 @@
     });
   }
 
-  function initVisitForm({visit=null,header=null,items=[]}={}) {
-    const input=document.getElementById('serviceVisitLocationSearch'),hidden=document.getElementById('serviceVisitLocationKey'),suggestions=document.getElementById('serviceVisitLocationSuggestions'),form=document.getElementById('modalForm');if(!input||!hidden||!suggestions||!form)return;
-    const existingLocation=visit?.location||header?.locationLabel||'';
-    if(existingLocation){renderDevices(findGroup(hidden.value,existingLocation),visit,items);}
-    if(visit)return;
+  function locationItems(items,key,fallbackKey='') {
+    return (items||[]).filter(item => String(item.draftLocationKey || fallbackKey || '') === String(key||''));
+  }
+
+  function visitForLocation(report,key) {
+    return (report?.visits||[]).find(visit => String(visit.locationKey||svKey(visit.location)) === String(key||'')) || null;
+  }
+
+  function renderLocationChips() {
+    const box=document.getElementById('serviceReportLocationChips');if(!box||!activeVisitDraft)return;
+    box.innerHTML=(activeVisitDraft.locations||[]).length
+      ?activeVisitDraft.locations.map(loc=>`<button type="button" class="service-report-location-chip ${loc.key===activeVisitDraft.activeLocationKey?'active':''}" data-sv-location-switch="${svEsc(loc.key)}"><span>${svEsc(loc.label)}</span>${loc.visitId?'<small>Bestaande locatie</small>':'<small>Concept</small>'}</button>`).join('')
+      :'<span class="muted">Nog geen locatie gekozen.</span>';
+  }
+
+  async function switchDraftLocation(group,{capture=true}={}) {
+    if(!activeVisitDraft||!group)return;
+    if(capture&&activeVisitDraft.activeLocationKey&&activeVisitDraft.activeLocationKey!==group.key) {
+      activeVisitDraft.items=await collectItems();
+    }
+    let loc=(activeVisitDraft.locations||[]).find(item=>item.key===group.key);
+    if(!loc){loc={key:group.key,label:group.label,visitId:''};activeVisitDraft.locations.push(loc);}
+    activeVisitDraft.activeLocationKey=group.key;
+    const input=document.getElementById('serviceVisitLocationSearch'),hidden=document.getElementById('serviceVisitLocationKey');
+    if(input){input.value=group.label;input.setCustomValidity('');}
+    if(hidden)hidden.value=group.key;
+    renderLocationChips();
+    const report=activeVisitDraft.report||null,existingVisit=visitForLocation(report,group.key);
+    const items=locationItems(activeVisitDraft.items,group.key,activeVisitDraft.header?.locationKey||'');
+    renderDevices(group,existingVisit,items);
+    activeVisitDraft.touched=true;scheduleDraft();
+  }
+
+  function initVisitForm({report=null,visit=null,header=null,items=[]}={}) {
+    const input=document.getElementById('serviceVisitLocationSearch'),hidden=document.getElementById('serviceVisitLocationKey'),suggestions=document.getElementById('serviceVisitLocationSuggestions'),form=document.getElementById('modalForm'),add=document.getElementById('serviceReportAddLocation');if(!input||!hidden||!suggestions||!form||!activeVisitDraft)return;
+    const initialLocations=draftLocationList(report,header);
+    activeVisitDraft.locations=(activeVisitDraft.locations?.length?activeVisitDraft.locations:initialLocations).map(loc=>({...loc}));
+    activeVisitDraft.activeLocationKey=activeVisitDraft.activeLocationKey||header?.activeLocationKey||activeVisitDraft.locations[0]?.key||hidden.value||'';
+    renderLocationChips();
+    const initial=activeVisitDraft.locations.find(loc=>loc.key===activeVisitDraft.activeLocationKey);
+    if(initial){const group=findGroup(initial.key,initial.label);if(group)void switchDraftLocation(group,{capture:false});}
+    else renderDevices(null);
+
     const hide=()=>suggestions.classList.remove('show');
-    const render=()=>{const matches=matchLocationGroups(input.value);suggestions.innerHTML=matches.length?matches.map(g=>`<button type="button" class="maintenance-location-suggestion" data-sv-location="${svEsc(g.key)}"><strong>${svEsc(g.label)}</strong><small>${g.devices.length} actief toestel${g.devices.length===1?'':'len'}</small></button>`).join(''):'<div class="maintenance-location-empty">Geen locatie of toestelnummer gevonden.</div>';suggestions.classList.add('show');};
-    if(!hidden.value)input.setCustomValidity('Kies een locatie uit de zoeklijst.');
-    input.addEventListener('focus',render);input.addEventListener('input',()=>{hidden.value='';input.setCustomValidity('Kies een locatie uit de zoeklijst.');renderDevices(null);render();});
+    const render=()=>{const matches=matchLocationGroups(input.value).filter(g=>!(activeVisitDraft.locations||[]).some(loc=>loc.key===g.key)||g.key===activeVisitDraft.activeLocationKey);suggestions.innerHTML=matches.length?matches.map(g=>`<button type="button" class="maintenance-location-suggestion" data-sv-location="${svEsc(g.key)}"><strong>${svEsc(g.label)}</strong><small>${g.devices.length} actief toestel${g.devices.length===1?'':'len'}</small></button>`).join(''):'<div class="maintenance-location-empty">Geen andere locatie of toestelnummer gevonden.</div>';suggestions.classList.add('show');};
+    input.addEventListener('focus',render);
+    input.addEventListener('input',()=>{hidden.value='';render();});
     input.addEventListener('keydown',e=>{if(e.key==='Escape')hide();if(e.key==='Enter'&&suggestions.classList.contains('show')){const first=suggestions.querySelector('[data-sv-location]');if(first){e.preventDefault();first.click();}}});
-    suggestions.addEventListener('click',e=>{const choice=e.target.closest('[data-sv-location]');if(!choice)return;const group=locationGroups().find(g=>g.key===choice.dataset.svLocation);if(!group)return;hidden.value=group.key;input.value=group.label;input.setCustomValidity('');hide();renderDevices(group,null,items);});
+    suggestions.addEventListener('click',e=>{const choice=e.target.closest('[data-sv-location]');if(!choice)return;const group=locationGroups().find(g=>g.key===choice.dataset.svLocation);if(!group)return;hide();void switchDraftLocation(group);});
+    document.getElementById('serviceReportLocationChips')?.addEventListener('click',e=>{const chip=e.target.closest('[data-sv-location-switch]');if(!chip)return;const loc=(activeVisitDraft.locations||[]).find(x=>x.key===chip.dataset.svLocationSwitch);const group=loc?findGroup(loc.key,loc.label):null;if(group)void switchDraftLocation(group);});
+    if(add)add.onclick=async()=>{if(activeVisitDraft.activeLocationKey)activeVisitDraft.items=await collectItems();activeVisitDraft.activeLocationKey='';hidden.value='';input.value='';renderLocationChips();renderDevices(null);input.focus();render();scheduleDraft();};
   }
 
   function collectUsed(panel){return [...(panel?.querySelectorAll('.sv-usage-list .usage-row')||[])].map(r=>({partId:r.querySelector('.usage-part')?.value||'',qty:Number(r.querySelector('.usage-qty')?.value||1)})).filter(u=>u.partId&&u.qty>0);}
