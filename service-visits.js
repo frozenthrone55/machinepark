@@ -670,17 +670,31 @@
   window.closeModal=closeModal;
 
   function ensurePrintSheet(){let sheet=document.getElementById('serviceVisitPrintSheet');if(!sheet){sheet=document.createElement('div');sheet.id='serviceVisitPrintSheet';sheet.className='service-visit-print-sheet';document.body.appendChild(sheet);}return sheet;}
-  async function printServiceVisit(id){const visit=serviceVisitById(id);if(!visit){toast('Servicebezoek niet gevonden.');return;}const sheet=ensurePrintSheet();sheet.innerHTML=visitReportHtml(visit);const images=[...sheet.querySelectorAll('img')];await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{const done=()=>resolve();img.addEventListener('load',done,{once:true});img.addEventListener('error',done,{once:true});setTimeout(done,3500);})));const title=document.title;document.title=`Machinepark - Serviceverslag - ${visit.number}`;document.body.classList.add('service-visit-printing');const restore=()=>{document.body.classList.remove('service-visit-printing');document.title=title;window.removeEventListener('afterprint',restore);};window.addEventListener('afterprint',restore);window.print();setTimeout(()=>{if(document.body.classList.contains('service-visit-printing'))restore();},1800);}
 
-  function showServiceVisitDetails(id) {
-    const visit=serviceVisitById(id);if(!visit){toast('Servicebezoek niet gevonden.');return;}
-    showModal(`Servicebezoek ${visit.number}`,visitReportHtml(visit),'Sluiten',async()=>closeModal());
+  async function printServiceReport(id){
+    const report=serviceReportById(id)||serviceReportForVisit(id);if(!report){toast('Serviceverslag niet gevonden.');return;}
+    const sheet=ensurePrintSheet();sheet.innerHTML=reportHtml(report);
+    const images=[...sheet.querySelectorAll('img')];
+    await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{const done=()=>resolve();img.addEventListener('load',done,{once:true});img.addEventListener('error',done,{once:true});setTimeout(done,3500);})));
+    const title=document.title;document.title=`Machinepark - Serviceverslag - ${report.number}`;document.body.classList.add('service-visit-printing');
+    const restore=()=>{document.body.classList.remove('service-visit-printing');document.title=title;window.removeEventListener('afterprint',restore);};
+    window.addEventListener('afterprint',restore);window.print();setTimeout(()=>{if(document.body.classList.contains('service-visit-printing'))restore();},1800);
+  }
+
+  function showServiceReportDetails(id) {
+    const report=serviceReportById(id)||serviceReportForVisit(id);if(!report){toast('Serviceverslag niet gevonden.');return;}
+    showModal(`Serviceverslag ${report.number}`,reportHtml(report),'Sluiten',async()=>closeModal());
     setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';
-      if(svCan('print')){const print=document.createElement('button');print.type='button';print.className='btn service-visit-print-btn';print.dataset.serviceVisitId=id;print.textContent='🖨 Afdrukken';print.onclick=()=>void printServiceVisit(id);foot.insertBefore(print,submit);
-      const mail=document.createElement('button');mail.type='button';mail.className='btn service-visit-mail-btn';mail.dataset.serviceVisitMailId=id;mail.dataset.serviceVisitLabel=visit.number;mail.textContent='✉ Mail PDF';foot.insertBefore(mail,submit);}
-      if(svCanCreate()){const add=document.createElement('button');add.type='button';add.className='btn primary';add.textContent='+ Toestel toevoegen';add.onclick=()=>{baseCloseModal();void openServiceVisit(id);};submit.classList.remove('primary');foot.appendChild(add);}
+      if(svCan('print')){const print=document.createElement('button');print.type='button';print.className='btn service-visit-print-btn';print.dataset.serviceReportId=report.id;print.textContent='🖨 Afdrukken';print.onclick=()=>void printServiceReport(report.id);foot.insertBefore(print,submit);
+      const mail=document.createElement('button');mail.type='button';mail.className='btn service-visit-mail-btn';mail.dataset.serviceVisitMailId=report.id;mail.dataset.serviceVisitLabel=report.number;mail.textContent='✉ Mail PDF';foot.insertBefore(mail,submit);}
+      if(svCanCreate()){
+        const addDevice=document.createElement('button');addDevice.type='button';addDevice.className='btn';addDevice.textContent='+ Toestel toevoegen';addDevice.onclick=()=>{baseCloseModal();void openServiceVisit(report.id);};foot.appendChild(addDevice);
+        const addLocation=document.createElement('button');addLocation.type='button';addLocation.className='btn primary';addLocation.textContent='+ Locatie toevoegen';addLocation.onclick=()=>{baseCloseModal();void openServiceVisit(report.id);setTimeout(()=>document.getElementById('serviceReportAddLocation')?.click(),80);};submit.classList.remove('primary');foot.appendChild(addLocation);
+      }
     },0);
   }
+
+  function showServiceVisitDetails(id) { return showServiceReportDetails(id); }
 
   function ensurePanel() {
     const work=document.getElementById('view-work');if(!work)return null;let panel=document.getElementById('serviceVisitPanel');if(panel)return panel;
