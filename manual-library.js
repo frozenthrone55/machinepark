@@ -91,6 +91,14 @@
       .filter((manual) => manualAppliesToDevice(manual, device))
       .sort((a, b) => manualSpecificity(a) - manualSpecificity(b) || String(a.type || '').localeCompare(String(b.type || ''), 'nl-BE') || String(a.title || '').localeCompare(String(b.title || ''), 'nl-BE'));
   }
+  window.machineparkManualsForDevice = async function(deviceId, force = false) {
+    await loadManualLibrary(force);
+    return manualsForDevice(deviceId);
+  };
+  window.machineparkManualListHtml = async function(deviceId, compact = true) {
+    await loadManualLibrary();
+    return deviceManualListHtml(deviceId, compact);
+  };
 
   function openManualCacheDb() {
     return new Promise((resolve, reject) => {
