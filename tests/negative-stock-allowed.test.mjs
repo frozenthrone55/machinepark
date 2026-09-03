@@ -14,6 +14,11 @@ test('onderhoud en depannage worden niet geblokkeerd door onvoldoende voorraad',
   assert.match(html, /stock:Number\(p\.stock\|\|0\)-qty/);
 });
 
+test('serviceconcepten mogen onderdelen onder nul brengen', () => {
+  assert.doesNotMatch(html, /if \(Number\(part\.stock \|\| 0\) < qty\) throw new Error\(`Onvoldoende voorraad/);
+  assert.match(html, /updates\.push\(\{ \.\.\.part, stock:Number\(part\.stock \|\| 0\) - qty, updatedAt:now \}\);/);
+});
+
 test('negatieve voorraad kan manueel en via Excel worden opgeslagen', () => {
   assert.match(html, /<input name="stock" type="number" step="1" value="\$\{p\.stock\?\?0\}">/);
   assert.doesNotMatch(html, /<input name="stock" type="number" step="1" min="0"/);
@@ -23,6 +28,7 @@ test('negatieve voorraad kan manueel en via Excel worden opgeslagen', () => {
 });
 
 test('negatieve-voorraad buildstap blijft onderdeel van de build', () => {
-  assert.match(builder, /negatieve voorraad toegestaan bij onderhoud, depannage, manuele stock en Excel-stocktelling/);
+  assert.match(builder, /negatieve voorraad toegestaan bij onderhoud, depannage, concepten, manuele stock en Excel-stocktelling/);
+  assert.match(builder, /voorraadblokkade bij serviceconcept afronden/);
   assert.ok(pkg.scripts.build.includes('python3 build-negative-stock-allowed.py'));
 });
