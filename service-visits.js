@@ -505,16 +505,23 @@
 
   function collectHeader() {
     const form=document.getElementById('modalForm'),existing=activeVisitDraft?.header||null,now=new Date().toISOString();
-    const locationLabel=String(document.getElementById('serviceVisitLocationSearch')?.value||'').trim();
+    const active=(activeVisitDraft?.locations||[]).find(loc=>loc.key===activeVisitDraft?.activeLocationKey)||null;
     const fd=new FormData(form);
     const workSessions=typeof window.machineparkCollectWorkSessions==='function'
-      ? window.machineparkCollectWorkSessions(fd)
-      : [{date:String(fd.get('workSessionDate')||''),minutes:Math.max(0,Math.round(Number(fd.get('workSessionMinutes'))||0))}].filter(row=>row.date&&row.minutes>0);
-    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:String(document.getElementById('serviceVisitLocationKey')?.value||''),locationLabel,date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:1};
+      ?window.machineparkCollectWorkSessions(fd)
+      :[{date:String(fd.get('workSessionDate')||''),minutes:Math.max(0,Math.round(Number(fd.get('workSessionMinutes'))||0))}].filter(row=>row.date&&row.minutes>0);
+    const locations=(activeVisitDraft?.locations||[]).map(loc=>({key:String(loc.key||''),label:String(loc.label||''),visitId:String(loc.visitId||'')})).filter(loc=>loc.key&&loc.label);
+    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:2};
   }
 
   async function collectItems() {
-    const oldMap=new Map((activeVisitDraft?.items||[]).map(i=>[`${i.draftServiceKind}:${i.deviceId}`,i]));
+    const activeKey=activeVisitDraft?.activeLocationKey||String(document.getElementById('serviceVisitLocationKey')?.value||'');
+    const activeLoc=(activeVisitDraft?.locations||[]).find(loc=>loc.key===activeKey)||null;
+    const legacyKey=activeVisitDraft?.header?.locationKey||'';
+    const oldItems=activeVisitDraft?.items||[];
+    if(!activeKey)return oldItems;
+    const preserved=oldItems.filter(item=>String(item.draftLocationKey||legacyKey||'')!==String(activeKey));
+    const oldMap=new Map(oldItems.filter(item=>String(item.draftLocationKey||legacyKey||'')===String(activeKey)).map(i=>[`${i.draftServiceKind}:${i.deviceId}`,i]));
     const out=[],now=new Date().toISOString();
     for(const card of document.querySelectorAll('#serviceVisitDevices .service-visit-device')){
       const deviceId=card.dataset.serviceVisitDevice||'';
@@ -525,12 +532,12 @@
         const photos=await collectPhotos(panel,kind,id,old?.photos||[]);
         const editor=panel?.querySelector('[data-workorder-editor]');
         const workOrder=editor&&typeof window.machineparkCollectWorkOrder==='function'?window.machineparkCollectWorkOrder(editor):old?.workOrder||null;
-        const base={...(old||{}),id,isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftServiceKind:kind,deviceId,usedParts:collectUsed(panel),oneOffParts:collectOneOff(panel),photos,workOrder,createdAt:old?.createdAt||now,updatedAt:now,draftSchema:1};
+        const base={...(old||{}),id,isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftServiceKind:kind,draftLocationKey:activeKey,draftLocationLabel:activeLoc?.label||'',targetVisitId:activeLoc?.visitId||old?.targetVisitId||'',deviceId,usedParts:collectUsed(panel),oneOffParts:collectOneOff(panel),photos,workOrder,createdAt:old?.createdAt||now,updatedAt:now,draftSchema:2};
         if(kind==='maintenance')out.push({...base,type:panel?.querySelector('.sv-maintenance-type')?.value||'Halfjaarlijks',notes:panel?.querySelector('.sv-maintenance-notes')?.value.trim()||''});
         else out.push({...base,priority:panel?.querySelector('.sv-breakdown-priority')?.value||'Normaal',status:panel?.querySelector('.sv-breakdown-status')?.value||'Open',issue:panel?.querySelector('.sv-breakdown-issue')?.value.trim()||'',diagnosis:panel?.querySelector('.sv-breakdown-diagnosis')?.value.trim()||'',solution:panel?.querySelector('.sv-breakdown-solution')?.value.trim()||'',faultRef:typeof window.machineparkFaultRefFromCard==='function'?window.machineparkFaultRefFromCard(card):old?.faultRef||null});
       }
     }
-    return out;
+    return [...preserved,...out];
   }
 
   function writeDraft(header,items) {
