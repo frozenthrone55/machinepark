@@ -1,0 +1,30 @@
+name: Machinepark kwaliteit
+
+on:
+  push:
+    branches: [development]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Functies syntactisch controleren
+        run: npm run check:functions
+      - name: Build
+        run: npm run build
+      - name: Code-audit
+        run: npm run audit
+      - name: Automatische tests
+        run: node --test tests/*.test.mjs
