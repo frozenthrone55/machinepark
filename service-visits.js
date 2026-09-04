@@ -218,11 +218,12 @@
   }
 
   function reportWorkSessions(report) {
-    const rows=[];
-    for(const visit of report?.visits||[]) {
-      for(const row of visitWorkSessions(visit)) rows.push({...row,location:visit.location||'—'});
-    }
-    return rows.sort((a,b)=>a.date.localeCompare(b.date)||String(a.location).localeCompare(String(b.location),'nl'));
+    const records=report?.records||[];
+    const explicit=records.find(row=>Array.isArray(row.item?.serviceReportWorkSessions)&&row.item.serviceReportWorkSessions.length)?.item?.serviceReportWorkSessions;
+    if(Array.isArray(explicit)&&explicit.length)return explicit.map(row=>({date:String(row.date||''),minutes:Math.max(0,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0).sort((a,b)=>a.date.localeCompare(b.date));
+    const byDate=new Map();
+    for(const visit of report?.visits||[])for(const row of visitWorkSessions(visit)){if(!row.date||!Number(row.minutes))continue;byDate.set(row.date,(byDate.get(row.date)||0)+Number(row.minutes));}
+    return [...byDate.entries()].map(([date,minutes])=>({date,minutes:Math.max(0,Math.round(minutes))})).sort((a,b)=>a.date.localeCompare(b.date));
   }
 
   function formatWorkDuration(minutes) {
@@ -232,7 +233,7 @@
 
   function printRecordPageHtml(report,visit,row,index) {
     const item=row.item||{},photos=(item.photos||[]).filter(src=>typeof src==='string'&&src.trim());
-    const sessions=visitWorkSessions(visit),serviceMinutes=sessions.reduce((sum,session)=>sum+Number(session.minutes||0),0),deviceCount=Math.max(1,Number(visit.deviceCount)||new Set((visit.records||[]).map(entry=>entry.item?.deviceId).filter(Boolean)).size);
+    const sessions=reportWorkSessions(report),serviceMinutes=sessions.reduce((sum,session)=>sum+Number(session.minutes||0),0),deviceCount=Math.max(1,Number(report.deviceCount)||new Set((report.records||[]).map(entry=>entry.item?.deviceId).filter(Boolean)).size);
     return `<section class="service-report-print-record-page">
       <div class="service-report-print-record-head">
         <div><small>Serviceverslag</small><strong>${svEsc(reportDisplayLabel(report))}</strong></div>
@@ -262,7 +263,7 @@
           <div><small>Status</small><strong>Afgesloten</strong></div>
           <div><small>Versie</small><strong>v${svEsc(report.revision)}</strong></div>
         </div>
-        <div><div class="section-title">Werkdagen en tijd</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · ${svEsc(row.location)} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal: ${svEsc(totalMinutes)} min</strong></div></div></div>
+        <div><div class="section-title">Werkdagen en tijd</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal: ${svEsc(totalMinutes)} min</strong></div></div></div>
         <div class="service-report-print-location-summary"><div class="section-title">Totaaloverzicht werkzaamheden</div><table class="service-visit-merged-parts service-report-print-summary-table"><thead><tr><th>Locatie</th><th>Toestellen</th><th>Onderhoud</th><th>Depannage</th><th>Andere werken</th></tr></thead><tbody>${(report.visits||[]).map(visit=>`<tr><td><strong>${svEsc(visit.location||'—')}</strong></td><td>${svEsc(visit.deviceCount||0)}</td><td>${svEsc(visit.maintenanceCount||0)}</td><td>${svEsc(visit.breakdownCount||0)}</td><td>${svEsc(visit.otherWorkCount||0)}</td></tr>`).join('')||'<tr><td colspan="5">Geen werkzaamheden.</td></tr>'}</tbody></table></div>
         <div class="service-report-print-only"><div class="section-title">Totaal gebruikte onderdelen · alle locaties</div><table class="service-visit-merged-parts"><thead><tr><th>Onderdeel</th><th>Aantal</th><th>Locaties / toestellen</th></tr></thead><tbody>${totalParts.length?totalParts.map(p=>`<tr><td>${svEsc(p.label)}</td><td><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join(''):'<tr><td colspan="3">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
       </div>
@@ -336,7 +337,7 @@
         <div><small>Status</small><strong>Afgesloten</strong></div>
         <div><small>Versie</small><strong>v${svEsc(visit.revision)}</strong></div>
       </div>
-      <div><div class="section-title">Werkdagen en tijd</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · <strong>${svEsc(row.minutes)} min</strong>${visit.revision>1?` · versie v${svEsc(row.revision)}`:''}</div>`).join(''):'<div>—</div>'}<div><strong>Totaal: ${svEsc(totalMinutes)} min</strong></div></div></div>
+      <div><div class="section-title">Servicetijd volledig serviceverslag</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal serviceverslag: ${svEsc(totalMinutes)} min · ${svEsc(Math.max(1,Number(visit.records?.[0]?.item?.serviceReportDeviceCount)||visit.deviceCount||1))} toestel${Math.max(1,Number(visit.records?.[0]?.item?.serviceReportDeviceCount)||visit.deviceCount||1)===1?'':'len'}</strong></div></div></div>
       <div><div class="section-title">Werkzaamheden per toestel</div><div style="display:grid;gap:9px">${visit.records.map(row => recordSummary(row.kind,row.item)).join('')}</div></div>
       <div><div class="section-title">Onderdelen · samengevoegd voor klant</div><table class="service-visit-merged-parts"><thead><tr><th>Onderdeel</th><th>Aantal</th><th>Gebruikt op</th></tr></thead><tbody>${parts.length ? parts.map(p => `<tr><td>${svEsc(p.label)}${p.kind === 'oneoff' ? '<div class="muted" style="font-size:10px">Eenmalig / leverancier</div>' : ''}</td><td><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join('') : '<tr><td colspan="3">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
       ${photos.length ? `<div><div class="section-title">Foto’s bij servicebezoek</div><div class="service-visit-photo-grid">${photos.map(p => `<figure><img src="${svEsc(p.src)}" data-full-src="${svEsc(p.src)}" data-photo-lightbox alt="${svEsc(p.label)}"><figcaption>${svEsc(p.label)}</figcaption></figure>`).join('')}</div></div>` : ''}
@@ -775,24 +776,28 @@
     return updates;
   }
 
-  function finalRecord(header,item,{visit,serviceVisitId,visitNumberValue,visitRevision,reportId,reportNumberValue,reportRevision,now,batchSize,deviceCount}) {
+  function finalRecord(header,item,{visit,serviceVisitId,visitNumberValue,visitRevision,reportId,reportNumberValue,reportRevision,now,batchSize,localDeviceCount,reportDeviceCount,reportSessions,reportTotalMinutes}) {
     const record={...item,id:item.sourceRecordId||item.id};['isDraft','draftRole','draftKind','draftBatchId','draftServiceKind','draftLocationKey','draftLocationLabel','draftSchema','targetVisitId','sourceRecordId','sourceUsedParts','serviceItemMinutes','serviceItemMinutesUnit'].forEach(k=>delete record[k]);
     const date=header.date||visit?.date||'',time=header.time||visit?.time||'',technician=header.technician||'';
     const locationKey=item.draftLocationKey||visit?.locationKey||'',locationLabel=item.draftLocationLabel||visit?.location||'';
-    const locationSessions=header.locationSessions?.[locationKey]||header.workSessions||[];
-    const workSessions=(Array.isArray(locationSessions)?locationSessions:[]).filter(row=>row?.date&&Number(row?.minutes)>0).map(row=>({date:String(row.date),minutes:Math.max(1,Math.round(Number(row.minutes)||0))}));
-    const totalMinutes=workSessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
-    return {...record,date,time,technician,workSessions,hours:totalMinutes/60,batchId:serviceVisitId,batchSize:deviceCount||batchSize,serviceVisitDeviceCount:deviceCount||batchSize,serviceVisitTotalMinutes:totalMinutes,updatedAt:now,
+    const workSessions=(Array.isArray(reportSessions)?reportSessions:[]).map(row=>({date:String(row.date||''),minutes:Math.max(1,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0);
+    return {...record,date,time,technician,workSessions,hours:reportTotalMinutes/60,batchId:serviceVisitId,batchSize:localDeviceCount||batchSize,serviceVisitDeviceCount:localDeviceCount||batchSize,serviceVisitTotalMinutes:reportTotalMinutes,updatedAt:now,
       serviceVisitId,serviceVisitNumber:visitNumberValue,serviceVisitLocation:locationLabel,serviceVisitLocationKey:locationKey,serviceVisitDate:date,serviceVisitTime:time,serviceVisitTechnician:technician,serviceVisitStatus:'closed',serviceVisitClosedAt:now,serviceVisitRevision:visitRevision,
-      serviceReportId:reportId,serviceReportNumber:reportNumberValue,serviceReportDate:date,serviceReportTime:time,serviceReportTechnician:technician,serviceReportStatus:'closed',serviceReportClosedAt:now,serviceReportRevision:reportRevision};
+      serviceReportId:reportId,serviceReportNumber:reportNumberValue,serviceReportDate:date,serviceReportTime:time,serviceReportTechnician:technician,serviceReportStatus:'closed',serviceReportClosedAt:now,serviceReportRevision:reportRevision,
+      serviceReportWorkSessions:workSessions,serviceReportTotalMinutes:reportTotalMinutes,serviceReportDeviceCount:reportDeviceCount};
   }
 
   function finalizeDraftTransaction(header,allItems,selected,report) {
     const updates=stockUpdates(selected,{editMode:Boolean(header.editMode)}),now=new Date().toISOString(),reportId=report?.id||header.appendToReportId||uid('sr'),reportNumberValue=report?.number||reportNumber(reportId,header.date),reportRevision=report?Math.max(1,Number(report.revision)||1)+1:1;
+    const reportSessions=(Array.isArray(header.reportSessions)?header.reportSessions:(Array.isArray(header.workSessions)?header.workSessions:[])).map(row=>({date:String(row.date||''),minutes:Math.max(1,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0);
+    const reportTotalMinutes=reportSessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
+    const existingRecords=(report?.records||[]).map(row=>row.item).filter(Boolean);
+    const replacedIds=new Set(selected.map(item=>String(item.sourceRecordId||'')).filter(Boolean));
+    const retainedExisting=existingRecords.filter(item=>!replacedIds.has(String(item.id||'')));
+    const reportDeviceCount=Math.max(1,new Set([...retainedExisting,...selected].map(item=>String(item.deviceId||'')).filter(Boolean)).size);
     const groups=new Map();
     for(const item of selected){const key=String(item.draftLocationKey||header.locationKey||'');if(!key)continue;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
-    const finals=[];
-    const visits=[];
+    const finals=[],visitMeta=new Map();
     for(const [key,items] of groups){
       const loc=(header.locations||[]).find(x=>x.key===key)||{key,label:items[0]?.draftLocationLabel||''};
       const existing=(report?.visits||[]).find(v=>String(v.locationKey||svKey(v.location))===key)||null;
@@ -800,15 +805,17 @@
       const visitNumberValue=existing?.number||visitNumber(serviceVisitId,header.date);
       const visitRevision=existing?Math.max(1,Number(existing.revision)||1)+1:1;
       const visitCtx={id:serviceVisitId,location:loc.label,locationKey:key,date:header.date,time:header.time};
-      const deviceIds=new Set([...(existing?.records||[]).map(row=>String(row.item?.deviceId||'')),...items.map(item=>String(item.deviceId||''))].filter(Boolean));
-      const deviceCount=Math.max(1,deviceIds.size);
-      const built=items.map(item=>finalRecord(header,item,{visit:visitCtx,serviceVisitId,visitNumberValue,visitRevision,reportId,reportNumberValue,reportRevision,now,batchSize:items.length,deviceCount}));
-      const replacedIds=new Set(items.map(item=>String(item.sourceRecordId||'')).filter(Boolean));
-      const sharedSessions=built[0]?.workSessions||[];
-      const sharedMinutes=sharedSessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
-      const carried=(existing?.records||[]).filter(row=>!replacedIds.has(String(row.item?.id||''))).map(row=>({...row.item,workSessions:sharedSessions,hours:sharedMinutes/60,batchId:serviceVisitId,batchSize:deviceCount,serviceVisitDeviceCount:deviceCount,serviceVisitTotalMinutes:sharedMinutes,serviceVisitRevision:visitRevision,serviceVisitClosedAt:now,serviceReportRevision:reportRevision,serviceReportClosedAt:now,updatedAt:now}));
-      finals.push(...built,...carried);visits.push({id:serviceVisitId,number:visitNumberValue,location:loc.label,locationKey:key,revision:visitRevision,count:built.length+carried.length,deviceCount});
+      const localDeviceCount=Math.max(1,new Set([...(existing?.records||[]).map(row=>String(row.item?.deviceId||'')),...items.map(item=>String(item.deviceId||''))].filter(Boolean)).size);
+      const built=items.map(item=>finalRecord(header,item,{visit:visitCtx,serviceVisitId,visitNumberValue,visitRevision,reportId,reportNumberValue,reportRevision,now,batchSize:items.length,localDeviceCount,reportDeviceCount,reportSessions,reportTotalMinutes}));
+      finals.push(...built);visitMeta.set(serviceVisitId,{id:serviceVisitId,number:visitNumberValue,location:loc.label,locationKey:key,revision:visitRevision,deviceCount:localDeviceCount});
     }
+    for(const item of retainedExisting){
+      const serviceVisitId=item.serviceVisitId||uid('sv'),existingVisit=(report?.visits||[]).find(v=>v.id===serviceVisitId)||null;
+      const localCount=Math.max(1,new Set((existingVisit?.records||[]).map(row=>row.item?.deviceId).filter(Boolean)).size||Number(item.serviceVisitDeviceCount)||1);
+      finals.push({...item,date:header.date||item.date,time:header.time||item.time,technician:header.technician||item.technician,workSessions:reportSessions,hours:reportTotalMinutes/60,batchSize:localCount,serviceVisitDeviceCount:localCount,serviceVisitTotalMinutes:reportTotalMinutes,serviceReportWorkSessions:reportSessions,serviceReportTotalMinutes:reportTotalMinutes,serviceReportDeviceCount:reportDeviceCount,serviceReportDate:header.date||item.serviceReportDate,serviceReportTime:header.time||item.serviceReportTime,serviceReportTechnician:header.technician||item.serviceReportTechnician,serviceReportRevision:reportRevision,serviceReportClosedAt:now,updatedAt:now});
+      if(!visitMeta.has(serviceVisitId))visitMeta.set(serviceVisitId,{id:serviceVisitId,number:item.serviceVisitNumber||serviceVisitId,location:item.serviceVisitLocation||existingVisit?.location||'',locationKey:item.serviceVisitLocationKey||existingVisit?.locationKey||'',revision:Math.max(1,Number(item.serviceVisitRevision)||existingVisit?.revision||1),deviceCount:localCount});
+    }
+    const visits=[...visitMeta.values()].map(meta=>({...meta,count:finals.filter(item=>item.serviceVisitId===meta.id).length}));
     return new Promise((resolve,reject)=>{let tr;try{tr=db.transaction(['maintenance','breakdowns','parts'],'readwrite');}catch(e){reject(e);return;}const ms=tr.objectStore('maintenance'),bs=tr.objectStore('breakdowns'),ps=tr.objectStore('parts');updates.forEach(p=>ps.put(p));(header.draftHeaderStore==='maintenance'?ms:bs).delete(header.id);allItems.forEach(i=>(i.draftServiceKind==='maintenance'?ms:bs).delete(i.id));finals.forEach(i=>(i.type!==undefined?ms:bs).put(i));tr.oncomplete=()=>{scheduleCentralSync();resolve({id:reportId,number:reportNumberValue,revision:reportRevision,visits,finals});};tr.onerror=()=>reject(tr.error||new Error('Serviceverslag afsluiten mislukt.'));tr.onabort=()=>reject(tr.error||new Error('Serviceverslag afsluiten afgebroken.'));});
   }
 
@@ -819,6 +826,7 @@
       const selected=saved.items,locations=saved.header.locations||[];
       if(!locations.length)throw new Error('Voeg minstens één locatie toe.');
       if(!selected.length)throw new Error('Kies minstens één onderhoud, depannage of Andere werken.');
+      if(!(saved.header.reportSessions||saved.header.workSessions||[]).some(row=>row?.date&&Number(row?.minutes)>0))throw new Error('Voeg minstens één werkdag met servicetijd toe voor het volledige serviceverslag.');
       const usedLocationKeys=new Set(selected.map(item=>item.draftLocationKey||saved.header.locationKey).filter(Boolean));
       const emptyLocation=locations.find(loc=>!usedLocationKeys.has(loc.key));if(emptyLocation)throw new Error(`Kies minstens één onderhoud, depannage of Andere werken op ${emptyLocation.label} of verwijder die locatie uit het concept.`);
       const missing=selected.find(i=>i.draftServiceKind==='breakdowns'&&!String(i.issue||'').trim());if(missing)throw new Error(`Vul het probleem / de melding in voor ${svDeviceShort(missing.deviceId)}.`);
@@ -1000,7 +1008,7 @@
     const report=serviceReportById(id)||serviceReportForVisit(id);if(!report)return null;
     const parts=mergedReportParts(report),sessions=reportWorkSessions(report),totalMinutes=sessions.reduce((sum,row)=>sum+row.minutes,0),fields=[
       {label:'Verslag',value:reportDisplayLabel(report)},{label:'Locaties',value:(report.visits||[]).map(v=>v.location||'—').join('\n')||'—'},{label:'Technieker',value:report.technician||'—'},{label:'Status / versie',value:`Afgesloten · v${report.revision}`},
-      {label:'Werkdagen / tijd',value:sessions.length?sessions.map(row=>`${svDateText(row.date)} · ${row.location||'—'} · ${row.minutes} min`).join('\n')+`\nTotaal: ${totalMinutes} min`:'—',full:true}
+      {label:'Werkdagen / tijd',value:sessions.length?sessions.map(row=>`${svDateText(row.date)} · ${row.minutes} min`).join('\n')+`\nTotaal: ${totalMinutes} min · ${report.deviceCount} toestel${report.deviceCount===1?'':'len'}`:'—',full:true}
     ];
     for(const visit of report.visits||[]) {
       fields.push({label:`LOCATIE · ${visit.location||'—'}`,value:`${visit.deviceCount} toestel${visit.deviceCount===1?'':'len'} · ${visit.maintenanceCount} onderhoud · ${visit.breakdownCount} depannage · ${visit.otherWorkCount||0} andere werken`,full:true});
@@ -1020,7 +1028,7 @@
             :[`Prioriteit: ${item.priority||'—'} · Status: ${item.status||'—'}`,`Probleem / melding: ${item.issue||'—'}`,`Diagnose: ${item.diagnosis||'—'}`,`Oplossing / uitgevoerde werken: ${item.solution||'—'}`];
         if(item.workOrder)detailLines.push(workOrderText(item.workOrder));
         if(row.kind==='breakdowns'&&item.faultRef)detailLines.push(`Gekoppelde storing: ${[item.faultRef.code,item.faultRef.name].filter(Boolean).join(' — ')||'—'}`);
-        const visitSessions=visitWorkSessions(visit),serviceMinutes=visitSessions.reduce((sum,session)=>sum+Number(session.minutes||0),0),deviceCount=Math.max(1,Number(visit.deviceCount)||new Set((visit.records||[]).map(entry=>entry.item?.deviceId).filter(Boolean)).size);
+        const serviceMinutes=totalMinutes,deviceCount=Math.max(1,Number(report.deviceCount)||new Set((report.records||[]).map(entry=>entry.item?.deviceId).filter(Boolean)).size);
         workPages.push({
           index:++workIndex,
           kind:row.kind,
@@ -1058,7 +1066,7 @@
           {label:'Status',value:'Afgesloten'},
           {label:'Versie',value:`v${report.revision}`},
         ],
-        sessions:sessions.map(row=>({date:svDateText(row.date),location:row.location||'—',minutes:row.minutes})),
+        sessions:sessions.map(row=>({date:svDateText(row.date),minutes:row.minutes})),
         totalMinutes,
         locations:(report.visits||[]).map(visit=>({
           location:visit.location||'—',
