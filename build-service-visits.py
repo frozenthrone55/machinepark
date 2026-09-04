@@ -92,6 +92,10 @@ for needle in [
     'svOtherWorkTypeNames',
     'recordPartsBoxHtml',
     'service-record-parts-box',
+    'svPartFields',
+    'svOneOffPartFields',
+    'service-part-description',
+    'service-part-qty',
 ]:
     if needle not in (ROOT / 'service-visits.js').read_text(encoding='utf-8'):
         raise SystemExit(f'Buildvalidatie mislukt: servicebezoekfunctie ontbreekt ({needle})')
