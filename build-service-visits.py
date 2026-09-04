@@ -34,8 +34,8 @@ index = re.sub(
     '',
     index,
 )
-index = index.replace('</head>', f'<link rel="stylesheet" href="{service_css_url}" {MARKER}>\\n</head>', 1)
-index = index.replace('</body>', f'<script src="{service_js_url}" {MARKER}></script>\\n</body>', 1)
+index = index.replace('</head>', f'<link rel="stylesheet" href="{service_css_url}" {MARKER}>\n</head>', 1)
+index = index.replace('</body>', f'<script src="{service_js_url}" {MARKER}></script>\n</body>', 1)
 index_path.write_text(index, encoding='utf-8')
 
 sw = re.sub(r"'/service-visits\.js(?:\?v=[^']*)?'", f"'{service_js_url}'", sw)
@@ -45,7 +45,7 @@ if f"'{service_js_url}'" not in sw or f"'{service_css_url}'" not in sw:
     assets_end = sw.rfind('];', 0, api_pos if api_pos >= 0 else len(sw))
     if assets_end < 0:
         raise SystemExit('Buildvalidatie mislukt: service-worker assetlijst ontbreekt voor servicebezoeken')
-    sw = sw[:assets_end] + f"  '{service_js_url}',\\n  '{service_css_url}',\\n" + sw[assets_end:]
+    sw = sw[:assets_end] + f"  '{service_js_url}',\n  '{service_css_url}',\n" + sw[assets_end:]
 sw = re.sub(
     r"const CACHE='machinepark-v1\\.68\\.9-[^']+';",
     "const CACHE='machinepark-v1.68.9-service-visits-v1';",
