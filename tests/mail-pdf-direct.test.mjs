@@ -143,7 +143,7 @@ test('serviceverslag PDF gebruikt dezelfde meta- en onderdelenkaders als afdruk'
 test('gezamenlijk serviceverslag gebruikt geen oude generieke PDF-opbouw', () => {
   assert.ok(build.includes("context.kind === 'serviceVisit' && model.servicePrintLayout"));
   assert.ok(build.includes('await addServiceVisitPrintLayout(doc, model)'));
-  assert.ok(build.includes("if (!(context.kind === 'serviceVisit' && model?.servicePrintLayout)) addPageNumbers(doc)"));
+  assert.ok(build.includes("(context.kind === 'service' && model?.workPrintLayout)"));
 });
 
 
@@ -189,4 +189,27 @@ test('service PDF meet breedste onderdeelcode en telt drie spaties reserve bij',
   assert.ok(build.includes('parts.map(part=>part.code)'));
   assert.ok(build.includes('partRows.map(row=>row[0])'));
   assert.ok(build.includes('descriptionW=totalPartsW-codeW-qtyW-devicesW'));
+});
+
+
+test('los onderhoud depannage en andere werken gebruiken dezelfde service-PDF-renderer', () => {
+  assert.ok(build.includes('workPrintLayout:{reportLabel:title,page}'));
+  assert.ok(build.includes('function servicePartRows(record)'));
+  assert.ok(build.includes('function addWorkRecordPrintLayout'));
+  assert.ok(build.includes("context.kind === 'service' && model.workPrintLayout"));
+  assert.ok(build.includes('await addWorkRecordPrintLayout(doc, model)'));
+  assert.ok(build.includes('servicePdfWorkPage(doc,model,model.workPrintLayout.page,false)'));
+  assert.ok(build.includes("documentLabel:'WERKVERSLAG'"));
+  assert.ok(build.includes("kindLabel = maintenance ? 'Onderhoud' : (other ? (record.workTypeName || 'Andere werken') : 'Depannage')"));
+});
+
+test('individuele werk-PDF gebruikt dezelfde drie infokaders en onderdelentabel als Service', () => {
+  assert.ok(build.includes("{label:'Locatie',value:serviceLocation(record)}"));
+  assert.ok(build.includes("{label:summaryLabel,value:summaryValue}"));
+  assert.ok(build.includes("{label:'Technieker',value:record.technician || '—'}"));
+  assert.ok(build.includes('parts:servicePartRows(record)'));
+  assert.ok(build.includes("doc.text('ONDERDEEL'"));
+  assert.ok(build.includes("doc.text('OMSCHRIJVING'"));
+  assert.ok(build.includes("doc.text('AANTAL'"));
+  assert.ok(build.includes("doc.getTextWidth('   ')"));
 });
