@@ -154,15 +154,29 @@
     return part ? ([part.artNr, part.description].filter(Boolean).join(' · ') || partId) : `Onbekend onderdeel (${partId || '—'})`;
   }
 
-  function perRecordPartsText(item) {
-    const lines = [];
-    (item?.usedParts || []).forEach(u => { if (u?.partId && Number(u.qty) > 0) lines.push(`${svPartLabel(u.partId)} × ${Number(u.qty)}`); });
-    (item?.oneOffParts || []).forEach(p => {
-      const label = [p?.supplier,p?.supplierCode,p?.description].map(v => String(v || '').trim()).filter(Boolean).join(' · ');
-      if (label) lines.push(`${label} × ${Math.max(1, Math.round(Number(p.qty) || 1))}`);
+  function perRecordPartsRows(item) {
+    const rows=[];
+    (item?.usedParts || []).forEach(u => {
+      const qty=Number(u?.qty||0);
+      if(u?.partId&&qty>0)rows.push({label:svPartLabel(u.partId),qty,kind:'stock'});
     });
-    return lines.length ? lines.join('\n') : '—';
+    (item?.oneOffParts || []).forEach(p => {
+      const label=[p?.supplier,p?.supplierCode,p?.description].map(v=>String(v||'').trim()).filter(Boolean).join(' · ');
+      if(label)rows.push({label,qty:Math.max(1,Math.round(Number(p.qty)||1)),kind:'oneoff'});
+    });
+    return rows;
   }
+
+  function perRecordPartsText(item) {
+    const rows=perRecordPartsRows(item);
+    return rows.length ? rows.map(row=>`${row.label} × ${row.qty}${row.kind==='oneoff'?' · eenmalig':''}`).join('\n') : '—';
+  }
+
+  function recordPartsBoxHtml(item) {
+    const rows=perRecordPartsRows(item);
+    return `<div class="service-record-parts-box"><div class="service-record-parts-title">Onderdelen voor deze werkzaamheid</div>${rows.length?`<table class="service-record-parts-table"><thead><tr><th>Onderdeel</th><th>Aantal</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${svEsc(row.label)}${row.kind==='oneoff'?'<small>Eenmalig / leverancier</small>':''}</td><td><strong>${svEsc(row.qty)}</strong></td></tr>`).join('')}</tbody></table>`:'<div class="service-record-parts-empty">Geen onderdelen gebruikt.</div>'}</div>`;
+  }
+
 
   function mergedVisitParts(visit) {
     const merged = new Map();
@@ -292,11 +306,10 @@
         : [`Prioriteit: ${item.priority || '—'} · Status: ${item.status || '—'}`, `Probleem / melding: ${item.issue || '—'}`, `Diagnose: ${item.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${item.solution || '—'}`];
     if (item.workOrder) lines.push(workOrderText(item.workOrder));
     if (kind === 'breakdowns' && item.faultRef) lines.push(`Gekoppelde storing: ${[item.faultRef.code,item.faultRef.name].filter(Boolean).join(' — ') || '—'}`);
-    lines.push(`Onderdelen op dit toestel: ${perRecordPartsText(item)}`);
-    if (plain) return lines.join('\n');
+    if (plain) { lines.push(`Onderdelen voor deze werkzaamheid: ${perRecordPartsText(item)}`); return lines.join('\n'); }
     const badgeClass=kind === 'maintenance' ? 'blue' : (kind === 'otherworks' ? 'other-work-badge' : 'danger');
     const badgeText=kind === 'maintenance' ? 'Onderhoud' : (kind === 'otherworks' ? 'Andere werken' : 'Depannage');
-    return `<div class="service-visit-report-record"><h4><span class="badge ${badgeClass}">${badgeText}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div></div>`;
+    return `<div class="service-visit-report-record"><h4><span class="badge ${badgeClass}">${badgeText}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div>${recordPartsBoxHtml(item)}</div>`;
   }
 
 
