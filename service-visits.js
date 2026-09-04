@@ -455,13 +455,8 @@
   function reportEditHeader(report) {
     if(!report)return null;
     const locations=(report.visits||[]).map(visit=>({key:visit.locationKey||svKey(visit.location),label:visit.location||'—',visitId:visit.id}));
-    const locationSessions={};
-    for(const visit of report.visits||[]) {
-      const key=visit.locationKey||svKey(visit.location);
-      const first=visit.records?.[0]?.item;
-      locationSessions[key]=Array.isArray(first?.workSessions)?first.workSessions.map(row=>({date:String(row.date||''),minutes:Math.max(0,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0):[];
-    }
-    return {locations,activeLocationKey:locations[0]?.key||'',date:report.date||todayISO(),time:report.time||nowLocalTime(),technician:report.technician==='—'?'':report.technician||'',locationSessions,appendToReportId:report.id,editReportId:report.id};
+    const reportSessions=reportWorkSessions(report).map(row=>({date:String(row.date||''),minutes:Math.max(0,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0);
+    return {locations,activeLocationKey:locations[0]?.key||'',date:report.date||todayISO(),time:report.time||nowLocalTime(),technician:report.technician==='—'?'':report.technician||'',reportSessions,workSessions:reportSessions,appendToReportId:report.id,editReportId:report.id};
   }
 
   function reportEditItems(report,draftBatchId) {
@@ -502,19 +497,20 @@
     const time=report?.time||visit?.time||header?.time||nowLocalTime();
     const technician=header?.technician??(report?.technician==='—'?'':report?.technician||visit?.technician==='—'?'':visit?.technician||'');
     const editMode=Boolean(activeVisitDraft?.editMode||header?.editMode);
-    const headerLocationSessions=header?.locationSessions?.[locationKey];
-    const existingVisitSessions=visit?.records?.[0]?.item?.workSessions||[];
-    const sessionSource={date,workSessions:Array.isArray(headerLocationSessions)?headerLocationSessions:(Array.isArray(existingVisitSessions)?existingVisitSessions:[])};
+    const existingReportSessions=reportWorkSessions(report);
+    const draftReportSessions=Array.isArray(header?.reportSessions)?header.reportSessions:(Array.isArray(header?.workSessions)?header.workSessions:[]);
+    const sessionSource={date,workSessions:draftReportSessions.length?draftReportSessions:existingReportSessions};
     const workSessionsHtml=typeof window.machineparkServiceWorkSessionsEditor==='function'
       ?window.machineparkServiceWorkSessionsEditor(sessionSource,'servicevisit')
       :`<div class="field full"><label>Werkdagen en tijd</label><input name="workSessionDate" type="date" required value="${svEsc(date)}"><input name="workSessionMinutes" type="number" min="1" step="1" required placeholder="minuten"></div>`;
     const chips=locations.map(loc=>`<button type="button" class="service-report-location-chip ${loc.key===locationKey?'active':''}" data-sv-location-switch="${svEsc(loc.key)}"><span>${svEsc(loc.label)}</span>${loc.visitId?'<small>Bestaande locatie</small>':'<small>Concept</small>'}</button>`).join('');
-    return `<div class="form-grid"><div class="service-visit-form-note"><strong>Eén serviceverslag, meerdere locaties.</strong> Per locatie voer je de servicetijd één keer in. Je kunt meerdere werkdagen en tijden toevoegen. Die volledige servicetijd geldt voor alle toestellen op die locatie. Onderhoud, depannage en Andere werken blijven aparte records per toestel; onderdelen blijven per toestel gekoppeld en worden in het klantverslag per locatie én totaal samengevoegd.</div>
+    return `<div class="form-grid"><div class="service-visit-form-note"><strong>Eén serviceverslag, één totale servicetijd.</strong> Je voert de werkdagen en minuten één keer in voor het volledige serviceverslag, ook wanneer het verslag meerdere locaties bevat. Onderhoud, depannage en Andere werken blijven aparte records per toestel; onderdelen blijven per toestel gekoppeld en worden in het klantverslag per locatie én totaal samengevoegd.</div>
       ${report?`<div class="service-visit-existing"><strong>${editMode?'Bewerken van':'Aanvulling op'} ${svEsc(report.number)} · huidige versie v${svEsc(report.revision)}</strong><div class="muted" style="font-size:11px;margin-top:3px">${editMode?'Bestaande registraties worden aangepast; nieuwe toestellen en locaties kun je vanuit dit bewerkscherm toevoegen.':'Je kunt een toestel aan een bestaande locatie toevoegen of een volledig nieuwe locatie aan hetzelfde verslag toevoegen.'}</div></div>`:''}
+      <div class="field"><label>Datum *</label><input name="date" type="date" required value="${svEsc(date)}"></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${svEsc(time)}"></div>
+      <div class="field"><label>Technieker</label><input name="technician" value="${svEsc(technician)}"></div>
+      <div id="serviceReportSessions" class="field full"><div class="section-title">Servicetijd voor volledig serviceverslag</div>${workSessionsHtml}<div class="muted" style="font-size:11px;margin-top:6px">Deze totale tijd geldt voor alle uitgevoerde toestellen en alle locaties in dit serviceverslag.</div></div>
       <div class="field full service-report-location-manager"><div class="service-report-location-manager-head"><div><label>Locaties in dit verslag *</label><div class="muted" style="font-size:11px">Wissel tussen locaties om de toestellen en werkzaamheden in te vullen.</div></div><button type="button" class="btn small primary" id="serviceReportAddLocation">+ Locatie toevoegen</button></div><div id="serviceReportLocationChips" class="service-report-location-chips">${chips||'<span class="muted">Nog geen locatie gekozen.</span>'}</div></div>
       <div class="field full" id="serviceReportLocationPicker"><label>${locations.length?'Actieve locatie':'Eerste locatie'} *</label><div class="maintenance-location-autocomplete"><input id="serviceVisitLocationSearch" type="search" autocomplete="off" placeholder="Typ locatie of toestelnummer…" value="${svEsc(location)}"><input id="serviceVisitLocationKey" name="locationKey" type="hidden" value="${svEsc(locationKey)}"><div id="serviceVisitLocationSuggestions" class="maintenance-location-suggestions"></div></div><div id="serviceVisitLocationCount" class="muted" style="font-size:11px;margin-top:4px">${location?`Locatie: ${svEsc(location)}`:'Typ een locatie of toestelnummer en kies de locatie uit de lijst.'}</div></div>
-      <div class="field"><label>Datum *</label><input name="date" type="date" required value="${svEsc(date)}"></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${svEsc(time)}"></div>
-      <div class="field"><label>Technieker</label><input name="technician" value="${svEsc(technician)}"></div><div id="serviceReportLocationSessions" class="field full"><div class="section-title">Servicetijd voor volledige actieve locatie</div>${workSessionsHtml}</div>
       <div class="field full"><div class="service-report-device-head"><div><div class="section-title">Toestellen op actieve locatie</div><div class="muted" style="font-size:11px">Kies per toestel Onderhoud, Depannage en/of Andere werken. Handleidingen, werkbonnen, foto's en onderdelen blijven aan dit toestel gekoppeld; storingskoppeling blijft specifiek voor Depannage.</div></div>${editMode&&svCanCreate()?'<button type="button" class="btn small" id="serviceReportAddDevice">+ Toestel toevoegen</button>':''}</div></div>
       <div id="serviceVisitDevices" class="service-visit-device-list"><div class="empty" style="padding:24px">${location?'Toestellen laden…':'Kies eerst een locatie.'}</div></div></div>`;
   }
@@ -600,32 +596,11 @@
     return (report?.visits||[]).find(visit => String(visit.locationKey||svKey(visit.location)) === String(key||'')) || null;
   }
 
-  function existingReportLocationSessions(report,key) {
-    const visit=visitForLocation(report,key);
-    const first=visit?.records?.[0]?.item;
-    return Array.isArray(first?.workSessions)?first.workSessions.map(row=>({date:String(row.date||''),minutes:Math.max(0,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0):[];
-  }
-
-  function captureActiveLocationSessions() {
-    if(!activeVisitDraft?.activeLocationKey)return;
-    const form=document.getElementById('modalForm');if(!form)return;
+  function captureReportSessions() {
+    const form=document.getElementById('modalForm');if(!form||!activeVisitDraft)return;
     const fd=new FormData(form);
-    const rows=typeof window.machineparkCollectWorkSessions==='function'
-      ?window.machineparkCollectWorkSessions(fd)
-      :[];
-    activeVisitDraft.locationSessions=activeVisitDraft.locationSessions||{};
-    activeVisitDraft.locationSessions[activeVisitDraft.activeLocationKey]=rows;
-  }
-
-  function renderActiveLocationSessions(key) {
-    const host=document.getElementById('serviceReportLocationSessions');if(!host||!activeVisitDraft)return;
-    const date=String(document.getElementById('modalForm')?.elements.date?.value||todayISO());
-    const rows=activeVisitDraft.locationSessions?.[key]||existingReportLocationSessions(activeVisitDraft.report,key);
-    const source={date,workSessions:Array.isArray(rows)?rows:[]};
-    const editor=typeof window.machineparkServiceWorkSessionsEditor==='function'
-      ?window.machineparkServiceWorkSessionsEditor(source,'servicevisit')
-      :`<div class="field full"><label>Werkdagen en tijd</label><input name="workSessionDate" type="date" required value="${svEsc(date)}"><input name="workSessionMinutes" type="number" min="1" step="1" required placeholder="minuten"></div>`;
-    host.innerHTML=`<div class="section-title">Werktijd op ${svEsc((activeVisitDraft.locations||[]).find(loc=>loc.key===key)?.label||'actieve locatie')}</div>${editor}`;
+    const rows=typeof window.machineparkCollectWorkSessions==='function'?window.machineparkCollectWorkSessions(fd):[];
+    activeVisitDraft.reportSessions=rows;
   }
 
   function renderLocationChips() {
@@ -638,7 +613,6 @@
   async function switchDraftLocation(group,{capture=true}={}) {
     if(!activeVisitDraft||!group)return;
     if(capture&&activeVisitDraft.activeLocationKey&&activeVisitDraft.activeLocationKey!==group.key) {
-      captureActiveLocationSessions();
       activeVisitDraft.items=await collectItems();
     }
     let loc=(activeVisitDraft.locations||[]).find(item=>item.key===group.key);
@@ -648,7 +622,6 @@
     if(input){input.value=group.label;input.setCustomValidity('');}
     if(hidden)hidden.value=group.key;
     renderLocationChips();
-    renderActiveLocationSessions(group.key);
     const report=activeVisitDraft.report||null,existingVisit=visitForLocation(report,group.key);
     const items=locationItems(activeVisitDraft.items,group.key,activeVisitDraft.header?.locationKey||'');
     renderDevices(group,existingVisit,items);
@@ -673,10 +646,10 @@
     suggestions.addEventListener('click',e=>{const choice=e.target.closest('[data-sv-location]');if(!choice)return;const group=locationGroups().find(g=>g.key===choice.dataset.svLocation);if(!group)return;hide();void switchDraftLocation(group);});
     document.getElementById('serviceReportLocationChips')?.addEventListener('click',e=>{
       const remove=e.target.closest('[data-sv-location-remove]');
-      if(remove){const key=remove.dataset.svLocationRemove||'',loc=(activeVisitDraft.locations||[]).find(x=>x.key===key);if(!loc||loc.visitId)return;if(!confirm(`Locatie ${loc.label} uit dit concept verwijderen? De reeds afgesloten locaties worden niet geraakt.`))return;activeVisitDraft.items=(activeVisitDraft.items||[]).filter(item=>String(item.draftLocationKey||'')!==key);delete activeVisitDraft.locationSessions?.[key];activeVisitDraft.locations=activeVisitDraft.locations.filter(x=>x.key!==key);if(activeVisitDraft.activeLocationKey===key){activeVisitDraft.activeLocationKey=activeVisitDraft.locations[0]?.key||'';const next=activeVisitDraft.locations[0],group=next?findGroup(next.key,next.label):null;if(group)void switchDraftLocation(group,{capture:false});else renderDevices(null);}renderLocationChips();scheduleDraft();return;}
+      if(remove){const key=remove.dataset.svLocationRemove||'',loc=(activeVisitDraft.locations||[]).find(x=>x.key===key);if(!loc||loc.visitId)return;if(!confirm(`Locatie ${loc.label} uit dit concept verwijderen? De reeds afgesloten locaties worden niet geraakt.`))return;activeVisitDraft.items=(activeVisitDraft.items||[]).filter(item=>String(item.draftLocationKey||'')!==key);activeVisitDraft.locations=activeVisitDraft.locations.filter(x=>x.key!==key);if(activeVisitDraft.activeLocationKey===key){activeVisitDraft.activeLocationKey=activeVisitDraft.locations[0]?.key||'';const next=activeVisitDraft.locations[0],group=next?findGroup(next.key,next.label):null;if(group)void switchDraftLocation(group,{capture:false});else renderDevices(null);}renderLocationChips();scheduleDraft();return;}
       const chip=e.target.closest('[data-sv-location-switch]');if(!chip)return;const loc=(activeVisitDraft.locations||[]).find(x=>x.key===chip.dataset.svLocationSwitch);const group=loc?findGroup(loc.key,loc.label):null;if(group)void switchDraftLocation(group);
     });
-    if(add)add.onclick=async()=>{if(activeVisitDraft.activeLocationKey){captureActiveLocationSessions();activeVisitDraft.items=await collectItems();}activeVisitDraft.activeLocationKey='';hidden.value='';input.value='';renderLocationChips();renderDevices(null);input.focus();render();scheduleDraft();};
+    if(add)add.onclick=async()=>{if(activeVisitDraft.activeLocationKey){activeVisitDraft.items=await collectItems();}activeVisitDraft.activeLocationKey='';hidden.value='';input.value='';renderLocationChips();renderDevices(null);input.focus();render();scheduleDraft();};
     const addDevice=document.getElementById('serviceReportAddDevice');
     if(addDevice)addDevice.onclick=()=>{
       const cards=[...document.querySelectorAll('#serviceVisitDevices .service-visit-device')];
@@ -712,11 +685,10 @@
     const form=document.getElementById('modalForm'),existing=activeVisitDraft?.header||null,now=new Date().toISOString();
     const active=(activeVisitDraft?.locations||[]).find(loc=>loc.key===activeVisitDraft?.activeLocationKey)||null;
     const fd=new FormData(form);
-    captureActiveLocationSessions();
-    const workSessions=activeVisitDraft.locationSessions?.[activeVisitDraft.activeLocationKey]||[];
-    const locationSessions={...(activeVisitDraft.locationSessions||{})};
+    captureReportSessions();
+    const reportSessions=Array.isArray(activeVisitDraft.reportSessions)?activeVisitDraft.reportSessions:[];
     const locations=(activeVisitDraft?.locations||[]).map(loc=>({key:String(loc.key||''),label:String(loc.label||''),visitId:String(loc.visitId||'')})).filter(loc=>loc.key&&loc.label);
-    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions,locationSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',editMode:Boolean(activeVisitDraft.editMode),createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:2};
+    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions:reportSessions,reportSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',editMode:Boolean(activeVisitDraft.editMode),createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:4};
   }
 
   async function collectItems() {
@@ -875,7 +847,7 @@
     const locations=draftLocationList(report,header);
     const activeKey=header?.activeLocationKey||locations[0]?.key||'';
     const activeVisit=report?.visits?.find(v=>String(v.locationKey||svKey(v.location))===activeKey)||report?.visits?.[0]||null;
-    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,locationSessions:{...(header?.locationSessions||{})},appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',editMode,createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(draftId),touched:false,finalizing:false,restoring:Boolean(header&&draftId)};
+    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,reportSessions:Array.isArray(header?.reportSessions)?header.reportSessions:(Array.isArray(header?.workSessions)?header.workSessions:reportWorkSessions(report)),appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',editMode,createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(draftId),touched:false,finalizing:false,restoring:Boolean(header&&draftId)};
     showModal(report?(editMode?`Serviceverslag bewerken · ${reportDisplayLabel(report)}`:`Serviceverslag aanvullen · ${reportDisplayLabel(report)}`):(header?'Serviceconcept verderzetten':'Nieuw serviceverslag'),serviceVisitForm({report,visit:activeVisit,header,items}),'Serviceverslag opslaan',async()=>finalizeActiveVisit());
     setTimeout(()=>{initVisitForm({report,visit:activeVisit,header,items});decorateDraftModal();if(activeVisitDraft){activeVisitDraft.restoring=false;activeVisitDraft.touched=false;}},0);
   }
