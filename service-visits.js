@@ -376,6 +376,7 @@
     const date=report?.date||visit?.date||header?.date||todayISO();
     const time=report?.time||visit?.time||header?.time||nowLocalTime();
     const technician=header?.technician??(report?.technician==='—'?'':report?.technician||visit?.technician==='—'?'':visit?.technician||'');
+    const editMode=Boolean(activeVisitDraft?.editMode||header?.editMode);
     const headerLocationSessions=header?.locationSessions?.[locationKey];
     const existingVisitSessions=visit?.records?.[0]?.item?.workSessions||[];
     const sessionSource={date,workSessions:Array.isArray(headerLocationSessions)?headerLocationSessions:(Array.isArray(existingVisitSessions)?existingVisitSessions:[])};
@@ -389,7 +390,7 @@
       <div class="field full" id="serviceReportLocationPicker"><label>${locations.length?'Actieve locatie':'Eerste locatie'} *</label><div class="maintenance-location-autocomplete"><input id="serviceVisitLocationSearch" type="search" autocomplete="off" placeholder="Typ locatie of toestelnummer…" value="${svEsc(location)}"><input id="serviceVisitLocationKey" name="locationKey" type="hidden" value="${svEsc(locationKey)}"><div id="serviceVisitLocationSuggestions" class="maintenance-location-suggestions"></div></div><div id="serviceVisitLocationCount" class="muted" style="font-size:11px;margin-top:4px">${location?`Locatie: ${svEsc(location)}`:'Typ een locatie of toestelnummer en kies de locatie uit de lijst.'}</div></div>
       <div class="field"><label>Datum *</label><input name="date" type="date" required value="${svEsc(date)}"></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${svEsc(time)}"></div>
       <div class="field"><label>Technieker</label><input name="technician" value="${svEsc(technician)}"></div><div id="serviceReportLocationSessions" class="field full"><div class="section-title">Werktijd op actieve locatie</div>${workSessionsHtml}</div>
-      <div class="field full"><div class="section-title">Toestellen op actieve locatie</div><div class="muted" style="font-size:11px">Kies per toestel Onderhoud, Depannage of beide. Handleidingen, werkbonnen, storingen, foto's en onderdelen blijven aan dit toestel gekoppeld.</div></div>
+      <div class="field full"><div class="service-report-device-head"><div><div class="section-title">Toestellen op actieve locatie</div><div class="muted" style="font-size:11px">Kies per toestel Onderhoud, Depannage of beide. Handleidingen, werkbonnen, storingen, foto's en onderdelen blijven aan dit toestel gekoppeld.</div></div>${editMode&&svCanCreate()?'<button type="button" class="btn small" id="serviceReportAddDevice">+ Toestel toevoegen</button>':''}</div></div>
       <div id="serviceVisitDevices" class="service-visit-device-list"><div class="empty" style="padding:24px">${location?'Toestellen laden…':'Kies eerst een locatie.'}</div></div></div>`;
   }
 
@@ -551,6 +552,16 @@
       const chip=e.target.closest('[data-sv-location-switch]');if(!chip)return;const loc=(activeVisitDraft.locations||[]).find(x=>x.key===chip.dataset.svLocationSwitch);const group=loc?findGroup(loc.key,loc.label):null;if(group)void switchDraftLocation(group);
     });
     if(add)add.onclick=async()=>{if(activeVisitDraft.activeLocationKey){captureActiveLocationSessions();activeVisitDraft.items=await collectItems();}activeVisitDraft.activeLocationKey='';hidden.value='';input.value='';renderLocationChips();renderDevices(null);input.focus();render();scheduleDraft();};
+    const addDevice=document.getElementById('serviceReportAddDevice');
+    if(addDevice)addDevice.onclick=()=>{
+      const cards=[...document.querySelectorAll('#serviceVisitDevices .service-visit-device')];
+      const target=cards.find(card=>![...card.querySelectorAll('[data-kind]')].some(toggle=>toggle.checked));
+      if(!target){toast('Alle toestellen op deze locatie staan al in het serviceverslag.');return;}
+      target.scrollIntoView({behavior:'smooth',block:'center'});
+      target.classList.add('service-report-device-highlight');
+      setTimeout(()=>target.classList.remove('service-report-device-highlight'),1800);
+      const first=target.querySelector('[data-kind]:not(:disabled)');if(first)first.focus();
+    };
   }
 
   function collectUsed(panel){return [...(panel?.querySelectorAll('.sv-usage-list .usage-row')||[])].map(r=>({partId:r.querySelector('.usage-part')?.value||'',qty:Number(r.querySelector('.usage-qty')?.value||1)})).filter(u=>u.partId&&u.qty>0);}
