@@ -75,6 +75,10 @@ for needle in [
     'machineparkServiceVisitPdfModel',
     'service-visit-mail-btn',
     '+ Toestel toevoegen',
+    'deleteServiceReportAtomic',
+    'service-visit-delete-btn',
+    'maintenance.delete',
+    'breakdowns.delete',
 ]:
     if needle not in (ROOT / 'service-visits.js').read_text(encoding='utf-8'):
         raise SystemExit(f'Buildvalidatie mislukt: servicebezoekfunctie ontbreekt ({needle})')
