@@ -244,7 +244,6 @@
         <div><small>Locatie</small><strong>${svEsc(visit.location||'—')}</strong></div>
         <div><small>Servicetijd / toestellen</small><strong>${svEsc(formatWorkDuration(serviceMinutes))} · ${svEsc(deviceCount)} toestel${deviceCount===1?'':'len'}</strong></div>
         <div><small>Technieker</small><strong>${svEsc(item.technician||visit.technician||report.technician||'—')}</strong></div>
-        <div><small>Type</small><strong>${svEsc(svKindLabel(row.kind,item))}</strong></div>
       </div>
       ${recordSummary(row.kind,item)}
       ${photos.length?`<div class="service-report-print-record-photos"><div class="section-title">Foto’s bij deze werkzaamheid</div><div class="service-visit-photo-grid">${photos.map((src,photoIndex)=>`<figure><img src="${svEsc(src)}" alt="${svEsc(`${svKindLabel(row.kind,item)} · ${svDeviceShort(item.deviceId)} · foto ${photoIndex+1}`)}"><figcaption>${svEsc(`Foto ${photoIndex+1}`)}</figcaption></figure>`).join('')}</div></div>`:''}
@@ -295,7 +294,7 @@
     if (plain) { lines.push(`Onderdelen voor deze werkzaamheid: ${perRecordPartsText(item)}`); return lines.join('\n'); }
     const badgeClass=kind === 'maintenance' ? 'blue' : (kind === 'otherworks' ? 'other-work-badge' : 'danger');
     const badgeText=svKindLabel(kind,item);
-    return `<div class="service-visit-report-record"><h4><span class="badge ${badgeClass}">${svEsc(badgeText)}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div>${recordPartsBoxHtml(item)}</div>`;
+    return `<div class="service-visit-report-record"><h4><span class="badge service-record-kind-badge ${badgeClass}">${svEsc(badgeText)}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div>${recordPartsBoxHtml(item)}</div>`;
   }
 
 
