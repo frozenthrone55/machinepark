@@ -97,7 +97,7 @@ test('onderdelenkader krijgt ook duidelijke printopmaak', () => {
 
 
 test('gedeelde servicetijd blijft in minuten en totalen blijven uit workSessions komen', () => {
-  assert.match(js, /return total>0?\`\$\{total\} min\`:'—'/);
+  assert.match(js, /return total>0\?\`\$\{total\} min\`:'—'/);
   const totals=js.slice(js.indexOf('function visitWorkSessions'),js.indexOf('function visitReportHtml'));
   assert.match(totals, /record\.item\?\.workSessions/);
   assert.match(totals, /Number\(session\?\.minutes\)/);
