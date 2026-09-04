@@ -65,14 +65,18 @@ test('detailpagina toont datum met werkduur in plaats van kloktijd', () => {
 });
 
 
-test('werkuren worden per afzonderlijke servicewerkzaamheid bewaard en afgedrukt', () => {
+test('werkminuten worden per afzonderlijke servicewerkzaamheid zonder omzetting bewaard en afgedrukt', () => {
   assert.match(js, /sv-maintenance-hours/);
   assert.match(js, /sv-breakdown-hours/);
   assert.match(js, /sv-other-hours/);
-  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-maintenance-hours'\)/);
-  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-breakdown-hours'\)/);
-  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-other-hours'\)/);
-  assert.match(js, /const specific=Math\.max\(0,Math\.round\(Number\(item\?\.serviceItemMinutes\)\|\|0\)\)/);
+  assert.match(js, /Werkminuten op dit onderhoud/);
+  assert.match(js, /Werkminuten op deze depannage/);
+  assert.match(js, /Werkminuten op deze werkzaamheid/);
+  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-maintenance-hours'\)\?\.value\|\|0\)\)\)/);
+  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-breakdown-hours'\)\?\.value\|\|0\)\)\)/);
+  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-other-hours'\)\?\.value\|\|0\)\)\)/);
+  assert.match(js, /serviceItemMinutesUnit:'minutes'/);
+  assert.match(js, /const itemMinutes=serviceItemMinutesValue\(item\)/);
   assert.match(js, /hours:\(itemMinutes>0\?itemMinutes:totalMinutes\)\/60/);
 });
 
@@ -95,7 +99,10 @@ test('onderdelenkader krijgt ook duidelijke printopmaak', () => {
 });
 
 
-test('werkduur op detailpagina wordt altijd in minuten getoond', () => {
+test('werkduur op detailpagina wordt altijd in minuten getoond zonder nieuwe omzetting', () => {
+  assert.match(js, /function serviceItemMinutesValue/);
+  assert.match(js, /if\(item\?\.serviceItemMinutesUnit==='minutes'\)return Math\.round\(raw\)/);
+  assert.match(js, /return Math\.round\(raw\/60\)/);
   assert.match(js, /const storedMinutes=Number\(item\?\.hours\|\|0\)/);
   assert.match(js, /return storedMinutes>0\?Math\.round\(storedMinutes\):0/);
   assert.match(js, /return total>0\?\`\$\{total\} min\`:'—'/);
