@@ -848,7 +848,8 @@
       rows,
       totals,
       maintenance:rows.maintenance.length,
-      breakdowns:rows.breakdowns.length,
+      breakdowns:rows.breakdowns.filter(item=>!svIsOtherWork(item)).length,
+      otherWorks:rows.breakdowns.filter(item=>svIsOtherWork(item)).length,
       records:all.length,
       usedTypes:Object.keys(totals).length,
       usedQty:Object.values(totals).reduce((sum,qty)=>sum+Number(qty||0),0),
@@ -861,7 +862,7 @@
     return new Promise((resolve,reject)=>{
       if(!report?.id){reject(new Error('Serviceverslag niet gevonden.'));return;}
       const impact=serviceReportDeleteImpact(report);
-      if(!impact.records){reject(new Error('Dit serviceverslag bevat geen gekoppelde onderhouds- of depannageregistraties meer.'));return;}
+      if(!impact.records){reject(new Error('Dit serviceverslag bevat geen gekoppelde onderhouds-, depannage- of Andere-werkenregistraties meer.'));return;}
       const now=new Date().toISOString(),updates=[];
       for(const [id,qty] of Object.entries(impact.totals)){
         const part=(state.parts || []).find(item=>item.id===id);
@@ -891,6 +892,7 @@
       '',
       `• ${impact.maintenance} onderhoudsregistratie${impact.maintenance===1?'':'s'} wordt/worden verwijderd.`,
       `• ${impact.breakdowns} depannageregistratie${impact.breakdowns===1?'':'s'} wordt/worden verwijderd.`,
+      `• ${impact.otherWorks} registratie${impact.otherWorks===1?'':'s'} Andere werken wordt/worden verwijderd.`,
     ];
     if(impact.usedQty)lines.push(`• ${impact.usedQty} gebruikt${impact.usedQty===1?' onderdeel':'e onderdelen'} over ${impact.usedTypes} artikeltype${impact.usedTypes===1?'':'s'} wordt/worden terug op voorraad gezet.`);
     else lines.push('• Er zijn geen voorraadonderdelen om terug te zetten.');
@@ -961,7 +963,7 @@
     const draftBox=document.getElementById('serviceVisitDraftList'),headers=visitDraftHeaders();
     if(draftBox)draftBox.innerHTML=headers.length?`<div class="service-visit-drafts"><div class="service-draft-head"><strong>Serviceconcepten (${headers.length})</strong><span class="muted" style="font-size:11px">Meerdere locaties blijven samen in één concept en worden centraal gesynchroniseerd.</span></div><div class="service-draft-list">${headers.map(h=>{const items=visitDraftItems(h.id),locations=Array.isArray(h.locations)&&h.locations.length?h.locations.map(x=>x.label):[h.locationLabel].filter(Boolean),devices=[...new Set(items.map(i=>svDeviceShort(i.deviceId)))].join(', ')||'Nog geen toestel geselecteerd',target=h.appendToReportId?serviceReportById(h.appendToReportId):(h.appendToVisitId?serviceReportForVisit(h.appendToVisitId):null);return `<div class="service-draft-row"><div><div class="service-draft-row-title"><span class="service-draft-badge">CONCEPT</span>${svEsc(target?`Aanvulling ${reportDisplayLabel(target)}`:locations.length?`Serviceverslag · ${locations.length} locatie${locations.length===1?'':'s'}`:'Nieuw serviceverslag')}</div><div class="service-draft-row-meta">${svEsc(locations.join(', ')||'Nog geen locatie')} · ${svEsc(devices)} · laatst aangepast ${svEsc(new Date(h.updatedAt||Date.now()).toLocaleString('nl-BE'))}</div></div><div class="service-draft-actions"><button type="button" class="btn small service-draft-button" data-sv-draft-open="${svEsc(h.id)}">Verdergaan</button><button type="button" class="btn small danger" data-sv-draft-delete="${svEsc(h.id)}">Verwijderen</button></div></div>`;}).join('')}</div></div>`:'';
     const body=document.getElementById('serviceVisitBody');if(!body)return;const reports=serviceReports();
-    body.innerHTML=reports.length?reports.map(r=>{const acts=[r.maintenanceCount?`${r.maintenanceCount} onderhoud`:'',r.breakdownCount?`${r.breakdownCount} depannage`:''].filter(Boolean).join(' · '),locations=r.visits.map(v=>v.location).filter(Boolean);return `<tr><td><span class="service-visit-number">${svEsc(reportDisplayLabel(r))}</span><div class="muted" style="font-size:10px">v${svEsc(r.revision)}</div></td><td>${svEsc(svDateText(r.date))}${r.time?`<div class="muted" style="font-size:10px">${svEsc(r.time)}</div>`:''}</td><td><strong>${svEsc(r.locationCount)}</strong><div class="muted" style="font-size:10px">${svEsc(locations.join(' · ')||'—')}</div></td><td>${svEsc(r.deviceCount)}</td><td>${svEsc(acts||'—')}</td><td>${svEsc(r.technician||'—')}</td><td><span class="service-visit-status">Afgesloten</span></td><td><button type="button" class="btn small" data-service-visit-open="${svEsc(r.id)}">Details</button></td></tr>`;}).join(''):'<tr><td colspan="8"><div class="empty">Nog geen gezamenlijke serviceverslagen. Los onderhoud en losse depannages blijven gewoon in de historiek staan.</div></td></tr>';
+    body.innerHTML=reports.length?reports.map(r=>{const acts=[r.maintenanceCount?`${r.maintenanceCount} onderhoud`:'',r.breakdownCount?`${r.breakdownCount} depannage`:'',r.otherWorkCount?`${r.otherWorkCount} andere werken`:''].filter(Boolean).join(' · '),locations=r.visits.map(v=>v.location).filter(Boolean);return `<tr><td><span class="service-visit-number">${svEsc(reportDisplayLabel(r))}</span><div class="muted" style="font-size:10px">v${svEsc(r.revision)}</div></td><td>${svEsc(svDateText(r.date))}${r.time?`<div class="muted" style="font-size:10px">${svEsc(r.time)}</div>`:''}</td><td><strong>${svEsc(r.locationCount)}</strong><div class="muted" style="font-size:10px">${svEsc(locations.join(' · ')||'—')}</div></td><td>${svEsc(r.deviceCount)}</td><td>${svEsc(acts||'—')}</td><td>${svEsc(r.technician||'—')}</td><td><span class="service-visit-status">Afgesloten</span></td><td><button type="button" class="btn small" data-service-visit-open="${svEsc(r.id)}">Details</button></td></tr>`;}).join(''):'<tr><td colspan="8"><div class="empty">Nog geen gezamenlijke serviceverslagen. Los onderhoud en losse depannages blijven gewoon in de historiek staan.</div></td></tr>';
   }
 
   document.addEventListener('click',e=>{const open=e.target.closest('[data-service-visit-open]');if(open){showServiceVisitDetails(open.dataset.serviceVisitOpen);return;}const draft=e.target.closest('[data-sv-draft-open]');if(draft){void openServiceVisit('',draft.dataset.svDraftOpen);return;}const del=e.target.closest('[data-sv-draft-delete]');if(del){void deleteVisitDraft(del.dataset.svDraftDelete);}});
@@ -977,8 +979,8 @@
       {label:'Werkdagen / tijd',value:sessions.length?sessions.map(row=>`${svDateText(row.date)} · ${row.location||'—'} · ${row.minutes} min`).join('\n')+`\nTotaal: ${totalMinutes} min`:'—',full:true}
     ];
     for(const visit of report.visits||[]) {
-      fields.push({label:`LOCATIE · ${visit.location||'—'}`,value:`${visit.deviceCount} toestel${visit.deviceCount===1?'':'len'} · ${visit.maintenanceCount} onderhoud · ${visit.breakdownCount} depannage`,full:true});
-      for(const row of visit.records) fields.push({label:`${row.kind==='maintenance'?'Onderhoud':'Depannage'} · ${svDeviceShort(row.item.deviceId)}`,value:recordSummary(row.kind,row.item,true),full:true});
+      fields.push({label:`LOCATIE · ${visit.location||'—'}`,value:`${visit.deviceCount} toestel${visit.deviceCount===1?'':'len'} · ${visit.maintenanceCount} onderhoud · ${visit.breakdownCount} depannage · ${visit.otherWorkCount||0} andere werken`,full:true});
+      for(const row of visit.records) fields.push({label:`${svKindLabel(row.kind,row.item)} · ${svDeviceShort(row.item.deviceId)}`,value:recordSummary(row.kind,row.item,true),full:true});
       const localParts=mergedVisitParts(visit);fields.push({label:`Onderdelen · ${visit.location||'—'}`,value:localParts.length?localParts.map(p=>`${p.label} × ${p.qty} · ${p.devices.join(', ')}`).join('\n'):'—',full:true});
     }
     fields.push({label:'Totaal gebruikte onderdelen · alle locaties',value:parts.length?parts.map(p=>`${p.label} × ${p.qty} · ${p.devices.join(', ')}`).join('\n'):'—',full:true});
