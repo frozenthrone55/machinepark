@@ -899,6 +899,9 @@ required = [
     'servicePdfSummaryPage',
     'servicePdfWorkPage',
     'ONDERDELEN VOOR DEZE WERKZAAMHEID',
+    'servicePdfFitSingleLine',
+    "headers:['Onderdeel','Omschrijving','Aantal','Locaties / toestellen']",
+    'nowrapCols:[0,2],rightCols:[2]',
     'green:[24,63,53]',
 ]
 for needle in required:
