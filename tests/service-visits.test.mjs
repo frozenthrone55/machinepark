@@ -27,9 +27,10 @@ test('onderdelen blijven per toestel en worden alleen voor klant samengevoegd', 
   assert.match(js, /devices:new Set/);
 });
 
-test('zichtbare serviceverslagnaam bevat dag maand locatie en korte code zonder jaartal', () => {
+test('zichtbare serviceverslagnaam bevat volledige datum locatie en korte code', () => {
   assert.match(js, /function reportDisplayLabel/);
   assert.match(js, /shortDate\(report\.date\)/);
+  assert.match(js, /\$\{m\[3\]\}\/\$\{m\[2\]\}\/\$\{m\[1\]\}/);
   assert.match(js, /visibleCode\(report\.number,'SR'\)/);
   assert.match(js, /\+\$\{locations\.length-1\}/);
   assert.match(js, /reportDisplayLabel\(r\)/);
