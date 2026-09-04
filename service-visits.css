@@ -21,7 +21,7 @@
 .service-visit-merged-parts{width:100%;border-collapse:collapse;font-size:12px}.service-visit-merged-parts th,.service-visit-merged-parts td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}.service-visit-merged-parts th{font-size:10px;text-transform:uppercase;color:var(--muted)}
 .service-visit-photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.service-visit-photo-grid figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff}.service-visit-photo-grid img{width:100%;height:130px;object-fit:cover;border-radius:7px}.service-visit-photo-grid figcaption{font-size:10px;color:var(--muted);margin-top:4px}
 .service-visit-print-sheet{display:none}
-.service-report-print-only,.service-report-print-details{display:none}
+.service-report-print-only,.service-report-print-details,.service-report-print-location-summary{display:none}
 .service-report-print-record-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
 .service-report-print-record-head small{display:block;font-size:10px;font-weight:850;text-transform:uppercase;margin-bottom:3px}
 .service-report-print-record-head strong{display:block;font-size:13px}
