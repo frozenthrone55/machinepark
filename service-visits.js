@@ -232,17 +232,13 @@
     const dated=sessions.filter(row=>String(row.date||'')===String(date||''));
     if(dated.length)return dated.reduce((sum,row)=>sum+Math.max(0,Number(row.minutes)||0),0);
     if(sessions.length===1)return Math.max(0,Number(sessions[0].minutes)||0);
-    const hours=Number(item?.hours||0);
-    return hours>0?Math.round(hours*60):0;
+    const storedMinutes=Number(item?.hours||0);
+    return storedMinutes>0?Math.round(storedMinutes):0;
   }
 
   function formatWorkDuration(minutes) {
     const total=Math.max(0,Math.round(Number(minutes)||0));
-    if(!total)return '—';
-    const hours=Math.floor(total/60),mins=total%60;
-    if(hours&&mins)return `${hours} u ${mins} min`;
-    if(hours)return `${hours} u`;
-    return `${mins} min`;
+    return total>0?`${total} min`:'—';
   }
 
   function printRecordPageHtml(report,visit,row,index) {
