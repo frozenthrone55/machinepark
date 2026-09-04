@@ -488,6 +488,232 @@ if MARKER not in index:
     }
   }
 
+  const SERVICE_PDF = {
+    green:[24,63,53],
+    ink:[17,17,17],
+    muted:[51,51,51],
+    border:[85,85,85],
+    meta:[236,236,234],
+    table:[222,222,219],
+    tableLight:[236,236,234],
+    maintenance:[36,72,93],
+    breakdowns:[107,45,45],
+    otherworks:[75,60,103],
+  };
+
+  function servicePdfSetText(doc,color=SERVICE_PDF.ink){doc.setTextColor(...color);}
+  function servicePdfSetDraw(doc,color=SERVICE_PDF.border){doc.setDrawColor(...color);}
+  function servicePdfSetFill(doc,color=SERVICE_PDF.meta){doc.setFillColor(...color);}
+  function servicePdfSafe(value){return pdfSafeText(value===undefined||value===null?'—':String(value));}
+
+  function servicePdfSectionTitle(doc,title,y) {
+    servicePdfSetText(doc,SERVICE_PDF.ink);
+    doc.setFont('helvetica','bold');doc.setFontSize(10.5);
+    doc.text(servicePdfSafe(title),8,y);
+    servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.35);doc.line(8,y+2,202,y+2);
+    return y+7;
+  }
+
+  function servicePdfMetaBoxes(doc,meta,y) {
+    const gap=2.5,width=(194-gap*3)/4,height=17;
+    (meta||[]).slice(0,4).forEach((field,index)=>{
+      const x=8+index*(width+gap);
+      servicePdfSetFill(doc,SERVICE_PDF.meta);servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.35);
+      doc.roundedRect(x,y,width,height,2.2,2.2,'FD');
+      servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFont('helvetica','bold');doc.setFontSize(6.7);
+      doc.text(servicePdfSafe(field.label).toUpperCase(),x+2.3,y+4.2);
+      doc.setFontSize(8.6);
+      const lines=doc.splitTextToSize(servicePdfSafe(field.value),width-4.6).slice(0,2);
+      doc.text(lines,x+2.3,y+9.2);
+    });
+    return y+height+5;
+  }
+
+  function servicePdfTable(doc,{headers=[],rows=[],widths=[],y,headerFill=SERVICE_PDF.table,rowFont=8.2}) {
+    const x=8,total=widths.reduce((sum,w)=>sum+w,0),headerH=8;
+    servicePdfSetFill(doc,headerFill);servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.3);
+    doc.rect(x,y,total,headerH,'FD');
+    let cx=x;
+    doc.setFont('helvetica','bold');doc.setFontSize(6.8);servicePdfSetText(doc,SERVICE_PDF.ink);
+    headers.forEach((header,i)=>{doc.text(servicePdfSafe(header).toUpperCase(),cx+2,y+5.1);cx+=widths[i]||0;});
+    y+=headerH;
+    for(const row of rows) {
+      const cells=row.map(cell=>servicePdfSafe(cell));
+      const wrapped=cells.map((cell,i)=>doc.splitTextToSize(cell,Math.max(5,(widths[i]||20)-4)));
+      const rowH=Math.max(8,...wrapped.map(lines=>Math.max(1,lines.length)*3.8+3));
+      servicePdfSetDraw(doc,[120,120,120]);doc.rect(x,y,total,rowH);
+      let xx=x;doc.setFont('helvetica','normal');doc.setFontSize(rowFont);servicePdfSetText(doc,SERVICE_PDF.ink);
+      wrapped.forEach((lines,i)=>{
+        if(i===1)doc.setFont('helvetica','bold');else doc.setFont('helvetica','normal');
+        doc.text(lines,xx+2,y+4.8);xx+=widths[i]||0;
+      });
+      y+=rowH;
+    }
+    return y;
+  }
+
+  function servicePdfSummaryPage(doc,model) {
+    const layout=model.servicePrintLayout;
+    servicePdfSetText(doc,SERVICE_PDF.ink);
+    doc.setFont('helvetica','bold');doc.setFontSize(16);
+    doc.text(servicePdfSafe(layout.title),8,13);
+    doc.setFont('helvetica','normal');doc.setFontSize(8.5);
+    doc.text(servicePdfSafe(layout.subtitle),8,19);
+    let y=24;
+    y=servicePdfMetaBoxes(doc,layout.meta,y);
+    y=servicePdfSectionTitle(doc,'Werkdagen en tijd',y);
+    doc.setFont('helvetica','normal');doc.setFontSize(8.3);servicePdfSetText(doc,SERVICE_PDF.ink);
+    if(layout.sessions?.length){
+      for(const row of layout.sessions){
+        doc.text(servicePdfSafe(`${row.date} · ${row.location} · ${row.minutes} min`),8,y);
+        y+=4.5;
+      }
+    }else{doc.text('—',8,y);y+=4.5;}
+    doc.setFont('helvetica','bold');doc.text(servicePdfSafe(`Totaal: ${layout.totalMinutes||0} min`),8,y);y+=7;
+
+    y=servicePdfSectionTitle(doc,'Totaaloverzicht werkzaamheden',y);
+    y=servicePdfTable(doc,{
+      headers:['Locatie','Toestellen','Onderhoud','Depannage','Andere werken'],
+      rows:(layout.locations||[]).map(row=>[row.location,row.devices,row.maintenance,row.breakdowns,row.otherWorks]),
+      widths:[62,30,32,32,38],y
+    })+6;
+
+    y=servicePdfSectionTitle(doc,'Totaal gebruikte onderdelen · alle locaties',y);
+    servicePdfTable(doc,{
+      headers:['Onderdeel','Aantal','Locaties / toestellen'],
+      rows:(layout.parts?.length?layout.parts:[{label:'Geen onderdelen gebruikt.',qty:'',devices:[]}]).map(row=>[row.label,row.qty,(row.devices||[]).join(', ')]),
+      widths:[72,22,100],y
+    });
+  }
+
+  function servicePdfKindColor(kind) {
+    return kind==='maintenance'?SERVICE_PDF.maintenance:(kind==='otherworks'?SERVICE_PDF.otherworks:SERVICE_PDF.breakdowns);
+  }
+
+  function servicePdfWorkHeader(doc,model,page) {
+    servicePdfSetText(doc,SERVICE_PDF.ink);
+    doc.setFont('helvetica','bold');doc.setFontSize(6.8);doc.text('SERVICEVERSLAG',8,8);
+    doc.setFontSize(8.5);doc.text(servicePdfSafe(model.servicePrintLayout.reportLabel),8,14);
+    const label=servicePdfSafe(page.kindLabel),pillW=Math.max(24,doc.getTextWidth(label)+10);
+    servicePdfSetFill(doc,SERVICE_PDF.green);doc.roundedRect(202-pillW,5,pillW,9,4.5,4.5,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(7.5);doc.text(label,202-pillW/2,10.7,{align:'center'});
+    servicePdfSetDraw(doc,SERVICE_PDF.green);doc.setLineWidth(.7);doc.line(8,19,202,19);
+    servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFontSize(6.8);doc.text(servicePdfSafe(`WERKZAAMHEID ${page.index}`),8,25);
+    doc.setFontSize(14);doc.text(servicePdfSafe(page.device),8,33);
+    return 38;
+  }
+
+  function servicePdfMeasureDetails(doc,lines,width) {
+    let height=0;doc.setFont('helvetica','normal');doc.setFontSize(8.2);
+    for(const raw of lines||[]) {
+      const chunks=String(raw??'—').split(/\n/);
+      for(const chunk of chunks){
+        const wrapped=doc.splitTextToSize(servicePdfSafe(chunk||'—'),width);
+        height+=Math.max(1,wrapped.length)*3.8+1;
+      }
+    }
+    return height;
+  }
+
+  function servicePdfMeasureParts(doc,parts,width) {
+    let height=14;
+    if(!parts?.length)return height+8;
+    doc.setFont('helvetica','normal');doc.setFontSize(7.8);
+    for(const part of parts){
+      const wrapped=doc.splitTextToSize(servicePdfSafe(part.label),width-28);
+      height+=Math.max(8,wrapped.length*3.5+3);
+    }
+    return height;
+  }
+
+  function servicePdfPartsBox(doc,page,x,y,width) {
+    const parts=page.parts||[],titleH=7,headH=7;
+    servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.35);
+    servicePdfSetFill(doc,SERVICE_PDF.table);doc.roundedRect(x,y,width,titleH+headH+(parts.length?0:8),2,2,'S');
+    doc.rect(x,y,width,titleH,'F');
+    servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFont('helvetica','bold');doc.setFontSize(6.8);
+    doc.text('ONDERDELEN VOOR DEZE WERKZAAMHEID',x+2.5,y+4.7);
+    y+=titleH;
+    servicePdfSetFill(doc,SERVICE_PDF.tableLight);doc.rect(x,y,width,headH,'F');servicePdfSetDraw(doc,SERVICE_PDF.border);doc.rect(x,y,width,headH);
+    doc.setFontSize(6.4);doc.text('ONDERDEEL',x+2.5,y+4.7);doc.text('AANTAL',x+width-2.5,y+4.7,{align:'right'});
+    y+=headH;
+    if(!parts.length){
+      doc.setFont('helvetica','normal');doc.setFontSize(7.8);doc.text('Geen onderdelen gebruikt.',x+2.5,y+5);
+      servicePdfSetDraw(doc,SERVICE_PDF.border);doc.rect(x,y,width,8);return y+8;
+    }
+    for(const part of parts){
+      doc.setFont('helvetica','normal');doc.setFontSize(7.8);
+      const wrapped=doc.splitTextToSize(servicePdfSafe(part.label),width-34);
+      const rowH=Math.max(8,wrapped.length*3.5+(part.oneOff?5:3));
+      servicePdfSetDraw(doc,[120,120,120]);doc.rect(x,y,width,rowH);
+      servicePdfSetText(doc,SERVICE_PDF.ink);doc.text(wrapped,x+2.5,y+4.5);
+      doc.setFont('helvetica','bold');doc.text(servicePdfSafe(part.qty),x+width-2.5,y+4.5,{align:'right'});
+      if(part.oneOff){doc.setFontSize(5.7);doc.text('EENMALIG / LEVERANCIER',x+2.5,y+rowH-2);}
+      y+=rowH;
+    }
+    return y;
+  }
+
+  async function servicePdfWorkPhotos(doc,model,page,startY) {
+    if(!page.photos?.length)return;
+    let y=startY+6;
+    if(y>235){doc.addPage();y=servicePdfWorkHeader(doc,model,page)+4;}
+    y=servicePdfSectionTitle(doc,'Foto’s bij deze werkzaamheid',y);
+    const gap=5,boxW=(194-gap)/2;
+    for(let index=0;index<page.photos.length;index+=2){
+      if(y+65>278){doc.addPage();y=servicePdfWorkHeader(doc,model,page)+4;y=servicePdfSectionTitle(doc,'Foto’s bij deze werkzaamheid',y);}
+      const batch=page.photos.slice(index,index+2),data=await Promise.all(batch.map(imageData));
+      data.forEach((img,col)=>{
+        const x=8+col*(boxW+gap);servicePdfSetDraw(doc,SERVICE_PDF.border);doc.rect(x,y,boxW,58);
+        if(!img)return;
+        try{
+          const props=doc.getImageProperties(img),ratio=Math.min((boxW-4)/props.width,54/props.height),w=props.width*ratio,h=props.height*ratio;
+          doc.addImage(img,img.startsWith('data:image/png')?'PNG':'JPEG',x+(boxW-w)/2,y+2+(54-h)/2,w,h,undefined,'FAST');
+        }catch(_){}
+      });
+      y+=63;
+    }
+  }
+
+  async function servicePdfWorkPage(doc,model,page) {
+    doc.addPage();
+    let y=servicePdfWorkHeader(doc,model,page);
+    y=servicePdfMetaBoxes(doc,[
+      {label:'Locatie',value:page.location},
+      {label:'Datum / werkuren',value:`${page.date} · ${Math.max(0,Math.round(Number(page.workMinutes)||0))} min`},
+      {label:'Technieker',value:page.technician},
+      {label:'Type',value:page.kindLabel},
+    ],y);
+
+    const detailH=servicePdfMeasureDetails(doc,page.detailLines,178),partsH=servicePdfMeasureParts(doc,page.parts,184);
+    const cardX=8,cardW=194,cardY=y,cardH=Math.min(215,12+detailH+5+partsH+5);
+    servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.35);doc.roundedRect(cardX,cardY,cardW,cardH,2.5,2.5,'S');
+
+    let cy=cardY+7;
+    const badge=servicePdfSafe(page.kindLabel),badgeColor=servicePdfKindColor(page.kind),badgeW=Math.max(20,doc.getTextWidth(badge)+9);
+    servicePdfSetFill(doc,badgeColor);doc.roundedRect(cardX+3,cy-4.5,badgeW,7,3.5,3.5,'F');
+    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(6.8);doc.text(badge,cardX+3+badgeW/2,cy,{align:'center'});
+    servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFontSize(8.8);doc.text(servicePdfSafe(page.device),cardX+6+badgeW,cy);
+    cy+=7;
+
+    doc.setFont('helvetica','normal');doc.setFontSize(8.2);
+    for(const raw of page.detailLines||[]){
+      for(const chunk of String(raw??'—').split(/\n/)){
+        const wrapped=doc.splitTextToSize(servicePdfSafe(chunk||'—'),178);
+        servicePdfSetText(doc,SERVICE_PDF.ink);doc.text(wrapped,cardX+3,cy);
+        cy+=Math.max(1,wrapped.length)*3.8+1;
+      }
+    }
+    cy+=2;
+    cy=servicePdfPartsBox(doc,page,cardX+3,cy,cardW-6);
+    await servicePdfWorkPhotos(doc,model,page,Math.max(cardY+cardH,cy));
+  }
+
+  async function addServiceVisitPrintLayout(doc,model) {
+    servicePdfSummaryPage(doc,model);
+    for(const page of model.servicePrintLayout?.workPages||[])await servicePdfWorkPage(doc,model,page);
+  }
+
   function addPageNumbers(doc) {
     const pages = doc.getNumberOfPages();
     for (let page = 1; page <= pages; page += 1) {
@@ -511,11 +737,15 @@ if MARKER not in index:
     if (context.kind === 'device') model = deviceModel(context);
 
     if (model) {
-      if (!(model.fields?.length || model.timelines?.length || model.photos?.length)) throw new Error('Er is geen inhoud gevonden om in de PDF te zetten.');
-      addHeader(doc, model);
-      let y = addFields(doc, model, 39);
-      y = addTimeline(doc, model, y);
-      await addPhotos(doc, model, y);
+      if (!(model.fields?.length || model.timelines?.length || model.photos?.length || model.servicePrintLayout)) throw new Error('Er is geen inhoud gevonden om in de PDF te zetten.');
+      if (context.kind === 'serviceVisit' && model.servicePrintLayout) {
+        await addServiceVisitPrintLayout(doc, model);
+      } else {
+        addHeader(doc, model);
+        let y = addFields(doc, model, 39);
+        y = addTimeline(doc, model, y);
+        await addPhotos(doc, model, y);
+      }
     } else {
       const lines = genericLines(context.source);
       const useful = lines.join(' ').replace(/\s+/g, ' ').trim();
@@ -525,7 +755,7 @@ if MARKER not in index:
       addGenericContent(doc, model, lines);
     }
 
-    addPageNumbers(doc);
+    if (!(context.kind === 'serviceVisit' && model?.servicePrintLayout)) addPageNumbers(doc);
     const blob = doc.output('blob');
     if (!(blob instanceof Blob) || blob.size < 1200) throw new Error('De PDF bevat geen geldige inhoud. Probeer opnieuw.');
     const stamp = new Date().toISOString().slice(0, 10);
