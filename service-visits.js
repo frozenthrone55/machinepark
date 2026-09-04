@@ -325,6 +325,37 @@
     </div>`;
   }
 
+  function reportEditHeader(report) {
+    if(!report)return null;
+    const locations=(report.visits||[]).map(visit=>({key:visit.locationKey||svKey(visit.location),label:visit.location||'—',visitId:visit.id}));
+    const locationSessions={};
+    for(const visit of report.visits||[]) {
+      const key=visit.locationKey||svKey(visit.location);
+      const first=visit.records?.[0]?.item;
+      locationSessions[key]=Array.isArray(first?.workSessions)?first.workSessions.map(row=>({date:String(row.date||''),minutes:Math.max(0,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0):[];
+    }
+    return {locations,activeLocationKey:locations[0]?.key||'',date:report.date||todayISO(),time:report.time||nowLocalTime(),technician:report.technician==='—'?'':report.technician||'',locationSessions,appendToReportId:report.id,editReportId:report.id};
+  }
+
+  function reportEditItems(report,draftBatchId) {
+    const now=new Date().toISOString(),out=[];
+    for(const visit of report?.visits||[]) {
+      const locationKey=visit.locationKey||svKey(visit.location),locationLabel=visit.location||'';
+      for(const row of visit.records||[]) {
+        const src=row.item||{},kind=row.kind;
+        out.push({...src,
+          id:uid(kind==='maintenance'?'mntdraft':'brkdraft'),
+          sourceRecordId:src.id,
+          sourceUsedParts:Array.isArray(src.usedParts)?src.usedParts.map(p=>({...p})):[],
+          isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId,
+          draftServiceKind:kind,draftLocationKey:locationKey,draftLocationLabel:locationLabel,
+          targetVisitId:visit.id,createdAt:now,updatedAt:now,draftSchema:3
+        });
+      }
+    }
+    return out;
+  }
+
   function draftLocationList(report=null,header=null) {
     const fromReport=(report?.visits||[]).map(visit=>({key:visit.locationKey||svKey(visit.location),label:visit.location||'—',visitId:visit.id}));
     const fromHeader=Array.isArray(header?.locations)?header.locations.map(loc=>({key:String(loc?.key||''),label:String(loc?.label||''),visitId:String(loc?.visitId||'')})).filter(loc=>loc.key&&loc.label):[];
