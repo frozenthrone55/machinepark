@@ -168,10 +168,12 @@ if MARKER not in index:
     const sessions = Array.isArray(record?.workSessions) ? record.workSessions : [];
     const sessionMinutes = sessions.reduce((sum, row) => sum + Math.max(0, Math.round(Number(row?.minutes) || 0)), 0);
     if (record?.serviceVisitId) {
-      const minutes = Math.max(0, Math.round(Number(record?.serviceVisitTotalMinutes) || sessionMinutes || Number(record?.hours || 0) * 60));
-      const linked = [...(state.maintenance || []), ...(state.breakdowns || [])].filter(item => item?.serviceVisitId === record.serviceVisitId);
+      const reportSessions = Array.isArray(record?.serviceReportWorkSessions) && record.serviceReportWorkSessions.length ? record.serviceReportWorkSessions : sessions;
+      const reportMinutes = reportSessions.reduce((sum, row) => sum + Math.max(0, Math.round(Number(row?.minutes) || 0)), 0);
+      const minutes = Math.max(0, Math.round(Number(record?.serviceReportTotalMinutes) || reportMinutes || Number(record?.hours || 0) * 60));
+      const linked = [...(state.maintenance || []), ...(state.breakdowns || [])].filter(item => (item?.serviceReportId || item?.serviceVisitId) === (record?.serviceReportId || record?.serviceVisitId));
       const unique = new Set(linked.map(item => item?.deviceId).filter(Boolean)).size;
-      const count = Math.max(1, unique || Math.round(Number(record?.serviceVisitDeviceCount || record?.batchSize) || 1));
+      const count = Math.max(1, unique || Math.round(Number(record?.serviceReportDeviceCount || record?.serviceVisitDeviceCount || record?.batchSize) || 1));
       return `${minutes} min / ${count} toestel${count === 1 ? '' : 'len'}`;
     }
     const minutes = sessionMinutes || Math.max(0, Math.round(Number(record?.hours || 0) * 60));
@@ -201,7 +203,7 @@ if MARKER not in index:
       { label:'Type onderhoud', value:record.type || '—' },
       { label:'Toestel', value:serviceDevice(record), full:true },
       { label:'Technieker', value:record.technician || '—' },
-      { label:'Werkminuten / toestellen', value:serviceWorkSummary('maintenance', record) },
+      { label:record?.serviceVisitId?'Servicetijd volledig verslag / toestellen':'Werkminuten / toestellen', value:serviceWorkSummary('maintenance', record) },
       { label:'Gebruikte onderdelen', value:serviceParts(record, true), full:true },
       ...(oneOff !== '—' ? [{ label:'Eenmalige onderdelen', value:oneOff, full:true }] : []),
       { label:'Uitgevoerde werkzaamheden / notitie', value:record.notes || '—', full:true },
@@ -211,7 +213,7 @@ if MARKER not in index:
       { label:'Prioriteit', value:record.priority || '—' },
       { label:'Status', value:record.status || '—' },
       { label:'Technieker', value:record.technician || '—' },
-      { label:'Werkminuten / toestellen', value:serviceWorkSummary('breakdowns', record) },
+      { label:record?.serviceVisitId?'Servicetijd volledig verslag / toestellen':'Werkminuten / toestellen', value:serviceWorkSummary('breakdowns', record) },
       { label:'Probleem / melding', value:record.issue || '—', full:true },
       { label:'Diagnose', value:record.diagnosis || '—', full:true },
       { label:'Oplossing / uitgevoerde werken', value:record.solution || '—', full:true },
@@ -572,7 +574,7 @@ if MARKER not in index:
     doc.setFont('helvetica','normal');doc.setFontSize(8.3);servicePdfSetText(doc,SERVICE_PDF.ink);
     if(layout.sessions?.length){
       for(const row of layout.sessions){
-        doc.text(servicePdfSafe(`${row.date} · ${row.location} · ${row.minutes} min`),8,y);
+        doc.text(servicePdfSafe(`${row.date} · ${row.minutes} min`),8,y);
         y+=4.5;
       }
     }else{doc.text('—',8,y);y+=4.5;}
