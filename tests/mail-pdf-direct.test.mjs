@@ -145,3 +145,17 @@ test('gezamenlijk serviceverslag gebruikt geen oude generieke PDF-opbouw', () =>
   assert.ok(build.includes('await addServiceVisitPrintLayout(doc, model)'));
   assert.ok(build.includes("if (!(context.kind === 'serviceVisit' && model?.servicePrintLayout)) addPageNumbers(doc)"));
 });
+
+
+test('service PDF toont werksoort slechts één keer bovenaan het detailblad', () => {
+  const start=build.indexOf('async function servicePdfWorkPage');
+  const end=build.indexOf('async function addServiceVisitPrintLayout',start);
+  const page=build.slice(start,end);
+  assert.ok(build.includes('servicePdfWorkHeader'));
+  assert.ok(page.includes("{label:'Locatie',value:page.location}"));
+  assert.ok(page.includes("{label:'Servicetijd / toestellen'"));
+  assert.ok(page.includes("{label:'Technieker',value:page.technician}"));
+  assert.ok(!page.includes("{label:'Type',value:page.kindLabel}"));
+  assert.ok(!page.includes('const badge=servicePdfSafe(page.kindLabel)'));
+  assert.ok(page.includes("doc.text(servicePdfSafe(page.device),cardX+3,cy)"));
+});
