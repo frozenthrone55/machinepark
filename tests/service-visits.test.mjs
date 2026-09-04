@@ -84,7 +84,7 @@ test('volledig servicebezoek heeft concept autosave en boekt voorraad pas bij af
   assert.match(js, /draftKind:'serviceVisit'/);
   assert.match(js, /scheduleDraft/);
   assert.match(js, /saveDraftInternal/);
-  assert.match(js, /stockUpdates\(selected\)/);
+  assert.match(js, /stockUpdates\(selected,\{editMode:Boolean\(header\.editMode\)\}\)/);
   assert.match(js, /db\.transaction\(\['maintenance','breakdowns','parts'\]/);
   assert.match(js, /machineparkSyncOnlineNow/);
 });
