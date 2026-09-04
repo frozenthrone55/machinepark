@@ -579,7 +579,7 @@
     const workSessions=activeVisitDraft.locationSessions?.[activeVisitDraft.activeLocationKey]||[];
     const locationSessions={...(activeVisitDraft.locationSessions||{})};
     const locations=(activeVisitDraft?.locations||[]).map(loc=>({key:String(loc.key||''),label:String(loc.label||''),visitId:String(loc.visitId||'')})).filter(loc=>loc.key&&loc.label);
-    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions,locationSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:2};
+    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions,locationSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',editMode:Boolean(activeVisitDraft.editMode),createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:2};
   }
 
   async function collectItems() {
@@ -653,13 +653,19 @@
     form.addEventListener('input',scheduleDraft);form.addEventListener('change',scheduleDraft);form.addEventListener('click',e=>{if(e.target.closest('.sv-add-part,.sv-add-oneoff,.remove-line,.usage-suggestion,[data-sv-location],[data-kind],[data-fault-pick],[data-add-work-session],[data-remove-work-session]'))scheduleDraft();});
   }
 
-  function stockUpdates(items) {
-    const totals={};items.forEach(item=>(item.usedParts||[]).forEach(u=>{const id=String(u?.partId||'').trim(),qty=Number(u?.qty||0);if(id&&qty>0)totals[id]=(totals[id]||0)+qty;}));
-    const now=new Date().toISOString(),updates=[];for(const[id,qty]of Object.entries(totals)){const p=(state.parts||[]).find(x=>x.id===id);if(!p)throw new Error(`Onderdeel ${id} bestaat niet meer.`);updates.push({...p,stock:Number(p.stock||0)-qty,updatedAt:now});}return updates;
+  function stockUpdates(items,{editMode=false}={}) {
+    const totals={};
+    items.forEach(item=>{
+      (item.usedParts||[]).forEach(u=>{const id=String(u?.partId||'').trim(),qty=Number(u?.qty||0);if(id&&qty>0)totals[id]=(totals[id]||0)+qty;});
+      if(editMode&&(item.sourceRecordId||item.sourceUsedParts)){(item.sourceUsedParts||[]).forEach(u=>{const id=String(u?.partId||'').trim(),qty=Number(u?.qty||0);if(id&&qty>0)totals[id]=(totals[id]||0)-qty;});}
+    });
+    const now=new Date().toISOString(),updates=[];
+    for(const[id,qty]of Object.entries(totals)){if(!qty)continue;const p=(state.parts||[]).find(x=>x.id===id);if(!p)throw new Error(`Onderdeel ${id} bestaat niet meer.`);updates.push({...p,stock:Number(p.stock||0)-qty,updatedAt:now});}
+    return updates;
   }
 
   function finalRecord(header,item,{visit,serviceVisitId,visitNumberValue,visitRevision,reportId,reportNumberValue,reportRevision,now,batchSize}) {
-    const record={...item};['isDraft','draftRole','draftKind','draftBatchId','draftServiceKind','draftLocationKey','draftLocationLabel','draftSchema','targetVisitId'].forEach(k=>delete record[k]);
+    const record={...item,id:item.sourceRecordId||item.id};['isDraft','draftRole','draftKind','draftBatchId','draftServiceKind','draftLocationKey','draftLocationLabel','draftSchema','targetVisitId','sourceRecordId','sourceUsedParts'].forEach(k=>delete record[k]);
     const date=header.date||visit?.date||'',time=header.time||visit?.time||'',technician=header.technician||'';
     const locationKey=item.draftLocationKey||visit?.locationKey||'',locationLabel=item.draftLocationLabel||visit?.location||'';
     const locationSessions=header.locationSessions?.[locationKey]||header.workSessions||[];
@@ -671,7 +677,7 @@
   }
 
   function finalizeDraftTransaction(header,allItems,selected,report) {
-    const updates=stockUpdates(selected),now=new Date().toISOString(),reportId=report?.id||header.appendToReportId||uid('sr'),reportNumberValue=report?.number||reportNumber(reportId,header.date),reportRevision=report?Math.max(1,Number(report.revision)||1)+1:1;
+    const updates=stockUpdates(selected,{editMode:Boolean(header.editMode)}),now=new Date().toISOString(),reportId=report?.id||header.appendToReportId||uid('sr'),reportNumberValue=report?.number||reportNumber(reportId,header.date),reportRevision=report?Math.max(1,Number(report.revision)||1)+1:1;
     const groups=new Map();
     for(const item of selected){const key=String(item.draftLocationKey||header.locationKey||'');if(!key)continue;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
     const finals=[];
