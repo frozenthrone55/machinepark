@@ -385,7 +385,7 @@
       :`<div class="field full"><label>Werkdagen en tijd</label><input name="workSessionDate" type="date" required value="${svEsc(date)}"><input name="workSessionMinutes" type="number" min="1" step="1" required placeholder="minuten"></div>`;
     const chips=locations.map(loc=>`<button type="button" class="service-report-location-chip ${loc.key===locationKey?'active':''}" data-sv-location-switch="${svEsc(loc.key)}"><span>${svEsc(loc.label)}</span>${loc.visitId?'<small>Bestaande locatie</small>':'<small>Concept</small>'}</button>`).join('');
     return `<div class="form-grid"><div class="service-visit-form-note"><strong>Eén serviceverslag, meerdere locaties.</strong> Elke locatie behoudt intern haar eigen servicebezoek. Onderhoud en depannage blijven aparte records per toestel; onderdelen blijven per toestel gekoppeld en worden in het klantverslag per locatie én totaal samengevoegd.</div>
-      ${report?`<div class="service-visit-existing"><strong>Aanvulling op ${svEsc(report.number)} · huidige versie v${svEsc(report.revision)}</strong><div class="muted" style="font-size:11px;margin-top:3px">Je kunt een toestel aan een bestaande locatie toevoegen of een volledig nieuwe locatie aan hetzelfde verslag toevoegen.</div></div>`:''}
+      ${report?`<div class="service-visit-existing"><strong>${editMode?'Bewerken van':'Aanvulling op'} ${svEsc(report.number)} · huidige versie v${svEsc(report.revision)}</strong><div class="muted" style="font-size:11px;margin-top:3px">${editMode?'Bestaande registraties worden aangepast; nieuwe toestellen en locaties kun je vanuit dit bewerkscherm toevoegen.':'Je kunt een toestel aan een bestaande locatie toevoegen of een volledig nieuwe locatie aan hetzelfde verslag toevoegen.'}</div></div>`:''}
       <div class="field full service-report-location-manager"><div class="service-report-location-manager-head"><div><label>Locaties in dit verslag *</label><div class="muted" style="font-size:11px">Wissel tussen locaties om de toestellen en werkzaamheden in te vullen.</div></div><button type="button" class="btn small primary" id="serviceReportAddLocation">+ Locatie toevoegen</button></div><div id="serviceReportLocationChips" class="service-report-location-chips">${chips||'<span class="muted">Nog geen locatie gekozen.</span>'}</div></div>
       <div class="field full" id="serviceReportLocationPicker"><label>${locations.length?'Actieve locatie':'Eerste locatie'} *</label><div class="maintenance-location-autocomplete"><input id="serviceVisitLocationSearch" type="search" autocomplete="off" placeholder="Typ locatie of toestelnummer…" value="${svEsc(location)}"><input id="serviceVisitLocationKey" name="locationKey" type="hidden" value="${svEsc(locationKey)}"><div id="serviceVisitLocationSuggestions" class="maintenance-location-suggestions"></div></div><div id="serviceVisitLocationCount" class="muted" style="font-size:11px;margin-top:4px">${location?`Locatie: ${svEsc(location)}`:'Typ een locatie of toestelnummer en kies de locatie uit de lijst.'}</div></div>
       <div class="field"><label>Datum *</label><input name="date" type="date" required value="${svEsc(date)}"></div><div class="field"><label>Uur *</label><input name="time" type="time" required value="${svEsc(time)}"></div>
@@ -726,13 +726,15 @@
   function headerStoreForUser() { return svCan('breakdowns.add') ? 'breakdowns' : 'maintenance'; }
 
   async function openServiceVisit(id='',draftId='',options={}) {
-    if(!svCanCreate()){toast('Deze rol mag geen onderhoud of depannage registreren.');return;}
+    if(!svCanCreate()&&!svCanEdit()){toast('Deze rol mag geen onderhoud of depannage registreren of wijzigen.');return;}
     if(typeof window.machineparkSyncOnlineNow==='function'&&navigator.onLine&&draftId){try{await window.machineparkSyncOnlineNow({quiet:true});await refreshVisitState();}catch(_){}}
     let header=draftId?visitDraftHeader(draftId):null,items=header?visitDraftItems(header.id):[];
     const requestedReport=id?(serviceReportById(id)||serviceReportForVisit(id)):null;
     const report=requestedReport||(header?.appendToReportId?serviceReportById(header.appendToReportId):null)||(header?.appendToVisitId?serviceReportForVisit(header.appendToVisitId):null);
     if(id&&!report){toast('Serviceverslag niet meer gevonden.');return;}if(!locationGroups().length){toast('Geen actieve toestellen met een locatie gevonden.');return;}
     const editMode=Boolean(options.edit||header?.editMode);
+    if(editMode&&!svCanEdit()){toast('Deze rol mag dit serviceverslag niet wijzigen.');return;}
+    if(!editMode&&!svCanCreate()){toast('Deze rol mag geen nieuwe onderhouds- of depannageregistraties toevoegen.');return;}
     const draftHeaderStore=header?.draftHeaderStore||headerStoreForUser(),draftKey=header?.id||uid('svdraft');
     if(editMode&&report&&!header){header={...reportEditHeader(report),id:draftKey,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:draftKey,draftHeaderStore,editMode:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),draftSchema:3};items=reportEditItems(report,draftKey);}
     const locations=draftLocationList(report,header);
