@@ -112,3 +112,14 @@ test('werkduur op detailpagina wordt altijd in minuten getoond zonder nieuwe omz
   assert.doesNotMatch(formatter, /\bu\b/);
   assert.doesNotMatch(formatter, /\*60/);
 });
+
+
+test('totaaloverzicht blijft workSessions gebruiken en wordt niet herberekend uit serviceItemMinutes', () => {
+  const start=js.indexOf('function visitWorkSessions');
+  const end=js.indexOf('function visitReportHtml',start);
+  const totals=js.slice(start,end);
+  assert.match(totals, /record\.item\?\.workSessions/);
+  assert.match(totals, /Number\(session\?\.minutes\)/);
+  assert.doesNotMatch(totals, /serviceItemMinutesValue/);
+  assert.doesNotMatch(totals, /serviceItemMinutes/);
+});
