@@ -291,10 +291,10 @@ if MARKER not in index:
       filenameTitle:title,
       fields,
       photos,
-      photoTitle:'Foto’s bij verslag',
-      photoColumns:2,
-      photoMaxHeight:105,
-      timelines:[],
+      photoTitle: 'Foto’s bij verslag',
+      photoColumns: 2,
+      photoMaxHeight: 105,
+      timelines: [],
       workPrintLayout:{reportLabel:title,page}
     };
   }
