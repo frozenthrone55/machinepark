@@ -1042,7 +1042,69 @@
       const localParts=mergedVisitParts(visit);fields.push({label:`Onderdelen · ${visit.location||'—'}`,value:localParts.length?localParts.map(p=>`${p.label} × ${p.qty} · ${p.devices.join(', ')}`).join('\n'):'—',full:true});
     }
     fields.push({label:'Totaal gebruikte onderdelen · alle locaties',value:parts.length?parts.map(p=>`${p.label} × ${p.qty} · ${p.devices.join(', ')}`).join('\n'):'—',full:true});
-    return {headerTitle:'Machinepark . Serviceverslag',subtitle:`${reportDisplayLabel(report)} · ${report.locationCount} locatie${report.locationCount===1?'':'s'}`,rightText:`${svDateText(report.date)}${report.time?` · ${report.time}`:''}`,filenameTitle:`Serviceverslag_${shortDate(report.date).replace('/','-')}_${visibleCode(report.number,'SR')}`,fields,photos:reportPhotos(report).map(p=>p.src),photoTitle:'Foto’s bij serviceverslag',photoColumns:2,photoMaxHeight:105,timelines:[]};
+
+    const workPages=[];
+    let workIndex=0;
+    for(const visit of report.visits||[]) {
+      for(const row of visit.records||[]) {
+        const item=row.item||{},detailLines=row.kind==='maintenance'
+          ?[`Type onderhoud: ${item.type||'—'}`,`Uitgevoerde werkzaamheden / notitie: ${item.notes||'—'}`]
+          :row.kind==='otherworks'
+            ?[`Soort werkzaamheden: ${item.workTypeName||'Andere werken'}`,`Prioriteit: ${item.priority||'—'} · Status: ${item.status||'—'}`,`Werkzaamheid / omschrijving: ${item.issue||'—'}`,`Extra info / diagnose: ${item.diagnosis||'—'}`,`Oplossing / uitgevoerde werken: ${item.solution||'—'}`]
+            :[`Prioriteit: ${item.priority||'—'} · Status: ${item.status||'—'}`,`Probleem / melding: ${item.issue||'—'}`,`Diagnose: ${item.diagnosis||'—'}`,`Oplossing / uitgevoerde werken: ${item.solution||'—'}`];
+        if(item.workOrder)detailLines.push(workOrderText(item.workOrder));
+        if(row.kind==='breakdowns'&&item.faultRef)detailLines.push(`Gekoppelde storing: ${[item.faultRef.code,item.faultRef.name].filter(Boolean).join(' — ')||'—'}`);
+        const workDate=item.date||visit.date||report.date||'';
+        workPages.push({
+          index:++workIndex,
+          kind:row.kind,
+          kindLabel:svKindLabel(row.kind,item),
+          device:svDeviceShort(item.deviceId),
+          location:visit.location||'—',
+          date:svDateText(workDate),
+          workMinutes:recordWorkMinutesForDate(item,workDate),
+          technician:item.technician||visit.technician||report.technician||'—',
+          detailLines,
+          parts:perRecordPartsRows(item).map(part=>({label:part.label,qty:part.qty,oneOff:part.kind==='oneoff'})),
+          photos:(item.photos||[]).filter(src=>typeof src==='string'&&src.trim()),
+        });
+      }
+    }
+
+    return {
+      headerTitle:'Machinepark . Serviceverslag',
+      subtitle:`${reportDisplayLabel(report)} · ${report.locationCount} locatie${report.locationCount===1?'':'s'}`,
+      rightText:`${svDateText(report.date)}${report.time?` · ${report.time}`:''}`,
+      filenameTitle:`Serviceverslag_${shortDate(report.date).replace('/','-')}_${visibleCode(report.number,'SR')}`,
+      fields,
+      photos:reportPhotos(report).map(p=>p.src),
+      photoTitle:'Foto’s bij serviceverslag',
+      photoColumns:2,
+      photoMaxHeight:105,
+      timelines:[],
+      servicePrintLayout:{
+        reportLabel:reportDisplayLabel(report),
+        title:`Serviceverslag ${reportDisplayLabel(report)}`,
+        subtitle:`${report.locationCount} locatie${report.locationCount===1?'':'s'} · ${report.deviceCount} toestel${report.deviceCount===1?'':'len'}`,
+        meta:[
+          {label:'Datum / uur',value:`${svDateText(report.date)}${report.time?` · ${report.time}`:''}`},
+          {label:'Technieker',value:report.technician||'—'},
+          {label:'Status',value:'Afgesloten'},
+          {label:'Versie',value:`v${report.revision}`},
+        ],
+        sessions:sessions.map(row=>({date:svDateText(row.date),location:row.location||'—',minutes:row.minutes})),
+        totalMinutes,
+        locations:(report.visits||[]).map(visit=>({
+          location:visit.location||'—',
+          devices:visit.deviceCount||0,
+          maintenance:visit.maintenanceCount||0,
+          breakdowns:visit.breakdownCount||0,
+          otherWorks:visit.otherWorkCount||0,
+        })),
+        parts:parts.map(part=>({label:part.label,qty:part.qty,devices:part.devices||[]})),
+        workPages,
+      }
+    };
   };
 
   window.openMachineparkServiceVisit=openServiceVisit;
