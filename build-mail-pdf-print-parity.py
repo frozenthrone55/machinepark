@@ -19,7 +19,8 @@ required = [
     "cleanText(item?.supplier)",
     "cleanText(item?.supplierCode)",
     "cleanText(item?.description)",
-    "label:'Werkminuten / toestellen'",
+    'Werkminuten / toestellen',
+    'Servicetijd volledig verslag / toestellen',
     "label:'Eenmalige onderdelen'",
     "headerTitle: `Machinepark . ${title}`",
     "record.photos",
@@ -32,8 +33,8 @@ for needle in required:
     if needle not in index:
         raise SystemExit(f"Buildvalidatie mislukt: Mail PDF wijkt af van afdrukopbouw ({needle})")
 
-if index.count("label:'Werkminuten / toestellen'") < 2:
-    raise SystemExit("Buildvalidatie mislukt: werkminuten ontbreken bij onderhoud of depannage")
+if "serviceWorkSummary('maintenance', record)" not in index or "serviceWorkSummary('breakdowns', record)" not in index:
+    raise SystemExit("Buildvalidatie mislukt: tijdsamenvatting ontbreekt bij onderhoud of depannage")
 
 if MARKER not in index:
     pos = index.rfind('</body>')
