@@ -523,6 +523,16 @@ if MARKER not in index:
     return {text,size};
   }
 
+  function servicePdfCodeColumnWidth(doc,codes,totalWidth,reservedWidth,baseSize=8.2,minDescriptionWidth=30) {
+    const original=doc.getFontSize?.()||baseSize;doc.setFontSize(baseSize);
+    const values=['ONDERDEEL',...(codes||[]).map(value=>servicePdfSafe(value||'—'))];
+    const widest=Math.max(...values.map(value=>doc.getTextWidth(value)),0);
+    const tenSpaces=doc.getTextWidth('          ');
+    doc.setFontSize(original);
+    const wanted=widest+tenSpaces+4;
+    return Math.max(12,Math.min(wanted,totalWidth-reservedWidth-minDescriptionWidth));
+  }
+
   function servicePdfSectionTitle(doc,title,y) {
     servicePdfSetText(doc,SERVICE_PDF.ink);
     doc.setFont('helvetica','bold');doc.setFontSize(10.5);
@@ -604,10 +614,12 @@ if MARKER not in index:
     })+6;
 
     y=servicePdfSectionTitle(doc,'Totaal gebruikte onderdelen · alle locaties',y);
+    const partRows=(layout.parts?.length?layout.parts:[{code:'—',description:'Geen onderdelen gebruikt.',qty:'',devices:[]}]).map(row=>[row.code||'—',row.description||'—',row.qty,(row.devices||[]).join(', ')]);
+    const qtyW=18,devicesW=76,totalPartsW=194,codeW=servicePdfCodeColumnWidth(doc,partRows.map(row=>row[0]),totalPartsW,qtyW+devicesW,8.2,34),descriptionW=totalPartsW-codeW-qtyW-devicesW;
     servicePdfTable(doc,{
       headers:['Onderdeel','Omschrijving','Aantal','Locaties / toestellen'],
-      rows:(layout.parts?.length?layout.parts:[{code:'—',description:'Geen onderdelen gebruikt.',qty:'',devices:[]}]).map(row=>[row.code||'—',row.description||'—',row.qty,(row.devices||[]).join(', ')]),
-      widths:[34,66,18,76],y,nowrapCols:[0,2],rightCols:[2]
+      rows:partRows,
+      widths:[codeW,descriptionW,qtyW,devicesW],y,nowrapCols:[0,2],rightCols:[2]
     });
   }
 
@@ -643,17 +655,17 @@ if MARKER not in index:
   function servicePdfMeasureParts(doc,parts,width) {
     let height=14;
     if(!parts?.length)return height+8;
-    const codeW=Math.min(42,Math.max(30,width*.22)),qtyW=18,descW=Math.max(30,width-codeW-qtyW-6);
+    const qtyW=18,codeW=servicePdfCodeColumnWidth(doc,parts.map(part=>part.code),width,qtyW,7.8,34),descW=Math.max(30,width-codeW-qtyW);
     doc.setFont('helvetica','normal');doc.setFontSize(7.8);
     for(const part of parts){
-      const wrapped=doc.splitTextToSize(servicePdfSafe(part.description||'—'),descW-4);
+      const wrapped=doc.splitTextToSize(servicePdfSafe(part.description||'—'),descW-5);
       height+=Math.max(8,wrapped.length*3.5+(part.oneOff?5:3));
     }
     return height;
   }
 
   function servicePdfPartsBox(doc,page,x,y,width) {
-    const parts=page.parts||[],titleH=7,headH=7,codeW=Math.min(42,Math.max(30,width*.22)),qtyW=18,descW=width-codeW-qtyW;
+    const parts=page.parts||[],titleH=7,headH=7,qtyW=18,codeW=servicePdfCodeColumnWidth(doc,parts.map(part=>part.code),width,qtyW,7.8,34),descW=width-codeW-qtyW;
     servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.35);
     servicePdfSetFill(doc,SERVICE_PDF.table);doc.roundedRect(x,y,width,titleH+headH+(parts.length?0:8),2,2,'S');
     doc.rect(x,y,width,titleH,'F');
