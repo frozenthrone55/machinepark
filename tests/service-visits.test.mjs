@@ -179,3 +179,14 @@ test('serviceconcepten passen binnen bestaande serverrechten voor onderhoud en d
   delete final.breakdowns[0].isDraft; delete final.breakdowns[0].draftRole; delete final.breakdowns[0].draftKind; delete final.breakdowns[0].draftBatchId; delete final.breakdowns[0].draftServiceKind;
   assert.doesNotThrow(() => assertSnapshotWriteAllowed(draft,final,'techniek',roleConfig));
 });
+
+
+test('Andere werken gebruikt de gekozen werknaam in overzicht afdruk en PDF zonder dubbele soortregel', () => {
+  assert.match(js, /const svKindLabel = \(kind,item=\{\}\) => kind === 'maintenance' \? 'Onderhoud' : \(kind === 'otherworks' \? \(item\.workTypeName \|\| 'Andere werken'\) : 'Depannage'\)/);
+  const summary=js.slice(js.indexOf('function recordSummary'),js.indexOf('function visitPhotos'));
+  assert.match(summary, /const badgeText=svKindLabel\(kind,item\)/);
+  assert.doesNotMatch(summary, /Soort werkzaamheden:/);
+  const pdf=js.slice(js.indexOf('const workPages=\[\]'),js.indexOf('return \{',js.indexOf('const workPages=\[\]')));
+  assert.match(pdf, /kindLabel:svKindLabel\(row\.kind,item\)/);
+  assert.doesNotMatch(pdf, /Soort werkzaamheden:/);
+});
