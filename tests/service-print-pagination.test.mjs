@@ -53,29 +53,29 @@ test('totaaloverzicht toont aantallen per locatie zonder detailblokken erin', ()
 });
 
 
-test('detailpagina toont volledige servicetijd en uniek toestelaantal', () => {
+test('detailpagina toont volledige servicetijd van het verslag en totaal uniek toestelaantal', () => {
   assert.match(js, /Servicetijd \/ toestellen/);
-  assert.match(js, /sessions=visitWorkSessions\(visit\)/);
+  assert.match(js, /sessions=reportWorkSessions\(report\)/);
   assert.match(js, /serviceMinutes=sessions\.reduce/);
-  assert.match(js, /deviceCount=Math\.max\(1,Number\(visit\.deviceCount\)/);
+  assert.match(js, /deviceCount=Math\.max\(1,Number\(report\.deviceCount\)/);
   assert.match(js, /formatWorkDuration\(serviceMinutes\)/);
   const detail=js.slice(js.indexOf('function printRecordPageHtml'),js.indexOf('function reportHtml'));
   assert.doesNotMatch(detail, /Datum \/ werkuren/);
   assert.doesNotMatch(detail, /serviceItemMinutes/);
 });
 
-test('serviceverslag heeft geen aparte tijdinvoer meer per toestel', () => {
-  assert.match(js, /Servicetijd voor volledige actieve locatie/);
-  assert.match(js, /Per locatie voer je de servicetijd één keer in/);
+test('serviceverslag heeft één tijdinvoer voor het volledige verslag', () => {
+  assert.match(js, /Servicetijd voor volledig serviceverslag/);
+  assert.match(js, /Je voert de werkdagen en minuten één keer in voor het volledige serviceverslag/);
+  assert.doesNotMatch(js, /serviceReportLocationSessions/);
+  assert.doesNotMatch(js, /locationSessions/);
   assert.doesNotMatch(js, /sv-maintenance-hours/);
   assert.doesNotMatch(js, /sv-breakdown-hours/);
   assert.doesNotMatch(js, /sv-other-hours/);
-  assert.doesNotMatch(js, /Werkminuten op dit onderhoud/);
-  assert.doesNotMatch(js, /Werkminuten op deze depannage/);
-  assert.doesNotMatch(js, /Werkminuten op deze werkzaamheid/);
-  assert.match(js, /serviceVisitDeviceCount:deviceCount\|\|batchSize/);
-  assert.match(js, /serviceVisitTotalMinutes:totalMinutes/);
-  assert.match(js, /hours:totalMinutes\/60/);
+  assert.match(js, /serviceReportWorkSessions:workSessions/);
+  assert.match(js, /serviceReportTotalMinutes:reportTotalMinutes/);
+  assert.match(js, /serviceReportDeviceCount:reportDeviceCount/);
+  assert.match(js, /hours:reportTotalMinutes\/60/);
 });
 
 test('onderdelen staan in details in een eigen kader binnen de werkzaamhedenkaart', () => {
@@ -96,11 +96,11 @@ test('onderdelenkader krijgt ook duidelijke printopmaak', () => {
 });
 
 
-test('gedeelde servicetijd blijft in minuten en totalen blijven uit workSessions komen', () => {
+test('gedeelde servicetijd blijft in minuten en wordt op rapportniveau bewaard', () => {
   assert.match(js, /return total>0\?\`\$\{total\} min\`:'—'/);
-  const totals=js.slice(js.indexOf('function visitWorkSessions'),js.indexOf('function visitReportHtml'));
-  assert.match(totals, /record\.item\?\.workSessions/);
-  assert.match(totals, /Number\(session\?\.minutes\)/);
+  const totals=js.slice(js.indexOf('function reportWorkSessions'),js.indexOf('function formatWorkDuration'));
+  assert.match(totals, /serviceReportWorkSessions/);
+  assert.match(totals, /byDate=new Map\(\)/);
   assert.doesNotMatch(totals, /serviceItemMinutes/);
 });
 
