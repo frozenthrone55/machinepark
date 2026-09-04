@@ -288,14 +288,14 @@
     const lines = kind === 'maintenance'
       ? [`Type onderhoud: ${item.type || '—'}`, `Uitgevoerde werkzaamheden / notitie: ${item.notes || '—'}`]
       : kind === 'otherworks'
-        ? [`Soort werkzaamheden: ${item.workTypeName || 'Andere werken'}`, `Prioriteit: ${item.priority || '—'} · Status: ${item.status || '—'}`, `Werkzaamheid / omschrijving: ${item.issue || '—'}`, `Extra info / diagnose: ${item.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${item.solution || '—'}`]
+        ? [`Prioriteit: ${item.priority || '—'} · Status: ${item.status || '—'}`, `Werkzaamheid / omschrijving: ${item.issue || '—'}`, `Extra info / diagnose: ${item.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${item.solution || '—'}`]
         : [`Prioriteit: ${item.priority || '—'} · Status: ${item.status || '—'}`, `Probleem / melding: ${item.issue || '—'}`, `Diagnose: ${item.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${item.solution || '—'}`];
     if (item.workOrder) lines.push(workOrderText(item.workOrder));
     if (kind === 'breakdowns' && item.faultRef) lines.push(`Gekoppelde storing: ${[item.faultRef.code,item.faultRef.name].filter(Boolean).join(' — ') || '—'}`);
     if (plain) { lines.push(`Onderdelen voor deze werkzaamheid: ${perRecordPartsText(item)}`); return lines.join('\n'); }
     const badgeClass=kind === 'maintenance' ? 'blue' : (kind === 'otherworks' ? 'other-work-badge' : 'danger');
-    const badgeText=kind === 'maintenance' ? 'Onderhoud' : (kind === 'otherworks' ? 'Andere werken' : 'Depannage');
-    return `<div class="service-visit-report-record"><h4><span class="badge ${badgeClass}">${badgeText}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div>${recordPartsBoxHtml(item)}</div>`;
+    const badgeText=svKindLabel(kind,item);
+    return `<div class="service-visit-report-record"><h4><span class="badge ${badgeClass}">${svEsc(badgeText)}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div>${recordPartsBoxHtml(item)}</div>`;
   }
 
 
@@ -1024,7 +1024,7 @@
         const item=row.item||{},detailLines=row.kind==='maintenance'
           ?[`Type onderhoud: ${item.type||'—'}`,`Uitgevoerde werkzaamheden / notitie: ${item.notes||'—'}`]
           :row.kind==='otherworks'
-            ?[`Soort werkzaamheden: ${item.workTypeName||'Andere werken'}`,`Prioriteit: ${item.priority||'—'} · Status: ${item.status||'—'}`,`Werkzaamheid / omschrijving: ${item.issue||'—'}`,`Extra info / diagnose: ${item.diagnosis||'—'}`,`Oplossing / uitgevoerde werken: ${item.solution||'—'}`]
+            ?[`Prioriteit: ${item.priority||'—'} · Status: ${item.status||'—'}`,`Werkzaamheid / omschrijving: ${item.issue||'—'}`,`Extra info / diagnose: ${item.diagnosis||'—'}`,`Oplossing / uitgevoerde werken: ${item.solution||'—'}`]
             :[`Prioriteit: ${item.priority||'—'} · Status: ${item.status||'—'}`,`Probleem / melding: ${item.issue||'—'}`,`Diagnose: ${item.diagnosis||'—'}`,`Oplossing / uitgevoerde werken: ${item.solution||'—'}`];
         if(item.workOrder)detailLines.push(workOrderText(item.workOrder));
         if(row.kind==='breakdowns'&&item.faultRef)detailLines.push(`Gekoppelde storing: ${[item.faultRef.code,item.faultRef.name].filter(Boolean).join(' — ')||'—'}`);
