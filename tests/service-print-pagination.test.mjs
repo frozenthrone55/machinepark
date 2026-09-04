@@ -49,3 +49,17 @@ test('totaaloverzicht toont aantallen per locatie zonder detailblokken erin', ()
   const summary=report.slice(0,summaryEnd);
   assert.doesNotMatch(summary, /recordSummary\(row\.kind/);
 });
+
+
+test('detailpagina toont datum met werkduur in plaats van kloktijd', () => {
+  assert.match(js, /Datum \/ werkuren/);
+  assert.match(js, /function recordWorkMinutesForDate/);
+  assert.match(js, /function formatWorkDuration/);
+  assert.match(js, /workMinutes=recordWorkMinutesForDate\(item,workDate\)/);
+  assert.match(js, /formatWorkDuration\(workMinutes\)/);
+  const start=js.indexOf('function printRecordPageHtml');
+  const end=js.indexOf('function reportHtml',start);
+  const detail=js.slice(start,end);
+  assert.doesNotMatch(detail, /Datum \/ uur/);
+  assert.doesNotMatch(detail, /item\.time\|\|visit\.time\|\|report\.time/);
+});
