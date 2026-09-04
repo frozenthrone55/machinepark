@@ -64,10 +64,12 @@ if MARKER not in index:
   window.machineparkServiceWorkSessionsEditor = (record,kind) => {
     const rows=sessionsFor(record),total=totalOf(rows);
     if(record?.serviceVisitId && kind!=='servicevisit'){
-      const linked=[...(state.maintenance||[]),...(state.breakdowns||[])].filter(item=>item?.serviceVisitId===record.serviceVisitId),unique=new Set(linked.map(item=>item?.deviceId).filter(Boolean)).size;
-      const count=Math.max(1,unique||Math.round(Number(record?.serviceVisitDeviceCount||record?.batchSize)||1));
-      const hidden=rows.map(row=>`<input type="hidden" name="workSessionDate" value="${escAttr(row?.date||'')}"><input type="hidden" name="workSessionMinutes" value="${Math.max(0,Math.round(Number(row?.minutes)||0))}">`).join('');
-      return `<div class="field full service-work-sessions service-shared-time" data-service-work-sessions><label>Servicetijd / toestellen</label><input name="hours" type="hidden" value="${total}">${hidden}<strong data-service-work-total>Totaal: ${total} min · ${count} toestel${count===1?'':'len'}</strong><div class="muted" style="font-size:11px;margin-top:5px">Deze tijd komt uit het gekoppelde serviceverslag en geldt voor de volledige locatie. Een eventuele afzonderlijke toesteltijd kun je in de omschrijving van de werken vermelden.</div></div>`;
+      const reportRows=[...(state.maintenance||[]),...(state.breakdowns||[])].filter(item=>(item?.serviceReportId||item?.serviceVisitId)===(record?.serviceReportId||record?.serviceVisitId)),unique=new Set(reportRows.map(item=>item?.deviceId).filter(Boolean)).size;
+      const reportRowsTime=Array.isArray(record?.serviceReportWorkSessions)&&record.serviceReportWorkSessions.length?record.serviceReportWorkSessions:rows;
+      const reportTotal=Math.max(0,Math.round(Number(record?.serviceReportTotalMinutes)||totalOf(reportRowsTime)));
+      const count=Math.max(1,unique||Math.round(Number(record?.serviceReportDeviceCount||record?.serviceVisitDeviceCount||record?.batchSize)||1));
+      const hidden=reportRowsTime.map(row=>`<input type="hidden" name="workSessionDate" value="${escAttr(row?.date||'')}"><input type="hidden" name="workSessionMinutes" value="${Math.max(0,Math.round(Number(row?.minutes)||0))}">`).join('');
+      return `<div class="field full service-work-sessions service-shared-time" data-service-work-sessions><label>Servicetijd volledig serviceverslag / toestellen</label><input name="hours" type="hidden" value="${reportTotal}">${hidden}<strong data-service-work-total>Totaal: ${reportTotal} min · ${count} toestel${count===1?'':'len'}</strong><div class="muted" style="font-size:11px;margin-top:5px">Deze tijd komt uit het volledige gekoppelde serviceverslag en geldt voor alle locaties en toestellen daarin. Een eventuele afzonderlijke toesteltijd kun je in de omschrijving van de werken vermelden.</div></div>`;
     }
     return `<div class="field full service-work-sessions" data-service-work-sessions><label>Werkdagen en tijd</label><input name="hours" type="hidden" value="${total}"><div class="service-work-session-list" data-service-work-session-list>${rows.map(rowHtml).join('')}</div><div class="service-work-session-actions"><button type="button" class="btn small" data-add-work-session>+ Dag toevoegen</button><strong data-service-work-total>Totaal: ${total} min</strong></div><div class="muted" style="font-size:11px">De totale tijd geldt voor de volledige ${kind==='breakdown'?'depannage':kind==='servicevisit'?'servicebezoek':'onderhoud'}${record?.batchId?'groep':''}.</div></div>`;
   };
@@ -83,7 +85,7 @@ if MARKER not in index:
     index=index[:pos]+feature+'\n'+index[pos:]
     index_path.write_text(index,encoding='utf-8')
 
-for needle in [MARKER,'Werkdagen en tijd','Servicetijd / toestellen','serviceVisitDeviceCount','data-add-work-session','workSessionDate','workSessionMinutes','machineparkCollectWorkSessions','workSessions,hours:totalMinutes/60']:
+for needle in [MARKER,'Werkdagen en tijd','Servicetijd volledig serviceverslag / toestellen','serviceReportDeviceCount','data-add-work-session','workSessionDate','workSessionMinutes','machineparkCollectWorkSessions','workSessions,hours:totalMinutes/60']:
     if needle not in index: raise SystemExit(f'Buildvalidatie mislukt: meerdaagse werktijd ontbreekt ({needle})')
 
 print('[Machinepark] meerdere werkdagen en automatische totaaltijd voor depannage en onderhoud actief')
