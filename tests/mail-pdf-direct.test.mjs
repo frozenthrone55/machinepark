@@ -182,10 +182,10 @@ test('service PDF houdt onderdeelcode op één regel en laat omschrijving doorlo
 });
 
 
-test('service PDF meet breedste onderdeelcode en telt tien spaties reserve bij', () => {
+test('service PDF meet breedste onderdeelcode en telt drie spaties reserve bij', () => {
   assert.ok(build.includes('function servicePdfCodeColumnWidth'));
-  assert.ok(build.includes("doc.getTextWidth('          ')"));
-  assert.ok(build.includes('const wanted=widest+tenSpaces+4'));
+  assert.ok(build.includes("doc.getTextWidth('   ')"));
+  assert.ok(build.includes('const wanted=widest+threeSpaces+4'));
   assert.ok(build.includes('parts.map(part=>part.code)'));
   assert.ok(build.includes('partRows.map(row=>row[0])'));
   assert.ok(build.includes('descriptionW=totalPartsW-codeW-qtyW-devicesW'));
