@@ -164,6 +164,40 @@ if MARKER not in index:
     return lines.length ? lines.join('\n') : '—';
   }
 
+  function serviceLocation(record) {
+    const device = (state.devices || []).find(item => item.id === record?.deviceId);
+    try {
+      if (device && typeof deviceLocationAt === 'function') return deviceLocationAt(device, recordMoment(record)) || device.location || record?.serviceVisitLocation || '—';
+    } catch (_) {}
+    return device?.location || record?.serviceVisitLocation || '—';
+  }
+
+  function servicePartRows(record) {
+    const rows = [];
+    (record?.usedParts || []).forEach(usage => {
+      const qty = Number(usage?.qty || 0);
+      if (!usage?.partId || qty <= 0) return;
+      const part = (state.parts || []).find(item => item.id === usage.partId);
+      rows.push({
+        code:cleanText(part?.artNr || usage.partId || '—') || '—',
+        description:cleanText(part?.description || ''),
+        qty,
+        oneOff:false
+      });
+    });
+    (record?.oneOffParts || []).forEach(part => {
+      const supplier=cleanText(part?.supplier),supplierCode=cleanText(part?.supplierCode),description=cleanText(part?.description);
+      if (!(supplier || supplierCode || description)) return;
+      rows.push({
+        code:supplierCode || supplier || 'Eenmalig',
+        description:[supplierCode && supplier ? supplier : '', description].filter(Boolean).join(' . '),
+        qty:Math.max(1,Math.round(Number(part?.qty)||1)),
+        oneOff:true
+      });
+    });
+    return rows;
+  }
+
   function serviceWorkSummary(kind, record) {
     const sessions = Array.isArray(record?.workSessions) ? record.workSessions : [];
     const sessionMinutes = sessions.reduce((sum, row) => sum + Math.max(0, Math.round(Number(row?.minutes) || 0)), 0);
@@ -196,14 +230,25 @@ if MARKER not in index:
     const record = list.find(item => item.id === context.recordId);
     if (!record) return null;
     const maintenance = context.serviceKind === 'maintenance';
-    const title = maintenance ? 'Onderhoudsverslag' : 'Depannageverslag';
+    const other = !maintenance && record?.serviceKind === 'other';
+    const kind = maintenance ? 'maintenance' : (other ? 'otherworks' : 'breakdowns');
+    const kindLabel = maintenance ? 'Onderhoud' : (other ? (record.workTypeName || 'Andere werken') : 'Depannage');
+    const title = maintenance ? 'Onderhoudsverslag' : (other ? `${kindLabel} · verslag` : 'Depannageverslag');
     const oneOff = serviceOneOffParts(record);
+    const summary = serviceWorkSummary(maintenance ? 'maintenance' : 'breakdowns', record);
+    const summaryLabel = record?.serviceVisitId ? 'Servicetijd volledig verslag / toestellen' : 'Datum / werkminuten';
+    const summaryValue = record?.serviceVisitId ? summary : `${serviceDate(record)} · ${summary}`;
+    const detailLines = maintenance
+      ? [`Type onderhoud: ${record.type || '—'}`, `Uitgevoerde werkzaamheden / notitie: ${record.notes || '—'}`]
+      : other
+        ? [`Prioriteit: ${record.priority || '—'} · Status: ${record.status || '—'}`, `Werkzaamheid / omschrijving: ${record.issue || '—'}`, `Extra info / diagnose: ${record.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${record.solution || '—'}`]
+        : [`Prioriteit: ${record.priority || '—'} · Status: ${record.status || '—'}`, `Probleem / melding: ${record.issue || '—'}`, `Diagnose: ${record.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${record.solution || '—'}`];
     const fields = maintenance ? [
       { label:'Datum', value:serviceDate(record) },
       { label:'Type onderhoud', value:record.type || '—' },
       { label:'Toestel', value:serviceDevice(record), full:true },
       { label:'Technieker', value:record.technician || '—' },
-      { label:record?.serviceVisitId?'Servicetijd volledig verslag / toestellen':'Werkminuten / toestellen', value:serviceWorkSummary('maintenance', record) },
+      { label:record?.serviceVisitId?'Servicetijd volledig verslag / toestellen':'Werkminuten / toestellen', value:summary },
       { label:'Gebruikte onderdelen', value:serviceParts(record, true), full:true },
       ...(oneOff !== '—' ? [{ label:'Eenmalige onderdelen', value:oneOff, full:true }] : []),
       { label:'Uitgevoerde werkzaamheden / notitie', value:record.notes || '—', full:true },
@@ -213,7 +258,7 @@ if MARKER not in index:
       { label:'Prioriteit', value:record.priority || '—' },
       { label:'Status', value:record.status || '—' },
       { label:'Technieker', value:record.technician || '—' },
-      { label:record?.serviceVisitId?'Servicetijd volledig verslag / toestellen':'Werkminuten / toestellen', value:serviceWorkSummary('breakdowns', record) },
+      { label:record?.serviceVisitId?'Servicetijd volledig verslag / toestellen':'Werkminuten / toestellen', value:summary },
       { label:'Probleem / melding', value:record.issue || '—', full:true },
       { label:'Diagnose', value:record.diagnosis || '—', full:true },
       { label:'Oplossing / uitgevoerde werken', value:record.solution || '—', full:true },
@@ -221,17 +266,36 @@ if MARKER not in index:
       ...(oneOff !== '—' ? [{ label:'Eenmalige onderdelen', value:oneOff, full:true }] : []),
     ];
     const photos = servicePhotos(record);
+    const page = {
+      index:1,
+      documentLabel:'WERKVERSLAG',
+      sectionLabel:'WERKZAAMHEID',
+      kind,
+      kindLabel,
+      device:serviceDevice(record),
+      location:serviceLocation(record),
+      technician:record.technician || '—',
+      meta:[
+        {label:'Locatie',value:serviceLocation(record)},
+        {label:summaryLabel,value:summaryValue},
+        {label:'Technieker',value:record.technician || '—'}
+      ],
+      detailLines,
+      parts:servicePartRows(record),
+      photos
+    };
     return {
-      headerTitle: `Machinepark . ${title}`,
-      subtitle: serviceDevice(record),
-      rightText: serviceDate(record),
-      filenameTitle: title,
+      headerTitle:`Machinepark . ${title}`,
+      subtitle:serviceDevice(record),
+      rightText:serviceDate(record),
+      filenameTitle:title,
       fields,
       photos,
-      photoTitle: 'Foto’s bij verslag',
-      photoColumns: 2,
-      photoMaxHeight: 105,
-      timelines: []
+      photoTitle:'Foto’s bij verslag',
+      photoColumns:2,
+      photoMaxHeight:105,
+      timelines:[],
+      workPrintLayout:{reportLabel:title,page}
     };
   }
 
@@ -629,13 +693,14 @@ if MARKER not in index:
 
   function servicePdfWorkHeader(doc,model,page) {
     servicePdfSetText(doc,SERVICE_PDF.ink);
-    doc.setFont('helvetica','bold');doc.setFontSize(6.8);doc.text('SERVICEVERSLAG',8,8);
-    doc.setFontSize(8.5);doc.text(servicePdfSafe(model.servicePrintLayout.reportLabel),8,14);
+    const layout=model.servicePrintLayout||model.workPrintLayout||{};
+    doc.setFont('helvetica','bold');doc.setFontSize(6.8);doc.text(servicePdfSafe(page.documentLabel||'SERVICEVERSLAG'),8,8);
+    doc.setFontSize(8.5);doc.text(servicePdfSafe(layout.reportLabel||model.filenameTitle||'Machinepark'),8,14);
     const label=servicePdfSafe(page.kindLabel),pillW=Math.max(24,doc.getTextWidth(label)+10);
     servicePdfSetFill(doc,SERVICE_PDF.green);doc.roundedRect(202-pillW,5,pillW,9,4.5,4.5,'F');
     doc.setTextColor(255,255,255);doc.setFontSize(7.5);doc.text(label,202-pillW/2,10.7,{align:'center'});
     servicePdfSetDraw(doc,SERVICE_PDF.green);doc.setLineWidth(.7);doc.line(8,19,202,19);
-    servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFontSize(6.8);doc.text(servicePdfSafe(`WERKZAAMHEID ${page.index}`),8,25);
+    servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFontSize(6.8);doc.text(servicePdfSafe(page.sectionLabel||`WERKZAAMHEID ${page.index}`),8,25);
     doc.setFontSize(14);doc.text(servicePdfSafe(page.device),8,33);
     return 38;
   }
@@ -718,14 +783,15 @@ if MARKER not in index:
     }
   }
 
-  async function servicePdfWorkPage(doc,model,page) {
-    doc.addPage();
+  async function servicePdfWorkPage(doc,model,page,addPage=true) {
+    if(addPage)doc.addPage();
     let y=servicePdfWorkHeader(doc,model,page);
-    y=servicePdfMetaBoxes(doc,[
+    const meta=Array.isArray(page.meta)&&page.meta.length?page.meta:[
       {label:'Locatie',value:page.location},
       {label:'Servicetijd / toestellen',value:`${Math.max(0,Math.round(Number(page.serviceMinutes)||0))} min · ${Math.max(1,Math.round(Number(page.deviceCount)||1))} toestel${Math.max(1,Math.round(Number(page.deviceCount)||1))===1?'':'len'}`},
       {label:'Technieker',value:page.technician},
-    ],y);
+    ];
+    y=servicePdfMetaBoxes(doc,meta,y);
 
     const detailH=servicePdfMeasureDetails(doc,page.detailLines,178),partsH=servicePdfMeasureParts(doc,page.parts,184);
     const cardX=8,cardW=194,cardY=y,cardH=Math.min(215,12+detailH+5+partsH+5);
@@ -751,6 +817,10 @@ if MARKER not in index:
   async function addServiceVisitPrintLayout(doc,model) {
     servicePdfSummaryPage(doc,model);
     for(const page of model.servicePrintLayout?.workPages||[])await servicePdfWorkPage(doc,model,page);
+  }
+
+  async function addWorkRecordPrintLayout(doc,model) {
+    if(model.workPrintLayout?.page)await servicePdfWorkPage(doc,model,model.workPrintLayout.page,false);
   }
 
   function addPageNumbers(doc) {
@@ -779,6 +849,8 @@ if MARKER not in index:
       if (!(model.fields?.length || model.timelines?.length || model.photos?.length || model.servicePrintLayout)) throw new Error('Er is geen inhoud gevonden om in de PDF te zetten.');
       if (context.kind === 'serviceVisit' && model.servicePrintLayout) {
         await addServiceVisitPrintLayout(doc, model);
+      } else if (context.kind === 'service' && model.workPrintLayout) {
+        await addWorkRecordPrintLayout(doc, model);
       } else {
         addHeader(doc, model);
         let y = addFields(doc, model, 39);
@@ -794,7 +866,7 @@ if MARKER not in index:
       addGenericContent(doc, model, lines);
     }
 
-    if (!(context.kind === 'serviceVisit' && model?.servicePrintLayout)) addPageNumbers(doc);
+    if (!((context.kind === 'serviceVisit' && model?.servicePrintLayout) || (context.kind === 'service' && model?.workPrintLayout))) addPageNumbers(doc);
     const blob = doc.output('blob');
     if (!(blob instanceof Blob) || blob.size < 1200) throw new Error('De PDF bevat geen geldige inhoud. Probeer opnieuw.');
     const stamp = new Date().toISOString().slice(0, 10);
