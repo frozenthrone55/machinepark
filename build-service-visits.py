@@ -73,6 +73,8 @@ for needle in [
     'Concept bewaren',
     'machineparkManualListHtml',
     'machineparkServiceVisitPdfModel',
+    'servicePrintLayout',
+    'workPages',
     'service-visit-mail-btn',
     '+ Toestel toevoegen',
     'deleteServiceReportAtomic',
