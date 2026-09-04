@@ -235,7 +235,7 @@ if MARKER not in index:
     const kindLabel = maintenance ? 'Onderhoud' : (other ? (record.workTypeName || 'Andere werken') : 'Depannage');
     const title = maintenance ? 'Onderhoudsverslag' : (other ? `${kindLabel} · verslag` : 'Depannageverslag');
     const oneOff = serviceOneOffParts(record);
-    const summary = serviceWorkSummary(maintenance ? 'maintenance' : 'breakdowns', record);
+    const summary = maintenance ? serviceWorkSummary('maintenance', record) : serviceWorkSummary('breakdowns', record);
     const summaryLabel = record?.serviceVisitId ? 'Servicetijd volledig verslag / toestellen' : 'Datum / werkminuten';
     const summaryValue = record?.serviceVisitId ? summary : `${serviceDate(record)} · ${summary}`;
     const detailLines = maintenance
