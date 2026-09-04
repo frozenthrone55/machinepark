@@ -27,14 +27,28 @@ test('onderdelen blijven per toestel en worden alleen voor klant samengevoegd', 
   assert.match(js, /devices:new Set/);
 });
 
-test('afgesloten serviceverslag kan met toestel of locatie worden aangevuld', () => {
-  assert.match(js, /\+ Toestel toevoegen/);
-  assert.match(js, /\+ Locatie toevoegen/);
-  assert.match(js, /appendToReportId/);
-  assert.match(js, /serviceReportRevision/);
-  assert.match(js, /serviceVisitRevision/);
-  assert.match(js, /serviceReportForVisit/);
+test('serviceverslagdetails tonen Bewerken en toevoegacties zitten alleen in bewerkmodus', () => {
+  assert.match(js, /edit\.textContent='✏️ Bewerken'/);
+  assert.match(js, /openServiceVisit\(report\.id,'',\{edit:true\}\)/);
+  assert.match(js, /id="serviceReportAddLocation"/);
+  assert.match(js, /id="serviceReportAddDevice"/);
+  const detailStart=js.indexOf('function showServiceReportDetails');
+  const detailEnd=js.indexOf('function showServiceVisitDetails',detailStart);
+  const detail=js.slice(detailStart,detailEnd);
+  assert.doesNotMatch(detail, /addDevice\.textContent='\+ Toestel toevoegen'/);
+  assert.doesNotMatch(detail, /addLocation\.textContent='\+ Locatie toevoegen'/);
 });
+
+test('serviceverslag bewerken behoudt bestaande record ids en corrigeert alleen voorraaddelta', () => {
+  assert.match(js, /sourceRecordId/);
+  assert.match(js, /sourceUsedParts/);
+  assert.match(js, /id:item\.sourceRecordId\|\|item\.id/);
+  assert.match(js, /stockUpdates\(selected,\{editMode:Boolean\(header\.editMode\)\}\)/);
+  assert.match(js, /totals\[id\]=\(totals\[id\]\|\|0\)-qty/);
+  assert.match(js, /serviceReportRevision/);
+});
+
+
 
 test('meerdere locaties delen één rapport maar behouden een eigen serviceVisitId', () => {
   assert.match(js, /serviceReportId/);
