@@ -63,3 +63,15 @@ test('detailpagina toont datum met werkduur in plaats van kloktijd', () => {
   assert.doesNotMatch(detail, /Datum \/ uur/);
   assert.doesNotMatch(detail, /item\.time\|\|visit\.time\|\|report\.time/);
 });
+
+
+test('werkuren worden per afzonderlijke servicewerkzaamheid bewaard en afgedrukt', () => {
+  assert.match(js, /sv-maintenance-hours/);
+  assert.match(js, /sv-breakdown-hours/);
+  assert.match(js, /sv-other-hours/);
+  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-maintenance-hours'\)/);
+  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-breakdown-hours'\)/);
+  assert.match(js, /serviceItemMinutes:Math\.max\(0,Math\.round\(Number\(panel\?\.querySelector\('\.sv-other-hours'\)/);
+  assert.match(js, /const specific=Math\.max\(0,Math\.round\(Number\(item\?\.serviceItemMinutes\)\|\|0\)\)/);
+  assert.match(js, /hours:\(itemMinutes>0\?itemMinutes:totalMinutes\)\/60/);
+});
