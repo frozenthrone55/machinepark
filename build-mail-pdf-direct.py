@@ -524,8 +524,8 @@ if MARKER not in index:
   }
 
   function servicePdfMetaBoxes(doc,meta,y) {
-    const gap=2.5,width=(194-gap*3)/4,height=17;
-    (meta||[]).slice(0,4).forEach((field,index)=>{
+    const fields=(meta||[]).slice(0,4),count=Math.max(1,fields.length),gap=2.5,width=(194-gap*(count-1))/count,height=17;
+    fields.forEach((field,index)=>{
       const x=8+index*(width+gap);
       servicePdfSetFill(doc,SERVICE_PDF.meta);servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.35);
       doc.roundedRect(x,y,width,height,2.2,2.2,'FD');
@@ -691,7 +691,6 @@ if MARKER not in index:
       {label:'Locatie',value:page.location},
       {label:'Servicetijd / toestellen',value:`${Math.max(0,Math.round(Number(page.serviceMinutes)||0))} min · ${Math.max(1,Math.round(Number(page.deviceCount)||1))} toestel${Math.max(1,Math.round(Number(page.deviceCount)||1))===1?'':'len'}`},
       {label:'Technieker',value:page.technician},
-      {label:'Type',value:page.kindLabel},
     ],y);
 
     const detailH=servicePdfMeasureDetails(doc,page.detailLines,178),partsH=servicePdfMeasureParts(doc,page.parts,184);
@@ -699,10 +698,7 @@ if MARKER not in index:
     servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.35);doc.roundedRect(cardX,cardY,cardW,cardH,2.5,2.5,'S');
 
     let cy=cardY+7;
-    const badge=servicePdfSafe(page.kindLabel),badgeColor=servicePdfKindColor(page.kind),badgeW=Math.max(20,doc.getTextWidth(badge)+9);
-    servicePdfSetFill(doc,badgeColor);doc.roundedRect(cardX+3,cy-4.5,badgeW,7,3.5,3.5,'F');
-    doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(6.8);doc.text(badge,cardX+3+badgeW/2,cy,{align:'center'});
-    servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFontSize(8.8);doc.text(servicePdfSafe(page.device),cardX+6+badgeW,cy);
+    servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFont('helvetica','bold');doc.setFontSize(8.8);doc.text(servicePdfSafe(page.device),cardX+3,cy);
     cy+=7;
 
     doc.setFont('helvetica','normal');doc.setFontSize(8.2);
