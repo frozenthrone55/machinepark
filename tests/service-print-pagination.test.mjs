@@ -112,3 +112,15 @@ test('los Onderhoud Depannage en Andere werken behouden hun eigen tijdregistrati
   assert.match(minutesBuild, /Werkminuten onderhoud \*/);
 });
 
+
+
+test('afdruk detailblad toont werksoort maar één keer bovenaan', () => {
+  const start=js.indexOf('function printRecordPageHtml');
+  const end=js.indexOf('function reportHtml',start);
+  const detail=js.slice(start,end);
+  assert.match(detail, /service-report-print-record-kind/);
+  assert.doesNotMatch(detail, /<small>Type<\/small>/);
+  assert.match(js, /service-record-kind-badge/);
+  assert.match(css, /\.service-report-print-record-page \.service-record-kind-badge\{display:none!important\}/);
+  assert.match(css, /\.service-report-print-record-meta\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+});
