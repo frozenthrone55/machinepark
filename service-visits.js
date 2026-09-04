@@ -211,19 +211,45 @@
     return rows.sort((a,b)=>a.date.localeCompare(b.date)||String(a.location).localeCompare(String(b.location),'nl'));
   }
 
+  function printRecordPageHtml(report,visit,row,index) {
+    const item=row.item||{},photos=(item.photos||[]).filter(src=>typeof src==='string'&&src.trim());
+    return `<section class="service-report-print-record-page">
+      <div class="service-report-print-record-head">
+        <div><small>Serviceverslag</small><strong>${svEsc(reportDisplayLabel(report))}</strong></div>
+        <div class="service-report-print-record-kind">${svEsc(svKindLabel(row.kind,item))}</div>
+      </div>
+      <div class="service-report-print-record-title"><span>Werkzaamheid ${svEsc(index+1)}</span><h3>${svEsc(svDeviceShort(item.deviceId))}</h3></div>
+      <div class="service-visit-report-meta service-report-print-record-meta">
+        <div><small>Locatie</small><strong>${svEsc(visit.location||'—')}</strong></div>
+        <div><small>Datum / uur</small><strong>${svEsc(svDateText(item.date||visit.date||report.date))}${item.time||visit.time||report.time?` · ${svEsc(item.time||visit.time||report.time)}`:''}</strong></div>
+        <div><small>Technieker</small><strong>${svEsc(item.technician||visit.technician||report.technician||'—')}</strong></div>
+        <div><small>Type</small><strong>${svEsc(svKindLabel(row.kind,item))}</strong></div>
+      </div>
+      ${recordSummary(row.kind,item)}
+      ${photos.length?`<div class="service-report-print-record-photos"><div class="section-title">Foto’s bij deze werkzaamheid</div><div class="service-visit-photo-grid">${photos.map((src,photoIndex)=>`<figure><img src="${svEsc(src)}" alt="${svEsc(`${svKindLabel(row.kind,item)} · ${svDeviceShort(item.deviceId)} · foto ${photoIndex+1}`)}"><figcaption>${svEsc(`Foto ${photoIndex+1}`)}</figcaption></figure>`).join('')}</div></div>`:''}
+    </section>`;
+  }
+
   function reportHtml(report) {
     const totalParts=mergedReportParts(report),sessions=reportWorkSessions(report),totalMinutes=sessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
+    const printRecords=(report.visits||[]).flatMap(visit=>(visit.records||[]).map(row=>({visit,row})));
     return `<div class="service-visit-report service-report">
-      <div class="service-visit-report-head"><h3>Serviceverslag ${svEsc(reportDisplayLabel(report))}</h3><div>${report.locationCount} locatie${report.locationCount===1?'':'s'} · ${report.deviceCount} toestel${report.deviceCount===1?'':'len'}</div></div>
-      <div class="service-visit-report-meta">
-        <div><small>Datum / uur</small><strong>${svEsc(svDateText(report.date))}${report.time?` · ${svEsc(report.time)}`:''}</strong></div>
-        <div><small>Technieker</small><strong>${svEsc(report.technician||'—')}</strong></div>
-        <div><small>Status</small><strong>Afgesloten</strong></div>
-        <div><small>Versie</small><strong>v${svEsc(report.revision)}</strong></div>
+      <div class="service-report-print-summary">
+        <div class="service-visit-report-head"><h3>Serviceverslag ${svEsc(reportDisplayLabel(report))}</h3><div>${report.locationCount} locatie${report.locationCount===1?'':'s'} · ${report.deviceCount} toestel${report.deviceCount===1?'':'len'}</div></div>
+        <div class="service-visit-report-meta">
+          <div><small>Datum / uur</small><strong>${svEsc(svDateText(report.date))}${report.time?` · ${svEsc(report.time)}`:''}</strong></div>
+          <div><small>Technieker</small><strong>${svEsc(report.technician||'—')}</strong></div>
+          <div><small>Status</small><strong>Afgesloten</strong></div>
+          <div><small>Versie</small><strong>v${svEsc(report.revision)}</strong></div>
+        </div>
+        <div><div class="section-title">Werkdagen en tijd</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · ${svEsc(row.location)} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal: ${svEsc(totalMinutes)} min</strong></div></div></div>
+        <div class="service-report-print-location-summary"><div class="section-title">Totaaloverzicht werkzaamheden</div><table class="service-visit-merged-parts service-report-print-summary-table"><thead><tr><th>Locatie</th><th>Toestellen</th><th>Onderhoud</th><th>Depannage</th><th>Andere werken</th></tr></thead><tbody>${(report.visits||[]).map(visit=>`<tr><td><strong>${svEsc(visit.location||'—')}</strong></td><td>${svEsc(visit.deviceCount||0)}</td><td>${svEsc(visit.maintenanceCount||0)}</td><td>${svEsc(visit.breakdownCount||0)}</td><td>${svEsc(visit.otherWorkCount||0)}</td></tr>`).join('')||'<tr><td colspan="5">Geen werkzaamheden.</td></tr>'}</tbody></table></div>
+        <div><div class="section-title">Totaal gebruikte onderdelen · alle locaties</div><table class="service-visit-merged-parts"><thead><tr><th>Onderdeel</th><th>Aantal</th><th>Locaties / toestellen</th></tr></thead><tbody>${totalParts.length?totalParts.map(p=>`<tr><td>${svEsc(p.label)}</td><td><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join(''):'<tr><td colspan="3">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
       </div>
-      <div><div class="section-title">Werkdagen en tijd</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · ${svEsc(row.location)} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal: ${svEsc(totalMinutes)} min</strong></div></div></div>
-      ${(report.visits||[]).map((visit,index)=>`<section class="service-report-location"><div class="service-report-location-head"><span>Locatie ${index+1}</span><h4>${svEsc(visit.location||'—')}</h4></div>${visitReportHtml(visit)}</section>`).join('')}
-      <div><div class="section-title">Totaal gebruikte onderdelen · alle locaties</div><table class="service-visit-merged-parts"><thead><tr><th>Onderdeel</th><th>Aantal</th><th>Locaties / toestellen</th></tr></thead><tbody>${totalParts.length?totalParts.map(p=>`<tr><td>${svEsc(p.label)}</td><td><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join(''):'<tr><td colspan="3">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
+      <div class="service-report-screen-locations">
+        ${(report.visits||[]).map((visit,index)=>`<section class="service-report-location"><div class="service-report-location-head"><span>Locatie ${index+1}</span><h4>${svEsc(visit.location||'—')}</h4></div>${visitReportHtml(visit)}</section>`).join('')}
+      </div>
+      <div class="service-report-print-details">${printRecords.map(({visit,row},index)=>printRecordPageHtml(report,visit,row,index)).join('')}</div>
     </div>`;
   }
 
