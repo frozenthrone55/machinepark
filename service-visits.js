@@ -211,8 +211,27 @@
     return rows.sort((a,b)=>a.date.localeCompare(b.date)||String(a.location).localeCompare(String(b.location),'nl'));
   }
 
+  function recordWorkMinutesForDate(item,date) {
+    const sessions=(Array.isArray(item?.workSessions)?item.workSessions:[]).filter(row=>row&&Number(row.minutes)>0);
+    const dated=sessions.filter(row=>String(row.date||'')===String(date||''));
+    if(dated.length)return dated.reduce((sum,row)=>sum+Math.max(0,Number(row.minutes)||0),0);
+    if(sessions.length===1)return Math.max(0,Number(sessions[0].minutes)||0);
+    const hours=Number(item?.hours||0);
+    return hours>0?Math.round(hours*60):0;
+  }
+
+  function formatWorkDuration(minutes) {
+    const total=Math.max(0,Math.round(Number(minutes)||0));
+    if(!total)return '—';
+    const hours=Math.floor(total/60),mins=total%60;
+    if(hours&&mins)return `${hours} u ${mins} min`;
+    if(hours)return `${hours} u`;
+    return `${mins} min`;
+  }
+
   function printRecordPageHtml(report,visit,row,index) {
     const item=row.item||{},photos=(item.photos||[]).filter(src=>typeof src==='string'&&src.trim());
+    const workDate=item.date||visit.date||report.date||'',workMinutes=recordWorkMinutesForDate(item,workDate);
     return `<section class="service-report-print-record-page">
       <div class="service-report-print-record-head">
         <div><small>Serviceverslag</small><strong>${svEsc(reportDisplayLabel(report))}</strong></div>
@@ -221,7 +240,7 @@
       <div class="service-report-print-record-title"><span>Werkzaamheid ${svEsc(index+1)}</span><h3>${svEsc(svDeviceShort(item.deviceId))}</h3></div>
       <div class="service-visit-report-meta service-report-print-record-meta">
         <div><small>Locatie</small><strong>${svEsc(visit.location||'—')}</strong></div>
-        <div><small>Datum / uur</small><strong>${svEsc(svDateText(item.date||visit.date||report.date))}${item.time||visit.time||report.time?` · ${svEsc(item.time||visit.time||report.time)}`:''}</strong></div>
+        <div><small>Datum / werkuren</small><strong>${svEsc(svDateText(workDate))} · ${svEsc(formatWorkDuration(workMinutes))}</strong></div>
         <div><small>Technieker</small><strong>${svEsc(item.technician||visit.technician||report.technician||'—')}</strong></div>
         <div><small>Type</small><strong>${svEsc(svKindLabel(row.kind,item))}</strong></div>
       </div>
