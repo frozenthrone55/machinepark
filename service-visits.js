@@ -14,6 +14,7 @@
   const svCan = permission => !window.machineparkAccessReady || typeof window.machineparkHasPermission !== 'function' || Boolean(window.machineparkHasPermission(permission));
   const svCanCreate = () => svCan('maintenance.add') || svCan('breakdowns.add');
   const svCanEdit = () => svCan('maintenance.edit') || svCan('breakdowns.edit');
+  const svCanDeleteReport = report => Boolean(report) && (!report.maintenanceCount || svCan('maintenance.delete')) && (!report.breakdownCount || svCan('breakdowns.delete'));
   const svDeviceShort = deviceId => {
     const d = (state.devices || []).find(item => item.id === deviceId);
     return [d?.assetCode, d?.brand, d?.model].filter(Boolean).join(' · ') || 'Onbekend toestel';
@@ -104,6 +105,14 @@
   }
   const serviceReportById = id => serviceReports().find(report => report.id === id) || null;
   const serviceReportForVisit = visitId => serviceReports().find(report => report.visits.some(visit => visit.id === visitId)) || null;
+
+  function serviceReportDeleteRows(reportId) {
+    const belongs = item => item?.isDraft !== true && item?.serviceVisitId && (item.serviceReportId || item.serviceVisitId) === reportId;
+    return {
+      maintenance:(state.maintenance || []).filter(belongs),
+      breakdowns:(state.breakdowns || []).filter(belongs),
+    };
+  }
 
   function reportNumber(id,date) {
     const year=String(date||todayISO()).slice(0,4)||String(new Date().getFullYear());
@@ -775,6 +784,84 @@
     await new Promise((resolve,reject)=>{const tr=db.transaction(['maintenance','breakdowns'],'readwrite'),ms=tr.objectStore('maintenance'),bs=tr.objectStore('breakdowns');(header.draftHeaderStore==='maintenance'?ms:bs).delete(header.id);items.forEach(i=>(i.draftServiceKind==='maintenance'?ms:bs).delete(i.id));tr.oncomplete=()=>{scheduleCentralSync();resolve();};tr.onerror=()=>reject(tr.error);tr.onabort=()=>reject(tr.error);});await refreshVisitState();await syncVisitDraft();toast('Serviceconcept verwijderd');
   }
 
+  function serviceReportDeleteImpact(report) {
+    const rows=serviceReportDeleteRows(report.id),totals={},all=[...rows.maintenance,...rows.breakdowns];
+    let photos=0,oneOff=0;
+    for(const record of all){
+      (record.usedParts || []).forEach(usage=>{
+        const id=String(usage?.partId || '').trim(),qty=Number(usage?.qty || 0);
+        if(id&&qty>0)totals[id]=(totals[id]||0)+qty;
+      });
+      oneOff+=(record.oneOffParts || []).filter(item=>item && (item.description||item.supplierCode||item.supplier)).length;
+      photos+=(record.photos || []).filter(src=>typeof src==='string'&&src.trim()).length;
+    }
+    return {
+      rows,
+      totals,
+      maintenance:rows.maintenance.length,
+      breakdowns:rows.breakdowns.length,
+      records:all.length,
+      usedTypes:Object.keys(totals).length,
+      usedQty:Object.values(totals).reduce((sum,qty)=>sum+Number(qty||0),0),
+      oneOff,
+      photos,
+    };
+  }
+
+  function deleteServiceReportAtomic(report) {
+    return new Promise((resolve,reject)=>{
+      if(!report?.id){reject(new Error('Serviceverslag niet gevonden.'));return;}
+      const impact=serviceReportDeleteImpact(report);
+      if(!impact.records){reject(new Error('Dit serviceverslag bevat geen gekoppelde onderhouds- of depannageregistraties meer.'));return;}
+      const now=new Date().toISOString(),updates=[];
+      for(const [id,qty] of Object.entries(impact.totals)){
+        const part=(state.parts || []).find(item=>item.id===id);
+        if(!part){reject(new Error(`Onderdeel ${id} bestaat niet meer. Het serviceverslag is niet verwijderd zodat de voorraad niet fout kan worden teruggezet.`));return;}
+        updates.push({...part,stock:Number(part.stock||0)+Number(qty||0),updatedAt:now});
+      }
+      let tr;
+      try{tr=db.transaction(['maintenance','breakdowns','parts'],'readwrite');}
+      catch(error){reject(error);return;}
+      const ms=tr.objectStore('maintenance'),bs=tr.objectStore('breakdowns'),ps=tr.objectStore('parts');
+      updates.forEach(part=>ps.put(part));
+      impact.rows.maintenance.forEach(record=>ms.delete(record.id));
+      impact.rows.breakdowns.forEach(record=>bs.delete(record.id));
+      tr.oncomplete=()=>{scheduleCentralSync();resolve(impact);};
+      tr.onerror=()=>reject(tr.error||new Error('Serviceverslag verwijderen mislukt.'));
+      tr.onabort=()=>reject(tr.error||new Error('Serviceverslag verwijderen afgebroken.'));
+    });
+  }
+
+  async function deleteServiceReport(id) {
+    const report=serviceReportById(id)||serviceReportForVisit(id);
+    if(!report){toast('Serviceverslag niet gevonden.');return;}
+    if(!svCanDeleteReport(report)){toast('Deze rol mist het verwijderrecht voor één of meer gekoppelde werkzaamheden.');return;}
+    const impact=serviceReportDeleteImpact(report);
+    const lines=[
+      `Serviceverslag ${reportDisplayLabel(report)} definitief verwijderen?`,
+      '',
+      `• ${impact.maintenance} onderhoudsregistratie${impact.maintenance===1?'':'s'} wordt/worden verwijderd.`,
+      `• ${impact.breakdowns} depannageregistratie${impact.breakdowns===1?'':'s'} wordt/worden verwijderd.`,
+    ];
+    if(impact.usedQty)lines.push(`• ${impact.usedQty} gebruikt${impact.usedQty===1?' onderdeel':'e onderdelen'} over ${impact.usedTypes} artikeltype${impact.usedTypes===1?'':'s'} wordt/worden terug op voorraad gezet.`);
+    else lines.push('• Er zijn geen voorraadonderdelen om terug te zetten.');
+    if(impact.oneOff)lines.push(`• ${impact.oneOff} eenmalig onderdeel${impact.oneOff===1?'':'delen'} wordt/worden samen met het verslag verwijderd; deze hebben geen voorraadcorrectie.`);
+    if(impact.photos)lines.push(`• ${impact.photos} verslagfoto${impact.photos===1?'':'’s'} wordt/worden na centrale synchronisatie uit de gekoppelde foto-opslag opgeruimd.`);
+    lines.push('','Het serviceverslag en alle bijhorende toestelregistraties verdwijnen samen. Deze actie kan niet ongedaan worden gemaakt.');
+    if(!confirm(lines.join('\n')))return;
+    try{
+      const result=await deleteServiceReportAtomic(report);
+      baseCloseModal();
+      await refresh();
+      await syncVisitDraft();
+      const restored=result.usedQty?` · ${result.usedQty} onderdeel${result.usedQty===1?'':'delen'} terug op voorraad`:'';
+      toast(`Serviceverslag volledig verwijderd${restored}`);
+    }catch(error){
+      console.error('Serviceverslag verwijderen',error);
+      alert(error?.message||'Serviceverslag verwijderen mislukt.');
+    }
+  }
+
   const baseCloseModal = closeModal;
   closeModal = function() {
     const current=activeVisitDraft;if(!current||current.finalizing)return baseCloseModal();clearTimeout(visitAutosaveTimer);
@@ -802,6 +889,7 @@
     setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';
       if(svCan('print')){const print=document.createElement('button');print.type='button';print.className='btn service-visit-print-btn';print.dataset.serviceReportId=report.id;print.textContent='🖨 Afdrukken';print.onclick=()=>void printServiceReport(report.id);foot.insertBefore(print,submit);
       const mail=document.createElement('button');mail.type='button';mail.className='btn service-visit-mail-btn';mail.dataset.serviceVisitMailId=report.id;mail.dataset.serviceVisitLabel=reportDisplayLabel(report);mail.textContent='✉ Mail PDF';foot.insertBefore(mail,submit);}
+      if(svCanDeleteReport(report)){const del=document.createElement('button');del.type='button';del.className='btn danger service-visit-delete-btn';del.textContent='Verwijderen';del.onclick=()=>void deleteServiceReport(report.id);foot.insertBefore(del,foot.firstChild);}
       if(svCanEdit()){
         const edit=document.createElement('button');edit.type='button';edit.className='btn primary';edit.textContent='✏️ Bewerken';edit.onclick=()=>{baseCloseModal();void openServiceVisit(report.id,'',{edit:true});};submit.classList.remove('primary');foot.appendChild(edit);
       }
