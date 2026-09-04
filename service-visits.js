@@ -684,7 +684,7 @@
     const out=[],now=new Date().toISOString();
     for(const card of document.querySelectorAll('#serviceVisitDevices .service-visit-device')){
       const deviceId=card.dataset.serviceVisitDevice||'';
-      for(const kind of ['maintenance','breakdowns']){
+      for(const kind of ['maintenance','breakdowns','otherworks']){
         const checked=card.querySelector(`[data-kind="${kind}"]`)?.checked;
         if(!checked)continue;
         const panel=card.querySelector(`[data-panel-kind="${kind}"]`),old=oldMap.get(`${kind}:${deviceId}`)||null,id=old?.id||uid(kind==='maintenance'?'mntdraft':'brkdraft');
@@ -693,7 +693,9 @@
         const workOrder=editor&&typeof window.machineparkCollectWorkOrder==='function'?window.machineparkCollectWorkOrder(editor):old?.workOrder||null;
         const base={...(old||{}),id,isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftServiceKind:kind,draftLocationKey:activeKey,draftLocationLabel:activeLoc?.label||'',targetVisitId:activeLoc?.visitId||old?.targetVisitId||'',deviceId,usedParts:collectUsed(panel),oneOffParts:collectOneOff(panel),photos,workOrder,createdAt:old?.createdAt||now,updatedAt:now,draftSchema:2};
         if(kind==='maintenance')out.push({...base,type:panel?.querySelector('.sv-maintenance-type')?.value||'Halfjaarlijks',notes:panel?.querySelector('.sv-maintenance-notes')?.value.trim()||''});
+        else if(kind==='otherworks')out.push({...base,serviceKind:'other',workTypeName:collectSvOtherWorkType(panel),priority:panel?.querySelector('.sv-other-priority')?.value||'Normaal',status:panel?.querySelector('.sv-other-status')?.value||'Open',issue:panel?.querySelector('.sv-other-issue')?.value.trim()||'',diagnosis:panel?.querySelector('.sv-other-diagnosis')?.value.trim()||'',solution:panel?.querySelector('.sv-other-solution')?.value.trim()||''});
         else out.push({...base,priority:panel?.querySelector('.sv-breakdown-priority')?.value||'Normaal',status:panel?.querySelector('.sv-breakdown-status')?.value||'Open',issue:panel?.querySelector('.sv-breakdown-issue')?.value.trim()||'',diagnosis:panel?.querySelector('.sv-breakdown-diagnosis')?.value.trim()||'',solution:panel?.querySelector('.sv-breakdown-solution')?.value.trim()||'',faultRef:typeof window.machineparkFaultRefFromCard==='function'?window.machineparkFaultRefFromCard(card):old?.faultRef||null});
+
       }
     }
     return [...preserved,...out];
@@ -792,10 +794,12 @@
       current.touched=true;const saved=await queueDraftSave({force:true});if(!saved||activeVisitDraft!==current)return;
       const selected=saved.items,locations=saved.header.locations||[];
       if(!locations.length)throw new Error('Voeg minstens één locatie toe.');
-      if(!selected.length)throw new Error('Kies minstens één onderhoud of depannage.');
+      if(!selected.length)throw new Error('Kies minstens één onderhoud, depannage of Andere werken.');
       const usedLocationKeys=new Set(selected.map(item=>item.draftLocationKey||saved.header.locationKey).filter(Boolean));
-      const emptyLocation=locations.find(loc=>!usedLocationKeys.has(loc.key));if(emptyLocation)throw new Error(`Kies minstens één onderhoud of depannage op ${emptyLocation.label} of verwijder die locatie uit het concept.`);
+      const emptyLocation=locations.find(loc=>!usedLocationKeys.has(loc.key));if(emptyLocation)throw new Error(`Kies minstens één onderhoud, depannage of Andere werken op ${emptyLocation.label} of verwijder die locatie uit het concept.`);
       const missing=selected.find(i=>i.draftServiceKind==='breakdowns'&&!String(i.issue||'').trim());if(missing)throw new Error(`Vul het probleem / de melding in voor ${svDeviceShort(missing.deviceId)}.`);
+      const missingOther=selected.find(i=>i.draftServiceKind==='otherworks'&&!String(i.issue||'').trim());if(missingOther)throw new Error(`Vul de werkzaamheid / omschrijving in voor ${svDeviceShort(missingOther.deviceId)}.`);
+      const missingOtherType=selected.find(i=>i.draftServiceKind==='otherworks'&&!String(i.workTypeName||'').trim());if(missingOtherType)throw new Error(`Kies een soort werkzaamheden voor ${svDeviceShort(missingOtherType.deviceId)}.`);
       const report=saved.header.appendToReportId?serviceReportById(saved.header.appendToReportId):null;
       const result=await finalizeDraftTransaction(saved.header,saved.items,selected,report);
       activeVisitDraft=null;baseCloseModal();await refresh();toast(`Serviceverslag ${reportDisplayLabel(serviceReportById(result.id) || {number:result.number,date:saved.header.date,visits:(result.visits||[]).map(v=>({location:v.location}))})} opgeslagen · ${result.visits.length} locatie${result.visits.length===1?'':'s'} · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceReportDetails(result.id),0);
@@ -805,7 +809,7 @@
   function headerStoreForUser() { return svCan('breakdowns.add') ? 'breakdowns' : 'maintenance'; }
 
   async function openServiceVisit(id='',draftId='',options={}) {
-    if(!svCanCreate()&&!svCanEdit()){toast('Deze rol mag geen onderhoud of depannage registreren of wijzigen.');return;}
+    if(!svCanCreate()&&!svCanEdit()){toast('Deze rol mag geen onderhoud, depannage of Andere werken registreren of wijzigen.');return;}
     if(typeof window.machineparkSyncOnlineNow==='function'&&navigator.onLine&&draftId){try{await window.machineparkSyncOnlineNow({quiet:true});await refreshVisitState();}catch(_){}}
     let header=draftId?visitDraftHeader(draftId):null,items=header?visitDraftItems(header.id):[];
     const requestedReport=id?(serviceReportById(id)||serviceReportForVisit(id)):null;
@@ -813,7 +817,7 @@
     if(id&&!report){toast('Serviceverslag niet meer gevonden.');return;}if(!locationGroups().length){toast('Geen actieve toestellen met een locatie gevonden.');return;}
     const editMode=Boolean(options.edit||header?.editMode);
     if(editMode&&!svCanEdit()){toast('Deze rol mag dit serviceverslag niet wijzigen.');return;}
-    if(!editMode&&!svCanCreate()){toast('Deze rol mag geen nieuwe onderhouds- of depannageregistraties toevoegen.');return;}
+    if(!editMode&&!svCanCreate()){toast('Deze rol mag geen nieuwe onderhouds-, depannage- of Andere-werkenregistraties toevoegen.');return;}
     const draftHeaderStore=header?.draftHeaderStore||headerStoreForUser(),draftKey=header?.id||uid('svdraft');
     if(editMode&&report&&!header){header={...reportEditHeader(report),id:draftKey,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:draftKey,draftHeaderStore,editMode:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),draftSchema:3};items=reportEditItems(report,draftKey);}
     const locations=draftLocationList(report,header);
