@@ -49,3 +49,7 @@
 .service-report-location .service-visit-report-meta{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:700px){.service-report-location-manager-head{align-items:flex-start}.service-report-location-manager-head .btn{width:100%}.service-report-location-chip-wrap,.service-report-location-chip{width:100%}.service-report-location .service-visit-report-meta{grid-template-columns:1fr 1fr}}
 @media print{.service-report-location{border-color:#bbb;break-inside:auto}.service-report-location-remove{display:none!important}.service-report-location-manager{display:none!important}}
+
+.service-report-device-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.service-report-device-highlight{box-shadow:0 0 0 3px rgba(44,106,88,.18);transition:box-shadow .2s ease}
+@media(max-width:700px){.service-report-device-head .btn{width:100%}}
