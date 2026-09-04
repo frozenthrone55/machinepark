@@ -527,9 +527,9 @@ if MARKER not in index:
     const original=doc.getFontSize?.()||baseSize;doc.setFontSize(baseSize);
     const values=['ONDERDEEL',...(codes||[]).map(value=>servicePdfSafe(value||'—'))];
     const widest=Math.max(...values.map(value=>doc.getTextWidth(value)),0);
-    const tenSpaces=doc.getTextWidth('          ');
+    const threeSpaces=doc.getTextWidth('   ');
     doc.setFontSize(original);
-    const wanted=widest+tenSpaces+4;
+    const wanted=widest+threeSpaces+4;
     return Math.max(12,Math.min(wanted,totalWidth-reservedWidth-minDescriptionWidth));
   }
 
@@ -913,7 +913,7 @@ required = [
     'ONDERDELEN VOOR DEZE WERKZAAMHEID',
     'servicePdfFitSingleLine',
     'servicePdfCodeColumnWidth',
-    "doc.getTextWidth('          ')",
+    "doc.getTextWidth('   ')",
     "headers:['Onderdeel','Omschrijving','Aantal','Locaties / toestellen']",
     'nowrapCols:[0,2],rightCols:[2]',
     'green:[24,63,53]',
