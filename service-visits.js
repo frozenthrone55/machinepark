@@ -225,24 +225,6 @@
     return rows.sort((a,b)=>a.date.localeCompare(b.date)||String(a.location).localeCompare(String(b.location),'nl'));
   }
 
-  function serviceItemMinutesValue(item) {
-    const raw=Math.max(0,Number(item?.serviceItemMinutes)||0);
-    if(!raw)return 0;
-    if(item?.serviceItemMinutesUnit==='minutes')return Math.round(raw);
-    return Math.round(raw/60);
-  }
-
-  function recordWorkMinutesForDate(item,date) {
-    const specific=serviceItemMinutesValue(item);
-    if(specific)return specific;
-    const sessions=(Array.isArray(item?.workSessions)?item.workSessions:[]).filter(row=>row&&Number(row.minutes)>0);
-    const dated=sessions.filter(row=>String(row.date||'')===String(date||''));
-    if(dated.length)return dated.reduce((sum,row)=>sum+Math.max(0,Number(row.minutes)||0),0);
-    if(sessions.length===1)return Math.max(0,Number(sessions[0].minutes)||0);
-    const storedMinutes=Number(item?.hours||0);
-    return storedMinutes>0?Math.round(storedMinutes):0;
-  }
-
   function formatWorkDuration(minutes) {
     const total=Math.max(0,Math.round(Number(minutes)||0));
     return total>0?`${total} min`:'—';
