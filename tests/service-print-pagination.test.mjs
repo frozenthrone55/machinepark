@@ -149,8 +149,8 @@ test('samengevoegde onderdelenlijsten gebruiken dezelfde code omschrijving aanta
 
 
 test('onderdeelkolom past zich automatisch aan breedste code plus drie spaties aan', () => {
-  assert.match(css, /\.service-record-parts-table \.service-part-code\{width:1%;white-space:nowrap;padding-right:calc\(10ch \+ 10px\)\}/);
-  assert.match(css, /\.service-parts-columns \.service-part-code\{width:1%;white-space:nowrap;padding-right:calc\(10ch \+ 6px\)\}/);
-  assert.match(css, /\.service-visit-print-sheet \.service-part-code\{width:1%!important;white-space:nowrap!important;padding-right:calc\(10ch \+ 6px\)!important\}/);
+  assert.match(css, /\.service-record-parts-table \.service-part-code\{width:1%;white-space:nowrap;padding-right:calc\(3ch \+ 10px\)\}/);
+  assert.match(css, /\.service-parts-columns \.service-part-code\{width:1%;white-space:nowrap;padding-right:calc\(3ch \+ 6px\)\}/);
+  assert.match(css, /\.service-visit-print-sheet \.service-part-code\{width:1%!important;white-space:nowrap!important;padding-right:calc\(3ch \+ 6px\)!important\}/);
   assert.match(css, /\.service-part-description\{[^}]*width:auto[^}]*white-space:normal/);
 });
