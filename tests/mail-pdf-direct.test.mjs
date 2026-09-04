@@ -108,3 +108,38 @@ test('directe Mail PDF en print-pariteit draaien na de bestaande mail-renderfix'
   assert.ok(directPos > renderPos);
   assert.ok(parityPos > directPos);
 });
+
+test('gezamenlijk serviceverslag PDF gebruikt dezelfde gekleurde indeling als Afdrukken', () => {
+  assert.ok(build.includes('servicePrintLayout'));
+  assert.ok(build.includes('function servicePdfSummaryPage'));
+  assert.ok(build.includes('function servicePdfWorkPage'));
+  assert.ok(build.includes('function addServiceVisitPrintLayout'));
+  assert.ok(build.includes('green:[24,63,53]'));
+  assert.ok(build.includes('maintenance:[36,72,93]'));
+  assert.ok(build.includes('breakdowns:[107,45,45]'));
+  assert.ok(build.includes('otherworks:[75,60,103]'));
+  assert.ok(build.includes('meta:[236,236,234]'));
+  assert.ok(build.includes('table:[222,222,219]'));
+});
+
+test('serviceverslag PDF heeft totaalpagina en één nieuwe pagina per werkzaamheid', () => {
+  assert.ok(build.includes("servicePdfSectionTitle(doc,'Totaaloverzicht werkzaamheden'"));
+  assert.ok(build.includes("servicePdfSectionTitle(doc,'Totaal gebruikte onderdelen · alle locaties'"));
+  assert.ok(build.includes('for(const page of model.servicePrintLayout?.workPages||[])await servicePdfWorkPage'));
+  assert.ok(build.includes('doc.addPage();'));
+  assert.ok(build.includes('WERKZAAMHEID ${page.index}'));
+});
+
+test('serviceverslag PDF gebruikt dezelfde meta- en onderdelenkaders als afdruk', () => {
+  assert.ok(build.includes("label:'Datum / werkuren'"));
+  assert.ok(build.includes('${Math.max(0,Math.round(Number(page.workMinutes)||0))} min'));
+  assert.ok(build.includes('ONDERDELEN VOOR DEZE WERKZAAMHEID'));
+  assert.ok(build.includes('EENMALIG / LEVERANCIER'));
+  assert.ok(build.includes("doc.roundedRect(x,y,width,height,2.2,2.2,'FD')"));
+});
+
+test('gezamenlijk serviceverslag gebruikt geen oude generieke PDF-opbouw', () => {
+  assert.ok(build.includes("context.kind === 'serviceVisit' && model.servicePrintLayout"));
+  assert.ok(build.includes('await addServiceVisitPrintLayout(doc, model)'));
+  assert.ok(build.includes("if (!(context.kind === 'serviceVisit' && model?.servicePrintLayout)) addPageNumbers(doc)"));
+});
