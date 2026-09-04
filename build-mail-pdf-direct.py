@@ -167,6 +167,11 @@ if MARKER not in index:
   function serviceWorkSummary(kind, record) {
     const sessions = Array.isArray(record?.workSessions) ? record.workSessions : [];
     const sessionMinutes = sessions.reduce((sum, row) => sum + Math.max(0, Math.round(Number(row?.minutes) || 0)), 0);
+    if (record?.serviceVisitId) {
+      const minutes = Math.max(0, Math.round(Number(record?.serviceVisitTotalMinutes) || sessionMinutes || Number(record?.hours || 0) * 60));
+      const count = Math.max(1, Math.round(Number(record?.serviceVisitDeviceCount || record?.batchSize) || 1));
+      return `${minutes} min / ${count} toestel${count === 1 ? '' : 'len'}`;
+    }
     const minutes = sessionMinutes || Math.max(0, Math.round(Number(record?.hours || 0) * 60));
     const collection = kind === 'maintenance' ? state.maintenance : state.breakdowns;
     let count = Math.max(1, Math.round(Number(record?.batchSize) || 1));
@@ -680,7 +685,7 @@ if MARKER not in index:
     let y=servicePdfWorkHeader(doc,model,page);
     y=servicePdfMetaBoxes(doc,[
       {label:'Locatie',value:page.location},
-      {label:'Datum / werkuren',value:`${page.date} · ${Math.max(0,Math.round(Number(page.workMinutes)||0))} min`},
+      {label:'Servicetijd / toestellen',value:`${Math.max(0,Math.round(Number(page.serviceMinutes)||0))} min · ${Math.max(1,Math.round(Number(page.deviceCount)||1))} toestel${Math.max(1,Math.round(Number(page.deviceCount)||1))===1?'':'len'}`},
       {label:'Technieker',value:page.technician},
       {label:'Type',value:page.kindLabel},
     ],y);
