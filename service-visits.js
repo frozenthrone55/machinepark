@@ -111,6 +111,138 @@
     return `SR-${year}-${suffix}`;
   }
 
+  function shortDate(value) {
+    const raw=String(value||'');
+    const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}/${m[2]}`:raw||'—';
+  }
+
+  function visibleCode(number,prefix='SR') {
+    const raw=String(number||'').trim();
+    const match=raw.match(new RegExp(`^${prefix}-\\d{4}-(.+)(() => {
+  const AUTOSAVE_DELAY = 1400;
+  let activeVisitDraft = null;
+  let visitAutosaveTimer = 0;
+  let visitSaveChain = Promise.resolve();
+
+  const svEsc = value => esc(String(value ?? ''));
+  const svKey = value => normalizeSearch(String(value ?? ''));
+  const svDateText = value => {
+    if (!value) return '—';
+    const d = new Date(`${value}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('nl-BE');
+  };
+  const svCan = permission => !window.machineparkAccessReady || typeof window.machineparkHasPermission !== 'function' || Boolean(window.machineparkHasPermission(permission));
+  const svCanCreate = () => svCan('maintenance.add') || svCan('breakdowns.add');
+  const svCanEdit = () => svCan('maintenance.edit') || svCan('breakdowns.edit');
+  const svDeviceShort = deviceId => {
+    const d = (state.devices || []).find(item => item.id === deviceId);
+    return [d?.assetCode, d?.brand, d?.model].filter(Boolean).join(' · ') || 'Onbekend toestel';
+  };
+  const svLocationForDevice = device => {
+    if (!device) return '';
+    try { return deviceLocationAt(device) || device.location || ''; }
+    catch (_) { return device.location || ''; }
+  };
+  const isVisitDraft = item => Boolean(item?.isDraft === true && item?.draftKind === 'serviceVisit');
+  const visitDraftHeaders = () => {
+    const all = [...(state.maintenance || []), ...(state.breakdowns || [])];
+    const seen = new Set();
+    return all.filter(item => isVisitDraft(item) && item.draftRole === 'header').filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    }).sort((a,b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  };
+  const visitDraftHeader = id => visitDraftHeaders().find(item => item.id === id) || null;
+  const visitDraftItems = id => [...(state.maintenance || []), ...(state.breakdowns || [])]
+    .filter(item => isVisitDraft(item) && item.draftRole === 'item' && item.draftBatchId === id);
+  const visitDraftStore = header => header?.draftHeaderStore === 'maintenance' ? 'maintenance' : 'breakdowns';
+
+  function serviceVisitRecords(id) {
+    const maintenance = (state.maintenance || []).filter(item => item?.isDraft !== true && item?.serviceVisitId === id).map(item => ({ kind:'maintenance', item }));
+    const breakdowns = (state.breakdowns || []).filter(item => item?.isDraft !== true && item?.serviceVisitId === id).map(item => ({ kind:'breakdowns', item }));
+    return [...maintenance, ...breakdowns].sort((a,b) => String(recordMoment(a.item) || a.item.updatedAt || '').localeCompare(String(recordMoment(b.item) || b.item.updatedAt || '')));
+  }
+
+  function serviceVisits() {
+    const ids = new Set();
+    (state.maintenance || []).forEach(item => { if (item?.isDraft !== true && item?.serviceVisitId) ids.add(item.serviceVisitId); });
+    (state.breakdowns || []).forEach(item => { if (item?.isDraft !== true && item?.serviceVisitId) ids.add(item.serviceVisitId); });
+    return [...ids].map(id => {
+      const records = serviceVisitRecords(id);
+      const all = records.map(row => row.item);
+      const first = all[0] || {};
+      const technicians = [...new Set(all.map(item => String(item.serviceVisitTechnician || item.technician || '').trim()).filter(Boolean))];
+      const revisions = all.map(item => Math.max(1, Number(item.serviceVisitRevision) || 1));
+      const closed = all.map(item => item.serviceVisitClosedAt || item.updatedAt || '').filter(Boolean).sort();
+      return {
+        id,
+        number:first.serviceVisitNumber || id,
+        location:first.serviceVisitLocation || '',
+        locationKey:first.serviceVisitLocationKey || svKey(first.serviceVisitLocation || ''),
+        date:first.serviceVisitDate || first.date || '',
+        time:first.serviceVisitTime || first.time || '',
+        technician:technicians.join(', ') || '—',
+        revision:Math.max(1, ...revisions),
+        closedAt:closed.at(-1) || '',
+        records,
+        deviceCount:new Set(all.map(item => item.deviceId).filter(Boolean)).size,
+        maintenanceCount:records.filter(row => row.kind === 'maintenance').length,
+        breakdownCount:records.filter(row => row.kind === 'breakdowns').length,
+      };
+    }).filter(v => v.records.length).sort((a,b) => String(b.closedAt || `${b.date}T${b.time || '00:00'}`).localeCompare(String(a.closedAt || `${a.date}T${a.time || '00:00'}`)));
+  }
+  const serviceVisitById = id => serviceVisits().find(v => v.id === id) || null;
+
+  function serviceReports() {
+    const rows = [...(state.maintenance || []), ...(state.breakdowns || [])].filter(item => item?.isDraft !== true && item?.serviceVisitId);
+    const ids = new Set(rows.map(item => item.serviceReportId || item.serviceVisitId).filter(Boolean));
+    return [...ids].map(id => {
+      const reportRows = rows.filter(item => (item.serviceReportId || item.serviceVisitId) === id);
+      const visitIds = [...new Set(reportRows.map(item => item.serviceVisitId).filter(Boolean))];
+      const visits = visitIds.map(visitId => serviceVisitById(visitId)).filter(Boolean);
+      const first = reportRows[0] || {};
+      const revisions = reportRows.map(item => Math.max(1, Number(item.serviceReportRevision || item.serviceVisitRevision) || 1));
+      const closed = reportRows.map(item => item.serviceReportClosedAt || item.serviceVisitClosedAt || item.updatedAt || '').filter(Boolean).sort();
+      const technicians = [...new Set(reportRows.map(item => String(item.serviceReportTechnician || item.serviceVisitTechnician || item.technician || '').trim()).filter(Boolean))];
+      return {
+        id,
+        number:first.serviceReportNumber || first.serviceVisitNumber || id,
+        revision:Math.max(1,...revisions),
+        date:first.serviceReportDate || first.serviceVisitDate || first.date || '',
+        time:first.serviceReportTime || first.serviceVisitTime || first.time || '',
+        technician:technicians.join(', ') || '—',
+        closedAt:closed.at(-1) || '',
+        visits:visits.sort((a,b)=>String(a.location||'').localeCompare(String(b.location||''),'nl',{numeric:true,sensitivity:'base'})),
+        records:visits.flatMap(v=>v.records),
+        locationCount:visits.length,
+        deviceCount:new Set(reportRows.map(item=>item.deviceId).filter(Boolean)).size,
+        maintenanceCount:reportRows.filter(item=>item.type !== undefined).length,
+        breakdownCount:reportRows.filter(item=>item.type === undefined).length,
+      };
+    }).filter(report=>report.visits.length).sort((a,b)=>String(b.closedAt||`${b.date}T${b.time||'00:00'}`).localeCompare(String(a.closedAt||`${a.date}T${a.time||'00:00'}`)));
+  }
+  const serviceReportById = id => serviceReports().find(report => report.id === id) || null;
+  const serviceReportForVisit = visitId => serviceReports().find(report => report.visits.some(visit => visit.id === visitId)) || null;
+
+,'i'));
+    return (match?.[1]||raw||'—').toUpperCase();
+  }
+
+  function reportDisplayLabel(report) {
+    if(!report)return '—';
+    const locations=(report.visits||[]).map(v=>String(v.location||'').trim()).filter(Boolean);
+    const first=locations[0]||'Locatie onbekend';
+    const extra=locations.length>1?` +${locations.length-1}`:'';
+    return `${shortDate(report.date)} · ${first}${extra} · ${visibleCode(report.number,'SR')}`;
+  }
+
+  function visitDisplayLabel(visit) {
+    if(!visit)return '—';
+    return `${shortDate(visit.date)} · ${visit.location||'Locatie onbekend'} · ${visibleCode(visit.number,'SV')}`;
+  }
+
   function svPartLabel(partId) {
     const part = (state.parts || []).find(item => item.id === partId);
     return part ? ([part.artNr, part.description].filter(Boolean).join(' · ') || partId) : `Onbekend onderdeel (${partId || '—'})`;
@@ -176,7 +308,7 @@
   function reportHtml(report) {
     const totalParts=mergedReportParts(report),sessions=reportWorkSessions(report),totalMinutes=sessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
     return `<div class="service-visit-report service-report">
-      <div class="service-visit-report-head"><h3>Serviceverslag ${svEsc(report.number)}</h3><div>${report.locationCount} locatie${report.locationCount===1?'':'s'} · ${report.deviceCount} toestel${report.deviceCount===1?'':'len'}</div></div>
+      <div class="service-visit-report-head"><h3>Serviceverslag ${svEsc(reportDisplayLabel(report))}</h3><div>${report.locationCount} locatie${report.locationCount===1?'':'s'} · ${report.deviceCount} toestel${report.deviceCount===1?'':'len'}</div></div>
       <div class="service-visit-report-meta">
         <div><small>Datum / uur</small><strong>${svEsc(svDateText(report.date))}${report.time?` · ${svEsc(report.time)}`:''}</strong></div>
         <div><small>Technieker</small><strong>${svEsc(report.technician||'—')}</strong></div>
@@ -766,17 +898,17 @@
     const sheet=ensurePrintSheet();sheet.innerHTML=reportHtml(report);
     const images=[...sheet.querySelectorAll('img')];
     await Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{const done=()=>resolve();img.addEventListener('load',done,{once:true});img.addEventListener('error',done,{once:true});setTimeout(done,3500);})));
-    const title=document.title;document.title=`Machinepark - Serviceverslag - ${report.number}`;document.body.classList.add('service-visit-printing');
+    const title=document.title;document.title=`Machinepark - Serviceverslag - ${reportDisplayLabel(report)}`;document.body.classList.add('service-visit-printing');
     const restore=()=>{document.body.classList.remove('service-visit-printing');document.title=title;window.removeEventListener('afterprint',restore);};
     window.addEventListener('afterprint',restore);window.print();setTimeout(()=>{if(document.body.classList.contains('service-visit-printing'))restore();},1800);
   }
 
   function showServiceReportDetails(id) {
     const report=serviceReportById(id)||serviceReportForVisit(id);if(!report){toast('Serviceverslag niet gevonden.');return;}
-    showModal(`Serviceverslag ${report.number}`,reportHtml(report),'Sluiten',async()=>closeModal());
+    showModal(`Serviceverslag ${reportDisplayLabel(report)}`,reportHtml(report),'Sluiten',async()=>closeModal());
     setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';
       if(svCan('print')){const print=document.createElement('button');print.type='button';print.className='btn service-visit-print-btn';print.dataset.serviceReportId=report.id;print.textContent='🖨 Afdrukken';print.onclick=()=>void printServiceReport(report.id);foot.insertBefore(print,submit);
-      const mail=document.createElement('button');mail.type='button';mail.className='btn service-visit-mail-btn';mail.dataset.serviceVisitMailId=report.id;mail.dataset.serviceVisitLabel=report.number;mail.textContent='✉ Mail PDF';foot.insertBefore(mail,submit);}
+      const mail=document.createElement('button');mail.type='button';mail.className='btn service-visit-mail-btn';mail.dataset.serviceVisitMailId=report.id;mail.dataset.serviceVisitLabel=reportDisplayLabel(report);mail.textContent='✉ Mail PDF';foot.insertBefore(mail,submit);}
       if(svCanEdit()){
         const edit=document.createElement('button');edit.type='button';edit.className='btn primary';edit.textContent='✏️ Bewerken';edit.onclick=()=>{baseCloseModal();void openServiceVisit(report.id,'',{edit:true});};submit.classList.remove('primary');foot.appendChild(edit);
       }
@@ -797,9 +929,9 @@
   function renderServiceVisits() {
     const panel=ensurePanel();if(!panel)return;const add=document.getElementById('serviceVisitAdd');if(add)add.style.display=svCanCreate()?'':'none';
     const draftBox=document.getElementById('serviceVisitDraftList'),headers=visitDraftHeaders();
-    if(draftBox)draftBox.innerHTML=headers.length?`<div class="service-visit-drafts"><div class="service-draft-head"><strong>Serviceconcepten (${headers.length})</strong><span class="muted" style="font-size:11px">Meerdere locaties blijven samen in één concept en worden centraal gesynchroniseerd.</span></div><div class="service-draft-list">${headers.map(h=>{const items=visitDraftItems(h.id),locations=Array.isArray(h.locations)&&h.locations.length?h.locations.map(x=>x.label):[h.locationLabel].filter(Boolean),devices=[...new Set(items.map(i=>svDeviceShort(i.deviceId)))].join(', ')||'Nog geen toestel geselecteerd',target=h.appendToReportId?serviceReportById(h.appendToReportId):(h.appendToVisitId?serviceReportForVisit(h.appendToVisitId):null);return `<div class="service-draft-row"><div><div class="service-draft-row-title"><span class="service-draft-badge">CONCEPT</span>${svEsc(target?`Aanvulling ${target.number}`:locations.length?`Serviceverslag · ${locations.length} locatie${locations.length===1?'':'s'}`:'Nieuw serviceverslag')}</div><div class="service-draft-row-meta">${svEsc(locations.join(', ')||'Nog geen locatie')} · ${svEsc(devices)} · laatst aangepast ${svEsc(new Date(h.updatedAt||Date.now()).toLocaleString('nl-BE'))}</div></div><div class="service-draft-actions"><button type="button" class="btn small service-draft-button" data-sv-draft-open="${svEsc(h.id)}">Verdergaan</button><button type="button" class="btn small danger" data-sv-draft-delete="${svEsc(h.id)}">Verwijderen</button></div></div>`;}).join('')}</div></div>`:'';
+    if(draftBox)draftBox.innerHTML=headers.length?`<div class="service-visit-drafts"><div class="service-draft-head"><strong>Serviceconcepten (${headers.length})</strong><span class="muted" style="font-size:11px">Meerdere locaties blijven samen in één concept en worden centraal gesynchroniseerd.</span></div><div class="service-draft-list">${headers.map(h=>{const items=visitDraftItems(h.id),locations=Array.isArray(h.locations)&&h.locations.length?h.locations.map(x=>x.label):[h.locationLabel].filter(Boolean),devices=[...new Set(items.map(i=>svDeviceShort(i.deviceId)))].join(', ')||'Nog geen toestel geselecteerd',target=h.appendToReportId?serviceReportById(h.appendToReportId):(h.appendToVisitId?serviceReportForVisit(h.appendToVisitId):null);return `<div class="service-draft-row"><div><div class="service-draft-row-title"><span class="service-draft-badge">CONCEPT</span>${svEsc(target?`Aanvulling ${reportDisplayLabel(target)}`:locations.length?`Serviceverslag · ${locations.length} locatie${locations.length===1?'':'s'}`:'Nieuw serviceverslag')}</div><div class="service-draft-row-meta">${svEsc(locations.join(', ')||'Nog geen locatie')} · ${svEsc(devices)} · laatst aangepast ${svEsc(new Date(h.updatedAt||Date.now()).toLocaleString('nl-BE'))}</div></div><div class="service-draft-actions"><button type="button" class="btn small service-draft-button" data-sv-draft-open="${svEsc(h.id)}">Verdergaan</button><button type="button" class="btn small danger" data-sv-draft-delete="${svEsc(h.id)}">Verwijderen</button></div></div>`;}).join('')}</div></div>`:'';
     const body=document.getElementById('serviceVisitBody');if(!body)return;const reports=serviceReports();
-    body.innerHTML=reports.length?reports.map(r=>{const acts=[r.maintenanceCount?`${r.maintenanceCount} onderhoud`:'',r.breakdownCount?`${r.breakdownCount} depannage`:''].filter(Boolean).join(' · '),locations=r.visits.map(v=>v.location).filter(Boolean);return `<tr><td><span class="service-visit-number">${svEsc(r.number)}</span><div class="muted" style="font-size:10px">v${svEsc(r.revision)}</div></td><td>${svEsc(svDateText(r.date))}${r.time?`<div class="muted" style="font-size:10px">${svEsc(r.time)}</div>`:''}</td><td><strong>${svEsc(r.locationCount)}</strong><div class="muted" style="font-size:10px">${svEsc(locations.join(' · ')||'—')}</div></td><td>${svEsc(r.deviceCount)}</td><td>${svEsc(acts||'—')}</td><td>${svEsc(r.technician||'—')}</td><td><span class="service-visit-status">Afgesloten</span></td><td><button type="button" class="btn small" data-service-visit-open="${svEsc(r.id)}">Details</button></td></tr>`;}).join(''):'<tr><td colspan="8"><div class="empty">Nog geen gezamenlijke serviceverslagen. Los onderhoud en losse depannages blijven gewoon in de historiek staan.</div></td></tr>';
+    body.innerHTML=reports.length?reports.map(r=>{const acts=[r.maintenanceCount?`${r.maintenanceCount} onderhoud`:'',r.breakdownCount?`${r.breakdownCount} depannage`:''].filter(Boolean).join(' · '),locations=r.visits.map(v=>v.location).filter(Boolean);return `<tr><td><span class="service-visit-number">${svEsc(reportDisplayLabel(r))}</span><div class="muted" style="font-size:10px">v${svEsc(r.revision)}</div></td><td>${svEsc(svDateText(r.date))}${r.time?`<div class="muted" style="font-size:10px">${svEsc(r.time)}</div>`:''}</td><td><strong>${svEsc(r.locationCount)}</strong><div class="muted" style="font-size:10px">${svEsc(locations.join(' · ')||'—')}</div></td><td>${svEsc(r.deviceCount)}</td><td>${svEsc(acts||'—')}</td><td>${svEsc(r.technician||'—')}</td><td><span class="service-visit-status">Afgesloten</span></td><td><button type="button" class="btn small" data-service-visit-open="${svEsc(r.id)}">Details</button></td></tr>`;}).join(''):'<tr><td colspan="8"><div class="empty">Nog geen gezamenlijke serviceverslagen. Los onderhoud en losse depannages blijven gewoon in de historiek staan.</div></td></tr>';
   }
 
   document.addEventListener('click',e=>{const open=e.target.closest('[data-service-visit-open]');if(open){showServiceVisitDetails(open.dataset.serviceVisitOpen);return;}const draft=e.target.closest('[data-sv-draft-open]');if(draft){void openServiceVisit('',draft.dataset.svDraftOpen);return;}const del=e.target.closest('[data-sv-draft-delete]');if(del){void deleteVisitDraft(del.dataset.svDraftDelete);}});
@@ -811,7 +943,7 @@
   window.machineparkServiceVisitPdfModel = function(id) {
     const report=serviceReportById(id)||serviceReportForVisit(id);if(!report)return null;
     const parts=mergedReportParts(report),sessions=reportWorkSessions(report),totalMinutes=sessions.reduce((sum,row)=>sum+row.minutes,0),fields=[
-      {label:'Verslag',value:report.number||'—'},{label:'Locaties',value:(report.visits||[]).map(v=>v.location||'—').join('\n')||'—'},{label:'Technieker',value:report.technician||'—'},{label:'Status / versie',value:`Afgesloten · v${report.revision}`},
+      {label:'Verslag',value:reportDisplayLabel(report)},{label:'Locaties',value:(report.visits||[]).map(v=>v.location||'—').join('\n')||'—'},{label:'Technieker',value:report.technician||'—'},{label:'Status / versie',value:`Afgesloten · v${report.revision}`},
       {label:'Werkdagen / tijd',value:sessions.length?sessions.map(row=>`${svDateText(row.date)} · ${row.location||'—'} · ${row.minutes} min`).join('\n')+`\nTotaal: ${totalMinutes} min`:'—',full:true}
     ];
     for(const visit of report.visits||[]) {
@@ -820,7 +952,7 @@
       const localParts=mergedVisitParts(visit);fields.push({label:`Onderdelen · ${visit.location||'—'}`,value:localParts.length?localParts.map(p=>`${p.label} × ${p.qty} · ${p.devices.join(', ')}`).join('\n'):'—',full:true});
     }
     fields.push({label:'Totaal gebruikte onderdelen · alle locaties',value:parts.length?parts.map(p=>`${p.label} × ${p.qty} · ${p.devices.join(', ')}`).join('\n'):'—',full:true});
-    return {headerTitle:'Machinepark . Serviceverslag',subtitle:`${report.number} · ${report.locationCount} locatie${report.locationCount===1?'':'s'}`,rightText:`${svDateText(report.date)}${report.time?` · ${report.time}`:''}`,filenameTitle:`Serviceverslag_${report.number}`,fields,photos:reportPhotos(report).map(p=>p.src),photoTitle:'Foto’s bij serviceverslag',photoColumns:2,photoMaxHeight:105,timelines:[]};
+    return {headerTitle:'Machinepark . Serviceverslag',subtitle:`${reportDisplayLabel(report)} · ${report.locationCount} locatie${report.locationCount===1?'':'s'}`,rightText:`${svDateText(report.date)}${report.time?` · ${report.time}`:''}`,filenameTitle:`Serviceverslag_${shortDate(report.date).replace('/','-')}_${visibleCode(report.number,'SR')}`,fields,photos:reportPhotos(report).map(p=>p.src),photoTitle:'Foto’s bij serviceverslag',photoColumns:2,photoMaxHeight:105,timelines:[]};
   };
 
   window.openMachineparkServiceVisit=openServiceVisit;
