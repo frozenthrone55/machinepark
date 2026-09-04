@@ -149,68 +149,86 @@
     return `${shortDate(visit.date)} · ${visit.location||'Locatie onbekend'} · ${visibleCode(visit.number,'SV')}`;
   }
 
+  function svPartFields(partId) {
+    const part=(state.parts||[]).find(item=>item.id===partId);
+    if(!part)return {code:String(partId||'—'),description:'Onbekend onderdeel'};
+    const code=String(part.artNr||partId||'—').trim()||'—';
+    const description=String(part.description||'').trim();
+    return {code,description};
+  }
+
+  function svOneOffPartFields(part={}) {
+    const supplier=String(part?.supplier||'').trim(),supplierCode=String(part?.supplierCode||'').trim(),description=String(part?.description||'').trim();
+    const code=supplierCode||supplier||'Eenmalig';
+    const desc=[supplierCode&&supplier?supplier:'',description].filter(Boolean).join(' · ');
+    return {code,description:desc};
+  }
+
   function svPartLabel(partId) {
-    const part = (state.parts || []).find(item => item.id === partId);
-    return part ? ([part.artNr, part.description].filter(Boolean).join(' · ') || partId) : `Onbekend onderdeel (${partId || '—'})`;
+    const fields=svPartFields(partId);
+    return [fields.code,fields.description].filter(Boolean).join(' · ');
   }
 
   function perRecordPartsRows(item) {
     const rows=[];
-    (item?.usedParts || []).forEach(u => {
+    (item?.usedParts||[]).forEach(u=>{
       const qty=Number(u?.qty||0);
-      if(u?.partId&&qty>0)rows.push({label:svPartLabel(u.partId),qty,kind:'stock'});
+      if(!u?.partId||qty<=0)return;
+      const fields=svPartFields(u.partId);
+      rows.push({...fields,label:[fields.code,fields.description].filter(Boolean).join(' · '),qty,kind:'stock'});
     });
-    (item?.oneOffParts || []).forEach(p => {
-      const label=[p?.supplier,p?.supplierCode,p?.description].map(v=>String(v||'').trim()).filter(Boolean).join(' · ');
-      if(label)rows.push({label,qty:Math.max(1,Math.round(Number(p.qty)||1)),kind:'oneoff'});
+    (item?.oneOffParts||[]).forEach(p=>{
+      const fields=svOneOffPartFields(p);
+      if(!fields.code&&!fields.description)return;
+      rows.push({...fields,label:[fields.code,fields.description].filter(Boolean).join(' · '),qty:Math.max(1,Math.round(Number(p.qty)||1)),kind:'oneoff'});
     });
     return rows;
   }
 
   function perRecordPartsText(item) {
     const rows=perRecordPartsRows(item);
-    return rows.length ? rows.map(row=>`${row.label} × ${row.qty}${row.kind==='oneoff'?' · eenmalig':''}`).join('\n') : '—';
+    return rows.length?rows.map(row=>`${[row.code,row.description].filter(Boolean).join(' · ')} × ${row.qty}${row.kind==='oneoff'?' · eenmalig':''}`).join('\n'):'—';
   }
 
   function recordPartsBoxHtml(item) {
     const rows=perRecordPartsRows(item);
-    return `<div class="service-record-parts-box"><div class="service-record-parts-title">Onderdelen voor deze werkzaamheid</div>${rows.length?`<table class="service-record-parts-table"><thead><tr><th>Onderdeel</th><th>Aantal</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${svEsc(row.label)}${row.kind==='oneoff'?'<small>Eenmalig / leverancier</small>':''}</td><td><strong>${svEsc(row.qty)}</strong></td></tr>`).join('')}</tbody></table>`:'<div class="service-record-parts-empty">Geen onderdelen gebruikt.</div>'}</div>`;
+    return `<div class="service-record-parts-box"><div class="service-record-parts-title">Onderdelen voor deze werkzaamheid</div>${rows.length?`<table class="service-record-parts-table"><thead><tr><th class="service-part-code">Onderdeel</th><th class="service-part-description">Omschrijving</th><th class="service-part-qty">Aantal</th></tr></thead><tbody>${rows.map(row=>`<tr><td class="service-part-code">${svEsc(row.code||'—')}</td><td class="service-part-description">${svEsc(row.description||'—')}${row.kind==='oneoff'?'<small>Eenmalig / leverancier</small>':''}</td><td class="service-part-qty"><strong>${svEsc(row.qty)}</strong></td></tr>`).join('')}</tbody></table>`:'<div class="service-record-parts-empty">Geen onderdelen gebruikt.</div>'}</div>`;
   }
 
-
   function mergedVisitParts(visit) {
-    const merged = new Map();
-    for (const row of visit?.records || []) {
-      const device = svDeviceShort(row.item.deviceId);
-      (row.item.usedParts || []).forEach(u => {
-        const qty = Number(u?.qty || 0);
-        if (!u?.partId || qty <= 0) return;
-        const key = `stock:${u.partId}`;
-        if (!merged.has(key)) merged.set(key, { kind:'stock', label:svPartLabel(u.partId), qty:0, devices:new Set() });
-        const target = merged.get(key); target.qty += qty; target.devices.add(device);
+    const merged=new Map();
+    for(const row of visit?.records||[]) {
+      const device=svDeviceShort(row.item.deviceId);
+      (row.item.usedParts||[]).forEach(u=>{
+        const qty=Number(u?.qty||0);
+        if(!u?.partId||qty<=0)return;
+        const fields=svPartFields(u.partId),key=`stock:${u.partId}`;
+        if(!merged.has(key))merged.set(key,{kind:'stock',...fields,label:[fields.code,fields.description].filter(Boolean).join(' · '),qty:0,devices:new Set()});
+        const target=merged.get(key);target.qty+=qty;target.devices.add(device);
       });
-      (row.item.oneOffParts || []).forEach(p => {
-        const label = [p?.supplier,p?.supplierCode,p?.description].map(v => String(v || '').trim()).filter(Boolean).join(' · ');
-        if (!label) return;
-        const key = `oneoff:${svKey(label)}`;
-        if (!merged.has(key)) merged.set(key, { kind:'oneoff', label, qty:0, devices:new Set() });
-        const target = merged.get(key); target.qty += Math.max(1, Math.round(Number(p.qty) || 1)); target.devices.add(device);
+      (row.item.oneOffParts||[]).forEach(p=>{
+        const fields=svOneOffPartFields(p),label=[fields.code,fields.description].filter(Boolean).join(' · ');
+        if(!label)return;
+        const key=`oneoff:${svKey(label)}`;
+        if(!merged.has(key))merged.set(key,{kind:'oneoff',...fields,label,qty:0,devices:new Set()});
+        const target=merged.get(key);target.qty+=Math.max(1,Math.round(Number(p.qty)||1));target.devices.add(device);
       });
     }
-    return [...merged.values()].map(row => ({...row,devices:[...row.devices].sort((a,b)=>a.localeCompare(b,'nl',{numeric:true,sensitivity:'base'}))}))
-      .sort((a,b)=>a.label.localeCompare(b.label,'nl',{numeric:true,sensitivity:'base'}));
+    return [...merged.values()].map(row=>({...row,devices:[...row.devices].sort((a,b)=>a.localeCompare(b,'nl',{numeric:true,sensitivity:'base'}))}))
+      .sort((a,b)=>String(a.code||a.label).localeCompare(String(b.code||b.label),'nl',{numeric:true,sensitivity:'base'}));
   }
 
   function mergedReportParts(report) {
     const merged=new Map();
     for(const visit of report?.visits||[]) {
       for(const part of mergedVisitParts(visit)) {
-        const key=`${part.kind}:${svKey(part.label)}`;
-        if(!merged.has(key)) merged.set(key,{kind:part.kind,label:part.label,qty:0,locations:new Set(),devices:new Set()});
+        const key=`${part.kind}:${svKey([part.code,part.description].filter(Boolean).join(' · '))}`;
+        if(!merged.has(key))merged.set(key,{kind:part.kind,code:part.code,description:part.description,label:part.label,qty:0,locations:new Set(),devices:new Set()});
         const target=merged.get(key);target.qty+=Number(part.qty||0);target.locations.add(visit.location||'—');(part.devices||[]).forEach(device=>target.devices.add(`${visit.location||'—'} · ${device}`));
       }
     }
-    return [...merged.values()].map(row=>({...row,locations:[...row.locations],devices:[...row.devices]})).sort((a,b)=>a.label.localeCompare(b.label,'nl',{numeric:true,sensitivity:'base'}));
+    return [...merged.values()].map(row=>({...row,locations:[...row.locations],devices:[...row.devices]}))
+      .sort((a,b)=>String(a.code||a.label).localeCompare(String(b.code||b.label),'nl',{numeric:true,sensitivity:'base'}));
   }
 
   function reportPhotos(report) {
@@ -264,12 +282,12 @@
         </div>
         <div><div class="section-title">Werkdagen en tijd</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal: ${svEsc(totalMinutes)} min</strong></div></div></div>
         <div class="service-report-print-location-summary"><div class="section-title">Totaaloverzicht werkzaamheden</div><table class="service-visit-merged-parts service-report-print-summary-table"><thead><tr><th>Locatie</th><th>Toestellen</th><th>Onderhoud</th><th>Depannage</th><th>Andere werken</th></tr></thead><tbody>${(report.visits||[]).map(visit=>`<tr><td><strong>${svEsc(visit.location||'—')}</strong></td><td>${svEsc(visit.deviceCount||0)}</td><td>${svEsc(visit.maintenanceCount||0)}</td><td>${svEsc(visit.breakdownCount||0)}</td><td>${svEsc(visit.otherWorkCount||0)}</td></tr>`).join('')||'<tr><td colspan="5">Geen werkzaamheden.</td></tr>'}</tbody></table></div>
-        <div class="service-report-print-only"><div class="section-title">Totaal gebruikte onderdelen · alle locaties</div><table class="service-visit-merged-parts"><thead><tr><th>Onderdeel</th><th>Aantal</th><th>Locaties / toestellen</th></tr></thead><tbody>${totalParts.length?totalParts.map(p=>`<tr><td>${svEsc(p.label)}</td><td><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join(''):'<tr><td colspan="3">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
+        <div class="service-report-print-only"><div class="section-title">Totaal gebruikte onderdelen · alle locaties</div><table class="service-visit-merged-parts service-parts-columns"><thead><tr><th class="service-part-code">Onderdeel</th><th class="service-part-description">Omschrijving</th><th class="service-part-qty">Aantal</th><th>Locaties / toestellen</th></tr></thead><tbody>${totalParts.length?totalParts.map(p=>`<tr><td class="service-part-code">${svEsc(p.code||'—')}</td><td class="service-part-description">${svEsc(p.description||'—')}${p.kind==='oneoff'?'<small>Eenmalig / leverancier</small>':''}</td><td class="service-part-qty"><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join(''):'<tr><td colspan="4">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
       </div>
       <div class="service-report-screen-locations">
         ${(report.visits||[]).map((visit,index)=>`<section class="service-report-location"><div class="service-report-location-head"><span>Locatie ${index+1}</span><h4>${svEsc(visit.location||'—')}</h4></div>${visitReportHtml(visit)}</section>`).join('')}
       </div>
-      <div class="service-report-screen-total"><div class="section-title">Totaal gebruikte onderdelen · alle locaties</div><table class="service-visit-merged-parts"><thead><tr><th>Onderdeel</th><th>Aantal</th><th>Locaties / toestellen</th></tr></thead><tbody>${totalParts.length?totalParts.map(p=>`<tr><td>${svEsc(p.label)}</td><td><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join(''):'<tr><td colspan="3">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
+      <div class="service-report-screen-total"><div class="section-title">Totaal gebruikte onderdelen · alle locaties</div><table class="service-visit-merged-parts service-parts-columns"><thead><tr><th class="service-part-code">Onderdeel</th><th class="service-part-description">Omschrijving</th><th class="service-part-qty">Aantal</th><th>Locaties / toestellen</th></tr></thead><tbody>${totalParts.length?totalParts.map(p=>`<tr><td class="service-part-code">${svEsc(p.code||'—')}</td><td class="service-part-description">${svEsc(p.description||'—')}${p.kind==='oneoff'?'<small>Eenmalig / leverancier</small>':''}</td><td class="service-part-qty"><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join(''):'<tr><td colspan="4">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
       <div class="service-report-print-details">${printRecords.map(({visit,row},index)=>printRecordPageHtml(report,visit,row,index)).join('')}</div>
     </div>`;
   }
@@ -338,7 +356,7 @@
       </div>
       <div><div class="section-title">Servicetijd volledig serviceverslag</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal serviceverslag: ${svEsc(totalMinutes)} min · ${svEsc(Math.max(1,Number(visit.records?.[0]?.item?.serviceReportDeviceCount)||visit.deviceCount||1))} toestel${Math.max(1,Number(visit.records?.[0]?.item?.serviceReportDeviceCount)||visit.deviceCount||1)===1?'':'len'}</strong></div></div></div>
       <div><div class="section-title">Werkzaamheden per toestel</div><div style="display:grid;gap:9px">${visit.records.map(row => recordSummary(row.kind,row.item)).join('')}</div></div>
-      <div><div class="section-title">Onderdelen · samengevoegd voor klant</div><table class="service-visit-merged-parts"><thead><tr><th>Onderdeel</th><th>Aantal</th><th>Gebruikt op</th></tr></thead><tbody>${parts.length ? parts.map(p => `<tr><td>${svEsc(p.label)}${p.kind === 'oneoff' ? '<div class="muted" style="font-size:10px">Eenmalig / leverancier</div>' : ''}</td><td><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join('') : '<tr><td colspan="3">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
+      <div><div class="section-title">Onderdelen · samengevoegd voor klant</div><table class="service-visit-merged-parts service-parts-columns"><thead><tr><th class="service-part-code">Onderdeel</th><th class="service-part-description">Omschrijving</th><th class="service-part-qty">Aantal</th><th>Gebruikt op</th></tr></thead><tbody>${parts.length ? parts.map(p => `<tr><td class="service-part-code">${svEsc(p.code||'—')}</td><td class="service-part-description">${svEsc(p.description||'—')}${p.kind === 'oneoff' ? '<small>Eenmalig / leverancier</small>' : ''}</td><td class="service-part-qty"><strong>${svEsc(p.qty)}</strong></td><td>${svEsc(p.devices.join(', '))}</td></tr>`).join('') : '<tr><td colspan="4">Geen onderdelen gebruikt.</td></tr>'}</tbody></table></div>
       ${photos.length ? `<div><div class="section-title">Foto’s bij servicebezoek</div><div class="service-visit-photo-grid">${photos.map(p => `<figure><img src="${svEsc(p.src)}" data-full-src="${svEsc(p.src)}" data-photo-lightbox alt="${svEsc(p.label)}"><figcaption>${svEsc(p.label)}</figcaption></figure>`).join('')}</div></div>` : ''}
     </div>`;
   }
@@ -1038,7 +1056,7 @@
           deviceCount,
           technician:item.technician||visit.technician||report.technician||'—',
           detailLines,
-          parts:perRecordPartsRows(item).map(part=>({label:part.label,qty:part.qty,oneOff:part.kind==='oneoff'})),
+          parts:perRecordPartsRows(item).map(part=>({code:part.code,description:part.description,qty:part.qty,oneOff:part.kind==='oneoff'})),
           photos:(item.photos||[]).filter(src=>typeof src==='string'&&src.trim()),
         });
       }
@@ -1074,7 +1092,7 @@
           breakdowns:visit.breakdownCount||0,
           otherWorks:visit.otherWorkCount||0,
         })),
-        parts:parts.map(part=>({label:part.label,qty:part.qty,devices:part.devices||[]})),
+        parts:parts.map(part=>({code:part.code,description:part.description,qty:part.qty,devices:part.devices||[],oneOff:part.kind==='oneoff'})),
         workPages,
       }
     };
