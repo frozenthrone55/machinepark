@@ -646,7 +646,7 @@
 
   function decorateDraftModal() {
     const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),submit=form?.querySelector('button[type="submit"]'),cancel=document.getElementById('cancelModal');if(!form||!foot||!submit)return;
-    submit.textContent=activeVisitDraft.appendToReportId?'Aanvulling afsluiten':'Serviceverslag afsluiten';
+    submit.textContent=activeVisitDraft.editMode?'Wijzigingen opslaan':(activeVisitDraft.appendToReportId?'Aanvulling afsluiten':'Serviceverslag afsluiten');
     const status=document.createElement('span');status.className='service-visit-draft-status';status.textContent=activeVisitDraft.persisted?'Concept geladen · wijzigingen worden automatisch opgeslagen.':'Automatisch opslaan start zodra je iets wijzigt.';
     const button=document.createElement('button');button.type='button';button.className='btn service-draft-button';button.textContent='Concept bewaren';button.onclick=async()=>{button.disabled=true;try{activeVisitDraft.touched=true;await queueDraftSave({manual:true,force:true});const current=activeVisitDraft;activeVisitDraft=null;clearTimeout(visitAutosaveTimer);baseCloseModal();if(current)await refreshVisitState();}catch(e){alert(e?.message||'Concept bewaren mislukt.');}finally{if(document.body.contains(button))button.disabled=false;}};
     foot.insertBefore(status,submit);foot.insertBefore(button,submit);if(cancel)cancel.textContent='Sluiten';
@@ -713,19 +713,21 @@
 
   function headerStoreForUser() { return svCan('breakdowns.add') ? 'breakdowns' : 'maintenance'; }
 
-  async function openServiceVisit(id='',draftId='') {
+  async function openServiceVisit(id='',draftId='',options={}) {
     if(!svCanCreate()){toast('Deze rol mag geen onderhoud of depannage registreren.');return;}
     if(typeof window.machineparkSyncOnlineNow==='function'&&navigator.onLine&&draftId){try{await window.machineparkSyncOnlineNow({quiet:true});await refreshVisitState();}catch(_){}}
-    const header=draftId?visitDraftHeader(draftId):null,items=header?visitDraftItems(header.id):[];
+    let header=draftId?visitDraftHeader(draftId):null,items=header?visitDraftItems(header.id):[];
     const requestedReport=id?(serviceReportById(id)||serviceReportForVisit(id)):null;
     const report=requestedReport||(header?.appendToReportId?serviceReportById(header.appendToReportId):null)||(header?.appendToVisitId?serviceReportForVisit(header.appendToVisitId):null);
     if(id&&!report){toast('Serviceverslag niet meer gevonden.');return;}if(!locationGroups().length){toast('Geen actieve toestellen met een locatie gevonden.');return;}
+    const editMode=Boolean(options.edit||header?.editMode);
     const draftHeaderStore=header?.draftHeaderStore||headerStoreForUser(),draftKey=header?.id||uid('svdraft');
+    if(editMode&&report&&!header){header={...reportEditHeader(report),id:draftKey,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:draftKey,draftHeaderStore,editMode:true,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),draftSchema:3};items=reportEditItems(report,draftKey);}
     const locations=draftLocationList(report,header);
     const activeKey=header?.activeLocationKey||locations[0]?.key||'';
     const activeVisit=report?.visits?.find(v=>String(v.locationKey||svKey(v.location))===activeKey)||report?.visits?.[0]||null;
-    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,locationSessions:{...(header?.locationSessions||{})},appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(header),touched:false,finalizing:false,restoring:Boolean(header)};
-    showModal(report?`Serviceverslag aanvullen · ${report.number}`:(header?'Serviceconcept verderzetten':'Nieuw serviceverslag'),serviceVisitForm({report,visit:activeVisit,header,items}),'Serviceverslag afsluiten',async()=>finalizeActiveVisit());
+    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,locationSessions:{...(header?.locationSessions||{})},appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',editMode,createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(draftId),touched:false,finalizing:false,restoring:Boolean(header&&draftId)};
+    showModal(report?(editMode?`Serviceverslag bewerken · ${report.number}`:`Serviceverslag aanvullen · ${report.number}`):(header?'Serviceconcept verderzetten':'Nieuw serviceverslag'),serviceVisitForm({report,visit:activeVisit,header,items}),'Serviceverslag opslaan',async()=>finalizeActiveVisit());
     setTimeout(()=>{initVisitForm({report,visit:activeVisit,header,items});decorateDraftModal();if(activeVisitDraft){activeVisitDraft.restoring=false;activeVisitDraft.touched=false;}},0);
   }
 
