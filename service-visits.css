@@ -63,8 +63,9 @@ body.service-visit-printing{background:#fff!important;color:#111!important}
 .service-report-print-record-head{border-bottom:2px solid #183f35;padding-bottom:8px}
 .service-report-print-record-kind{background:#183f35!important;color:#fff!important}
 .service-report-print-record-title span{color:#333!important}
-.service-report-print-record-meta{margin-bottom:5mm}
+.service-report-print-record-meta{margin-bottom:5mm;grid-template-columns:repeat(3,minmax(0,1fr))!important}
 .service-report-print-record-page .badge{border:0!important;color:#fff!important;font-weight:900!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.service-report-print-record-page .service-record-kind-badge{display:none!important}
 .service-report-print-record-page .badge.blue{background:#24485d!important}
 .service-report-print-record-page .badge.danger{background:#6b2d2d!important}
 .service-report-print-record-page .other-work-badge{background:#4b3c67!important}
