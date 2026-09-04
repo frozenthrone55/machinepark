@@ -93,3 +93,15 @@ test('onderdelenkader krijgt ook duidelijke printopmaak', () => {
   assert.match(css, /\.service-visit-print-sheet \.service-record-parts-box\{/);
   assert.match(css, /\.service-visit-print-sheet \.service-record-parts-title\{/);
 });
+
+
+test('werkduur op detailpagina wordt altijd in minuten getoond', () => {
+  assert.match(js, /const storedMinutes=Number\(item\?\.hours\|\|0\)/);
+  assert.match(js, /return storedMinutes>0\?Math\.round\(storedMinutes\):0/);
+  assert.match(js, /return total>0\?\`\$\{total\} min\`:'—'/);
+  const start=js.indexOf('function formatWorkDuration');
+  const end=js.indexOf('function printRecordPageHtml',start);
+  const formatter=js.slice(start,end);
+  assert.doesNotMatch(formatter, /\bu\b/);
+  assert.doesNotMatch(formatter, /\*60/);
+});
