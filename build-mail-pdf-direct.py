@@ -865,6 +865,12 @@ required = [
     'machineparkDirectMailPdf',
     'service-visit-mail-btn',
     'machineparkServiceVisitPdfModel',
+    'servicePrintLayout',
+    'addServiceVisitPrintLayout',
+    'servicePdfSummaryPage',
+    'servicePdfWorkPage',
+    'ONDERDELEN VOOR DEZE WERKZAAMHEID',
+    'green:[24,63,53]',
 ]
 for needle in required:
     if needle not in index:
