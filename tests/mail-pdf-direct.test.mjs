@@ -131,8 +131,9 @@ test('serviceverslag PDF heeft totaalpagina en één nieuwe pagina per werkzaamh
 });
 
 test('serviceverslag PDF gebruikt dezelfde meta- en onderdelenkaders als afdruk', () => {
-  assert.ok(build.includes("label:'Datum / werkuren'"));
-  assert.ok(build.includes('${Math.max(0,Math.round(Number(page.workMinutes)||0))} min'));
+  assert.ok(build.includes("label:'Servicetijd / toestellen'"));
+  assert.ok(build.includes('${Math.max(0,Math.round(Number(page.serviceMinutes)||0))} min'));
+  assert.ok(build.includes('page.deviceCount'));
   assert.ok(build.includes('ONDERDELEN VOOR DEZE WERKZAAMHEID'));
   assert.ok(build.includes('EENMALIG / LEVERANCIER'));
   assert.ok(build.includes("doc.roundedRect(x,y,width,height,2.2,2.2,'FD')"));
