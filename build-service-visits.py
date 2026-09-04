@@ -79,6 +79,10 @@ for needle in [
     'service-visit-delete-btn',
     'maintenance.delete',
     'breakdowns.delete',
+    'data-kind="otherworks"',
+    'serviceKind:\'other\'',
+    'otherWorkCount',
+    'svOtherWorkTypeNames',
 ]:
     if needle not in (ROOT / 'service-visits.js').read_text(encoding='utf-8'):
         raise SystemExit(f'Buildvalidatie mislukt: servicebezoekfunctie ontbreekt ({needle})')
