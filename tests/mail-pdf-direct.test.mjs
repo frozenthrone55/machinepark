@@ -180,3 +180,13 @@ test('service PDF houdt onderdeelcode op één regel en laat omschrijving doorlo
   assert.ok(box.includes("doc.splitTextToSize(servicePdfSafe(part.description||'—')"));
   assert.ok(box.includes("doc.text(servicePdfSafe(part.qty),x+width-2.5,y+4.5,{align:'right'})"));
 });
+
+
+test('service PDF meet breedste onderdeelcode en telt tien spaties reserve bij', () => {
+  assert.ok(build.includes('function servicePdfCodeColumnWidth'));
+  assert.ok(build.includes("doc.getTextWidth('          ')"));
+  assert.ok(build.includes('const wanted=widest+tenSpaces+4'));
+  assert.ok(build.includes('parts.map(part=>part.code)'));
+  assert.ok(build.includes('partRows.map(row=>row[0])'));
+  assert.ok(build.includes('descriptionW=totalPartsW-codeW-qtyW-devicesW'));
+});
