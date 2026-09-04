@@ -13,6 +13,7 @@
   };
   const svCan = permission => !window.machineparkAccessReady || typeof window.machineparkHasPermission !== 'function' || Boolean(window.machineparkHasPermission(permission));
   const svCanCreate = () => svCan('maintenance.add') || svCan('breakdowns.add');
+  const svCanEdit = () => svCan('maintenance.edit') || svCan('breakdowns.edit');
   const svDeviceShort = deviceId => {
     const d = (state.devices || []).find(item => item.id === deviceId);
     return [d?.assetCode, d?.brand, d?.model].filter(Boolean).join(' · ') || 'Onbekend toestel';
@@ -314,8 +315,8 @@
     const b = drafts.get(`breakdowns:${device.id}`) || {};
     const mChecked = Boolean(m.id), bChecked = Boolean(b.id);
     const editing=Boolean(activeVisitDraft?.editMode);
-    const canM = svCan('maintenance.add') && (editing || !existing.has('maintenance'));
-    const canB = svCan('breakdowns.add') && (editing || !existing.has('breakdowns'));
+    const canM = existing.has('maintenance') ? (editing && svCan('maintenance.edit')) : svCan('maintenance.add');
+    const canB = existing.has('breakdowns') ? (editing && svCan('breakdowns.edit')) : svCan('breakdowns.add');
     const machine = [device.brand,device.model].filter(Boolean).join(' ') || 'Geen toestelomschrijving';
     const loc = svLocationForDevice(device);
     return `<div class="service-visit-device breakdown-machine-card" data-service-visit-device="${svEsc(device.id)}" data-breakdown-device="${svEsc(device.id)}">
@@ -423,7 +424,7 @@
       const addOne=event.target.closest('.sv-add-oneoff');if(addOne){const list=addOne.closest('.service-visit-oneoff')?.querySelector('.service-visit-oneoff-list');if(list){list.insertAdjacentHTML('beforeend',oneOffRowHtml());list.lastElementChild?.querySelector('.sv-oneoff-supplier')?.focus();}return;}
       const removeOne=event.target.closest('.sv-remove-oneoff');if(removeOne){const list=removeOne.closest('.service-visit-oneoff-list'),rows=list?.querySelectorAll('.service-visit-oneoff-row')||[];if(rows.length>1)removeOne.closest('.service-visit-oneoff-row')?.remove();else removeOne.closest('.service-visit-oneoff-row')?.querySelectorAll('input').forEach(i=>i.value=i.type==='number'?'1':'');}
     });
-    root.addEventListener('change',event=>{const toggle=event.target.closest('[data-kind]');if(toggle){const panel=toggle.closest('.service-visit-device')?.querySelector(`[data-panel-kind="${toggle.dataset.kind}"]`);panel?.classList.toggle('active',toggle.checked);panel?.querySelectorAll('[data-workorder-editor] input,[data-workorder-editor] select,[data-workorder-editor] textarea').forEach(el=>{el.disabled=!toggle.checked;});}});
+    root.addEventListener('change',event=>{const toggle=event.target.closest('[data-kind]');if(toggle){if(toggle.dataset.existingKind==='1'&&!toggle.checked){toggle.checked=true;toast('Een bestaande registratie blijft in het serviceverslag. Je kunt de inhoud wel bewerken.');}const panel=toggle.closest('.service-visit-device')?.querySelector(`[data-panel-kind="${toggle.dataset.kind}"]`);panel?.classList.toggle('active',toggle.checked);panel?.querySelectorAll('[data-workorder-editor] input,[data-workorder-editor] select,[data-workorder-editor] textarea').forEach(el=>{el.disabled=!toggle.checked;});}});
     root.addEventListener('input',event=>{const input=event.target.closest('.sv-usage-list .usage-search');if(!input)return;const row=input.closest('.usage-row'),menu=row?.querySelector('.usage-suggestions'),hidden=row?.querySelector('.usage-part');if(hidden)hidden.value='';const q=input.value.trim();if(!menu)return;if(!q){menu.innerHTML='';menu.classList.remove('show');return;}menu.innerHTML=usageSuggestionsHtml(q);menu.classList.add('show');});
     root.addEventListener('keydown',event=>{const input=event.target.closest('.sv-usage-list .usage-search');if(!input)return;const menu=input.closest('.usage-row')?.querySelector('.usage-suggestions');if(event.key==='Escape')menu?.classList.remove('show');if(event.key==='Enter'&&menu?.classList.contains('show')){const first=menu.querySelector('.usage-suggestion');if(first){event.preventDefault();first.click();}}});
     root.addEventListener('focusout',event=>{const input=event.target.closest('.sv-usage-list .usage-search');if(input)setTimeout(()=>closeSuggestions(input.closest('.usage-row')),140);});
@@ -763,9 +764,8 @@
     setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';
       if(svCan('print')){const print=document.createElement('button');print.type='button';print.className='btn service-visit-print-btn';print.dataset.serviceReportId=report.id;print.textContent='🖨 Afdrukken';print.onclick=()=>void printServiceReport(report.id);foot.insertBefore(print,submit);
       const mail=document.createElement('button');mail.type='button';mail.className='btn service-visit-mail-btn';mail.dataset.serviceVisitMailId=report.id;mail.dataset.serviceVisitLabel=report.number;mail.textContent='✉ Mail PDF';foot.insertBefore(mail,submit);}
-      if(svCanCreate()){
-        const addDevice=document.createElement('button');addDevice.type='button';addDevice.className='btn';addDevice.textContent='+ Toestel toevoegen';addDevice.onclick=()=>{baseCloseModal();void openServiceVisit(report.id);};foot.appendChild(addDevice);
-        const addLocation=document.createElement('button');addLocation.type='button';addLocation.className='btn primary';addLocation.textContent='+ Locatie toevoegen';addLocation.onclick=()=>{baseCloseModal();void openServiceVisit(report.id);setTimeout(()=>document.getElementById('serviceReportAddLocation')?.click(),80);};submit.classList.remove('primary');foot.appendChild(addLocation);
+      if(svCanEdit()){
+        const edit=document.createElement('button');edit.type='button';edit.className='btn primary';edit.textContent='✏️ Bewerken';edit.onclick=()=>{baseCloseModal();void openServiceVisit(report.id,'',{edit:true});};submit.classList.remove('primary');foot.appendChild(edit);
       }
     },0);
   }
