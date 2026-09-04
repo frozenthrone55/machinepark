@@ -65,6 +65,15 @@ if MARKER not in index:
         2,
         'werkduursamenvattingen',
     )
+    # Registraties uit een serviceverslag tonen de volledige servicetijd van
+    # die locatie en het aantal unieke toestellen. Losse registraties behouden
+    # hun bestaande groepslogica.
+    breakdown_summary_old = "function breakdownWorkSummary(b){const hours=Number(b?.hours||0);if(!Number.isFinite(hours)||hours<=0)return '—';const liveCount=b?.batchId?state.breakdowns.filter(x=>x.batchId===b.batchId).length:0;const count=b?.batchId?Math.max(1,liveCount||Number(b.batchSize||0)):1;const minutes=Math.round(hours*60);return `${minutes} min / ${count} ${count===1?'toestel':'toestellen'}`}"
+    breakdown_summary_new = "function breakdownWorkSummary(b){if(b?.serviceVisitId){const sessions=Array.isArray(b?.workSessions)?b.workSessions:[],sessionMinutes=sessions.reduce((sum,row)=>sum+Math.max(0,Math.round(Number(row?.minutes)||0)),0),minutes=Math.max(0,Math.round(Number(b?.serviceVisitTotalMinutes)||sessionMinutes||Number(b?.hours||0)*60)),count=Math.max(1,Math.round(Number(b?.serviceVisitDeviceCount||b?.batchSize)||1));if(minutes<=0)return '—';return `${minutes} min / ${count} ${count===1?'toestel':'toestellen'}`;}const hours=Number(b?.hours||0);if(!Number.isFinite(hours)||hours<=0)return '—';const liveCount=b?.batchId?state.breakdowns.filter(x=>x.batchId===b.batchId).length:0;const count=b?.batchId?Math.max(1,liveCount||Number(b.batchSize||0)):1;const minutes=Math.round(hours*60);return `${minutes} min / ${count} ${count===1?'toestel':'toestellen'}`}"
+    maintenance_summary_old = "function maintenanceWorkSummary(m){const hours=Number(m?.hours||0);if(!Number.isFinite(hours)||hours<=0)return '—';const count=m?.batchId?Math.max(1,state.maintenance.filter(x=>x.batchId===m.batchId).length):1;const minutes=Math.round(hours*60);return `${minutes} min / ${count} ${count===1?'toestel':'toestellen'}`}"
+    maintenance_summary_new = "function maintenanceWorkSummary(m){if(m?.serviceVisitId){const sessions=Array.isArray(m?.workSessions)?m.workSessions:[],sessionMinutes=sessions.reduce((sum,row)=>sum+Math.max(0,Math.round(Number(row?.minutes)||0)),0),minutes=Math.max(0,Math.round(Number(m?.serviceVisitTotalMinutes)||sessionMinutes||Number(m?.hours||0)*60)),count=Math.max(1,Math.round(Number(m?.serviceVisitDeviceCount||m?.batchSize)||1));if(minutes<=0)return '—';return `${minutes} min / ${count} ${count===1?'toestel':'toestellen'}`;}const hours=Number(m?.hours||0);if(!Number.isFinite(hours)||hours<=0)return '—';const count=m?.batchId?Math.max(1,state.maintenance.filter(x=>x.batchId===m.batchId).length):1;const minutes=Math.round(hours*60);return `${minutes} min / ${count} ${count===1?'toestel':'toestellen'}`}"
+    replace_exact(breakdown_summary_old, breakdown_summary_new, 1, 'servicetijd in depannagesamenvatting')
+    replace_exact(maintenance_summary_old, maintenance_summary_new, 1, 'servicetijd in onderhoudssamenvatting')
     index = index.replace('Werkuren / toestellen', 'Werkminuten / toestellen')
     index = index.replace('Deze uren gelden voor de volledige depannagegroep', 'Deze minuten gelden voor de volledige depannagegroep')
     index = index.replace('Deze uren gelden voor de volledige onderhoudsgroep', 'Deze minuten gelden voor de volledige onderhoudsgroep')
@@ -84,6 +93,8 @@ required = [
     "hours:Number(fd.get('hours')||0)/60",
     "hours=Number(fd.get('hours')||0)/60",
     '`${minutes} min / ${count}',
+    'serviceVisitDeviceCount',
+    'serviceVisitTotalMinutes',
 ]
 for needle in required:
     if needle not in index:
