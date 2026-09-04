@@ -39,7 +39,7 @@ test('onderhoud-PDF volgt de afdrukvelden en bevat werkminuten', () => {
   assert.ok(build.includes("{ label:'Type onderhoud', value:record.type || '—' }"));
   assert.ok(build.includes("serviceWorkSummary('maintenance', record)"));
   assert.ok(build.includes("{ label:'Uitgevoerde werkzaamheden / notitie'"));
-  assert.ok((build.match(/label:'Werkminuten \/ toestellen'/g) || []).length >= 2);
+  assert.ok(build.includes("record?.serviceVisitId?'Servicetijd volledig verslag / toestellen':'Werkminuten / toestellen'"));
 });
 
 test('eenmalige onderdelen bevatten leverancier, code, omschrijving en aantal', () => {
@@ -92,7 +92,8 @@ test('lege of ongeldige PDF wordt niet gedeeld', () => {
 
 test('print-pariteitscontrole bewaakt depannage en onderhoud', () => {
   assert.ok(parity.includes('mail-pdf-direct-v4'));
-  assert.ok(parity.includes("label:'Werkminuten / toestellen'"));
+  assert.ok(parity.includes('Werkminuten / toestellen'));
+  assert.ok(parity.includes('Servicetijd volledig verslag / toestellen'));
   assert.ok(parity.includes('cleanText(item?.supplier)'));
   assert.ok(parity.includes('photoColumns: 2'));
   assert.ok(parity.includes('Afgedrukt vanuit Machinepark'));
