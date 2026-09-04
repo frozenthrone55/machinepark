@@ -372,7 +372,7 @@
     const sessions = visitWorkSessions(visit);
     const totalMinutes = sessions.reduce((sum,row)=>sum+row.minutes,0);
     return `<div class="service-visit-report">
-      <div class="service-visit-report-head"><h3>Serviceverslag ${svEsc(visit.number)}</h3><div>${svEsc(visit.location || 'Locatie niet ingevuld')}</div></div>
+      <div class="service-visit-report-head"><h3>Servicebezoek ${svEsc(visitDisplayLabel(visit))}</h3><div>${svEsc(visit.location || 'Locatie niet ingevuld')}</div></div>
       <div class="service-visit-report-meta">
         <div><small>Datum / uur</small><strong>${svEsc(svDateText(visit.date))}${visit.time ? ` · ${svEsc(visit.time)}` : ''}</strong></div>
         <div><small>Technieker</small><strong>${svEsc(visit.technician || '—')}</strong></div>
@@ -851,7 +851,7 @@
       const missing=selected.find(i=>i.draftServiceKind==='breakdowns'&&!String(i.issue||'').trim());if(missing)throw new Error(`Vul het probleem / de melding in voor ${svDeviceShort(missing.deviceId)}.`);
       const report=saved.header.appendToReportId?serviceReportById(saved.header.appendToReportId):null;
       const result=await finalizeDraftTransaction(saved.header,saved.items,selected,report);
-      activeVisitDraft=null;baseCloseModal();await refresh();toast(`Serviceverslag ${result.number} opgeslagen · ${result.visits.length} locatie${result.visits.length===1?'':'s'} · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceReportDetails(result.id),0);
+      activeVisitDraft=null;baseCloseModal();await refresh();toast(`Serviceverslag ${reportDisplayLabel(serviceReportById(result.id) || {number:result.number,date:saved.header.date,visits:(result.visits||[]).map(v=>({location:v.location}))})} opgeslagen · ${result.visits.length} locatie${result.visits.length===1?'':'s'} · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceReportDetails(result.id),0);
     }catch(e){current.finalizing=false;setDraftStatus(e?.message||'Afsluiten mislukt','error');throw e;}
   }
 
@@ -873,7 +873,7 @@
     const activeKey=header?.activeLocationKey||locations[0]?.key||'';
     const activeVisit=report?.visits?.find(v=>String(v.locationKey||svKey(v.location))===activeKey)||report?.visits?.[0]||null;
     activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,locationSessions:{...(header?.locationSessions||{})},appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',editMode,createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(draftId),touched:false,finalizing:false,restoring:Boolean(header&&draftId)};
-    showModal(report?(editMode?`Serviceverslag bewerken · ${report.number}`:`Serviceverslag aanvullen · ${report.number}`):(header?'Serviceconcept verderzetten':'Nieuw serviceverslag'),serviceVisitForm({report,visit:activeVisit,header,items}),'Serviceverslag opslaan',async()=>finalizeActiveVisit());
+    showModal(report?(editMode?`Serviceverslag bewerken · ${reportDisplayLabel(report)}`:`Serviceverslag aanvullen · ${reportDisplayLabel(report)}`):(header?'Serviceconcept verderzetten':'Nieuw serviceverslag'),serviceVisitForm({report,visit:activeVisit,header,items}),'Serviceverslag opslaan',async()=>finalizeActiveVisit());
     setTimeout(()=>{initVisitForm({report,visit:activeVisit,header,items});decorateDraftModal();if(activeVisitDraft){activeVisitDraft.restoring=false;activeVisitDraft.touched=false;}},0);
   }
 
