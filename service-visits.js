@@ -828,9 +828,14 @@
       const visitNumberValue=existing?.number||visitNumber(serviceVisitId,header.date);
       const visitRevision=existing?Math.max(1,Number(existing.revision)||1)+1:1;
       const visitCtx={id:serviceVisitId,location:loc.label,locationKey:key,date:header.date,time:header.time};
-      const deviceCount=new Set(items.map(item=>String(item.deviceId||'')).filter(Boolean)).size;
+      const deviceIds=new Set([...(existing?.records||[]).map(row=>String(row.item?.deviceId||'')),...items.map(item=>String(item.deviceId||''))].filter(Boolean));
+      const deviceCount=Math.max(1,deviceIds.size);
       const built=items.map(item=>finalRecord(header,item,{visit:visitCtx,serviceVisitId,visitNumberValue,visitRevision,reportId,reportNumberValue,reportRevision,now,batchSize:items.length,deviceCount}));
-      finals.push(...built);visits.push({id:serviceVisitId,number:visitNumberValue,location:loc.label,locationKey:key,revision:visitRevision,count:built.length,deviceCount});
+      const replacedIds=new Set(items.map(item=>String(item.sourceRecordId||'')).filter(Boolean));
+      const sharedSessions=built[0]?.workSessions||[];
+      const sharedMinutes=sharedSessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
+      const carried=(existing?.records||[]).filter(row=>!replacedIds.has(String(row.item?.id||''))).map(row=>({...row.item,workSessions:sharedSessions,hours:sharedMinutes/60,batchId:serviceVisitId,batchSize:deviceCount,serviceVisitDeviceCount:deviceCount,serviceVisitTotalMinutes:sharedMinutes,serviceVisitRevision:visitRevision,serviceVisitClosedAt:now,serviceReportRevision:reportRevision,serviceReportClosedAt:now,updatedAt:now}));
+      finals.push(...built,...carried);visits.push({id:serviceVisitId,number:visitNumberValue,location:loc.label,locationKey:key,revision:visitRevision,count:built.length+carried.length,deviceCount});
     }
     return new Promise((resolve,reject)=>{let tr;try{tr=db.transaction(['maintenance','breakdowns','parts'],'readwrite');}catch(e){reject(e);return;}const ms=tr.objectStore('maintenance'),bs=tr.objectStore('breakdowns'),ps=tr.objectStore('parts');updates.forEach(p=>ps.put(p));(header.draftHeaderStore==='maintenance'?ms:bs).delete(header.id);allItems.forEach(i=>(i.draftServiceKind==='maintenance'?ms:bs).delete(i.id));finals.forEach(i=>(i.type!==undefined?ms:bs).put(i));tr.oncomplete=()=>{scheduleCentralSync();resolve({id:reportId,number:reportNumberValue,revision:reportRevision,visits,finals});};tr.onerror=()=>reject(tr.error||new Error('Serviceverslag afsluiten mislukt.'));tr.onabort=()=>reject(tr.error||new Error('Serviceverslag afsluiten afgebroken.'));});
   }
