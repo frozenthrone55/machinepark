@@ -114,7 +114,7 @@
   function shortDate(value) {
     const raw=String(value||'');
     const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m?`${m[3]}/${m[2]}`:raw||'—';
+    return m?`${m[3]}/${m[2]}/${m[1]}`:raw||'—';
   }
 
   function visibleCode(number,prefix='SR') {
