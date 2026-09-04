@@ -285,10 +285,10 @@ if MARKER not in index:
       photos
     };
     return {
-      headerTitle:`Machinepark . ${title}`,
-      subtitle:serviceDevice(record),
-      rightText:serviceDate(record),
-      filenameTitle:title,
+      headerTitle: `Machinepark . ${title}`,
+      subtitle: serviceDevice(record),
+      rightText: serviceDate(record),
+      filenameTitle: title,
       fields,
       photos,
       photoTitle: 'Foto’s bij verslag',
