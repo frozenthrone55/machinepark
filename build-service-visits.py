@@ -83,6 +83,8 @@ for needle in [
     'serviceKind:\'other\'',
     'otherWorkCount',
     'svOtherWorkTypeNames',
+    'recordPartsBoxHtml',
+    'service-record-parts-box',
 ]:
     if needle not in (ROOT / 'service-visits.js').read_text(encoding='utf-8'):
         raise SystemExit(f'Buildvalidatie mislukt: servicebezoekfunctie ontbreekt ({needle})')
