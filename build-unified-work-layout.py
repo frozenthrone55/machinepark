@@ -174,9 +174,9 @@ if MARKER not in index:
 </style>
 '''
 
-    runtime = rf'''
-<script {MARKER}>
-(() => {{
+    runtime = r'''
+<script data-machinepark-build-fix="unified-work-layout-v1">
+(() => {
   const definitions = [
     ['view-maintenance','Onderhoudsverslagen','Overzicht van geregistreerd onderhoud per toestel.'],
     ['view-breakdowns','Depannageverslagen','Overzicht van geregistreerde depannages per toestel.'],
@@ -184,16 +184,16 @@ if MARKER not in index:
     ['view-work','Werkzaamhedenoverzicht','Onderhoud, depannages en andere werken in één overzicht.']
   ];
 
-  function ensurePageActions(view, title) {{
+  function ensurePageActions(view, title) {
     if (!view || view.querySelector(':scope > .page-print-row')) return;
     const row = document.createElement('div');
     row.className = 'page-print-row';
     row.innerHTML = `<div class="page-print-heading">Machinepark · ${title}</div><button type="button" class="btn page-print-btn">🖨 Afdrukken</button><button type="button" class="btn page-mail-btn">✉ Mail PDF</button>`;
     row.querySelector('.page-print-btn')?.addEventListener('click', () => window.printMachineparkView?.(view));
     view.insertAdjacentElement('afterbegin', row);
-  }}
+  }
 
-  function decorateOverview(id, title, description) {{
+  function decorateOverview(id, title, description) {
     const view = document.getElementById(id);
     if (!view) return;
     ensurePageActions(view, title);
@@ -206,14 +206,14 @@ if MARKER not in index:
     wrap.parentNode.insertBefore(panel, wrap);
     wrap.classList.add('work-overview-table-wrap');
     panel.appendChild(wrap);
-  }}
+  }
 
-  function apply() {{ definitions.forEach(args => decorateOverview(...args)); }}
+  function apply() { definitions.forEach(args => decorateOverview(...args)); }
   apply();
   setTimeout(apply, 0);
   setTimeout(apply, 250);
   window.machineparkApplyUnifiedWorkLayout = apply;
-}})();
+})();
 </script>
 '''
 
