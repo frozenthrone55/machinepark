@@ -73,10 +73,13 @@ test('meerdere locaties delen één rapport maar behouden een eigen serviceVisit
   assert.match(js, /reportId=report\?\.id\|\|header\.appendToReportId\|\|uid\('sr'\)/);
 });
 
-test('concept bewaart locaties en werktijd apart per locatie', () => {
-  assert.match(js, /locationSessions/);
-  assert.match(js, /captureActiveLocationSessions/);
-  assert.match(js, /renderActiveLocationSessions/);
+test('concept bewaart één totale servicetijd voor het volledige verslag naast de locaties', () => {
+  assert.match(js, /reportSessions/);
+  assert.match(js, /captureReportSessions/);
+  assert.match(js, /serviceReportSessions/);
+  assert.doesNotMatch(js, /locationSessions/);
+  assert.doesNotMatch(js, /captureActiveLocationSessions/);
+  assert.doesNotMatch(js, /renderActiveLocationSessions/);
   assert.match(js, /serviceReportLocationChips/);
   assert.match(js, /serviceReportAddLocation/);
   assert.match(js, /data-sv-location-remove/);
