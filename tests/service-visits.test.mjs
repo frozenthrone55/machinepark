@@ -27,6 +27,17 @@ test('onderdelen blijven per toestel en worden alleen voor klant samengevoegd', 
   assert.match(js, /devices:new Set/);
 });
 
+test('zichtbare serviceverslagnaam bevat dag maand locatie en korte code zonder jaartal', () => {
+  assert.match(js, /function reportDisplayLabel/);
+  assert.match(js, /shortDate\(report\.date\)/);
+  assert.match(js, /visibleCode\(report\.number,'SR'\)/);
+  assert.match(js, /\+\$\{locations\.length-1\}/);
+  assert.match(js, /reportDisplayLabel\(r\)/);
+  assert.match(js, /reportDisplayLabel\(report\)/);
+  assert.match(js, /function visitDisplayLabel/);
+  assert.match(js, /visitDisplayLabel\(visit\)/);
+});
+
 test('serviceverslagdetails tonen Bewerken en toevoegacties zitten alleen in bewerkmodus', () => {
   assert.match(js, /edit\.textContent='✏️ Bewerken'/);
   assert.match(js, /openServiceVisit\(report\.id,'',\{edit:true\}\)/);
