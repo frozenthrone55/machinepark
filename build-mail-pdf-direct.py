@@ -515,6 +515,14 @@ if MARKER not in index:
   function servicePdfSetFill(doc,color=SERVICE_PDF.meta){doc.setFillColor(...color);}
   function servicePdfSafe(value){return pdfSafeText(value===undefined||value===null?'—':String(value));}
 
+  function servicePdfFitSingleLine(doc,value,maxWidth,baseSize=8.2,minSize=5.6) {
+    const text=servicePdfSafe(value),original=doc.getFontSize?.()||baseSize;
+    let size=baseSize;doc.setFontSize(size);
+    while(size>minSize&&doc.getTextWidth(text)>maxWidth){size=Math.max(minSize,size-.25);doc.setFontSize(size);}
+    doc.setFontSize(original);
+    return {text,size};
+  }
+
   function servicePdfSectionTitle(doc,title,y) {
     servicePdfSetText(doc,SERVICE_PDF.ink);
     doc.setFont('helvetica','bold');doc.setFontSize(10.5);
@@ -538,23 +546,31 @@ if MARKER not in index:
     return y+height+5;
   }
 
-  function servicePdfTable(doc,{headers=[],rows=[],widths=[],y,headerFill=SERVICE_PDF.table,rowFont=8.2}) {
+  function servicePdfTable(doc,{headers=[],rows=[],widths=[],y,headerFill=SERVICE_PDF.table,rowFont=8.2,nowrapCols=[],rightCols=[]}) {
     const x=8,total=widths.reduce((sum,w)=>sum+w,0),headerH=8;
     servicePdfSetFill(doc,headerFill);servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.3);
     doc.rect(x,y,total,headerH,'FD');
     let cx=x;
     doc.setFont('helvetica','bold');doc.setFontSize(6.8);servicePdfSetText(doc,SERVICE_PDF.ink);
-    headers.forEach((header,i)=>{doc.text(servicePdfSafe(header).toUpperCase(),cx+2,y+5.1);cx+=widths[i]||0;});
+    headers.forEach((header,i)=>{const right=rightCols.includes(i);doc.text(servicePdfSafe(header).toUpperCase(),right?cx+(widths[i]||0)-2:cx+2,y+5.1,right?{align:'right'}:undefined);cx+=widths[i]||0;});
     y+=headerH;
     for(const row of rows) {
       const cells=row.map(cell=>servicePdfSafe(cell));
-      const wrapped=cells.map((cell,i)=>doc.splitTextToSize(cell,Math.max(5,(widths[i]||20)-4)));
+      doc.setFont('helvetica','normal');doc.setFontSize(rowFont);
+      const wrapped=cells.map((cell,i)=>nowrapCols.includes(i)?[cell]:doc.splitTextToSize(cell,Math.max(5,(widths[i]||20)-4)));
       const rowH=Math.max(8,...wrapped.map(lines=>Math.max(1,lines.length)*3.8+3));
       servicePdfSetDraw(doc,[120,120,120]);doc.rect(x,y,total,rowH);
-      let xx=x;doc.setFont('helvetica','normal');doc.setFontSize(rowFont);servicePdfSetText(doc,SERVICE_PDF.ink);
+      let xx=x;servicePdfSetText(doc,SERVICE_PDF.ink);
       wrapped.forEach((lines,i)=>{
-        if(i===1)doc.setFont('helvetica','bold');else doc.setFont('helvetica','normal');
-        doc.text(lines,xx+2,y+4.8);xx+=widths[i]||0;
+        const right=rightCols.includes(i);
+        doc.setFont('helvetica',right?'bold':'normal');
+        if(nowrapCols.includes(i)){
+          const fit=servicePdfFitSingleLine(doc,lines[0],Math.max(5,(widths[i]||20)-4),rowFont);
+          doc.setFontSize(fit.size);doc.text(fit.text,right?xx+(widths[i]||0)-2:xx+2,y+4.8,right?{align:'right'}:undefined);doc.setFontSize(rowFont);
+        }else{
+          doc.text(lines,right?xx+(widths[i]||0)-2:xx+2,y+4.8,right?{align:'right'}:undefined);
+        }
+        xx+=widths[i]||0;
       });
       y+=rowH;
     }
@@ -589,9 +605,9 @@ if MARKER not in index:
 
     y=servicePdfSectionTitle(doc,'Totaal gebruikte onderdelen · alle locaties',y);
     servicePdfTable(doc,{
-      headers:['Onderdeel','Aantal','Locaties / toestellen'],
-      rows:(layout.parts?.length?layout.parts:[{label:'Geen onderdelen gebruikt.',qty:'',devices:[]}]).map(row=>[row.label,row.qty,(row.devices||[]).join(', ')]),
-      widths:[72,22,100],y
+      headers:['Onderdeel','Omschrijving','Aantal','Locaties / toestellen'],
+      rows:(layout.parts?.length?layout.parts:[{code:'—',description:'Geen onderdelen gebruikt.',qty:'',devices:[]}]).map(row=>[row.code||'—',row.description||'—',row.qty,(row.devices||[]).join(', ')]),
+      widths:[34,66,18,76],y,nowrapCols:[0,2],rightCols:[2]
     });
   }
 
@@ -627,16 +643,17 @@ if MARKER not in index:
   function servicePdfMeasureParts(doc,parts,width) {
     let height=14;
     if(!parts?.length)return height+8;
+    const codeW=Math.min(42,Math.max(30,width*.22)),qtyW=18,descW=Math.max(30,width-codeW-qtyW-6);
     doc.setFont('helvetica','normal');doc.setFontSize(7.8);
     for(const part of parts){
-      const wrapped=doc.splitTextToSize(servicePdfSafe(part.label),width-28);
-      height+=Math.max(8,wrapped.length*3.5+3);
+      const wrapped=doc.splitTextToSize(servicePdfSafe(part.description||'—'),descW-4);
+      height+=Math.max(8,wrapped.length*3.5+(part.oneOff?5:3));
     }
     return height;
   }
 
   function servicePdfPartsBox(doc,page,x,y,width) {
-    const parts=page.parts||[],titleH=7,headH=7;
+    const parts=page.parts||[],titleH=7,headH=7,codeW=Math.min(42,Math.max(30,width*.22)),qtyW=18,descW=width-codeW-qtyW;
     servicePdfSetDraw(doc,SERVICE_PDF.border);doc.setLineWidth(.35);
     servicePdfSetFill(doc,SERVICE_PDF.table);doc.roundedRect(x,y,width,titleH+headH+(parts.length?0:8),2,2,'S');
     doc.rect(x,y,width,titleH,'F');
@@ -644,20 +661,25 @@ if MARKER not in index:
     doc.text('ONDERDELEN VOOR DEZE WERKZAAMHEID',x+2.5,y+4.7);
     y+=titleH;
     servicePdfSetFill(doc,SERVICE_PDF.tableLight);doc.rect(x,y,width,headH,'F');servicePdfSetDraw(doc,SERVICE_PDF.border);doc.rect(x,y,width,headH);
-    doc.setFontSize(6.4);doc.text('ONDERDEEL',x+2.5,y+4.7);doc.text('AANTAL',x+width-2.5,y+4.7,{align:'right'});
+    doc.setFontSize(6.4);
+    doc.text('ONDERDEEL',x+2.5,y+4.7);
+    doc.text('OMSCHRIJVING',x+codeW+2.5,y+4.7);
+    doc.text('AANTAL',x+width-2.5,y+4.7,{align:'right'});
     y+=headH;
     if(!parts.length){
-      doc.setFont('helvetica','normal');doc.setFontSize(7.8);doc.text('Geen onderdelen gebruikt.',x+2.5,y+5);
+      doc.setFont('helvetica','normal');doc.setFontSize(7.8);doc.text('Geen onderdelen gebruikt.',x+codeW+2.5,y+5);
       servicePdfSetDraw(doc,SERVICE_PDF.border);doc.rect(x,y,width,8);return y+8;
     }
     for(const part of parts){
       doc.setFont('helvetica','normal');doc.setFontSize(7.8);
-      const wrapped=doc.splitTextToSize(servicePdfSafe(part.label),width-34);
+      const wrapped=doc.splitTextToSize(servicePdfSafe(part.description||'—'),Math.max(12,descW-5));
       const rowH=Math.max(8,wrapped.length*3.5+(part.oneOff?5:3));
       servicePdfSetDraw(doc,[120,120,120]);doc.rect(x,y,width,rowH);
-      servicePdfSetText(doc,SERVICE_PDF.ink);doc.text(wrapped,x+2.5,y+4.5);
+      const fit=servicePdfFitSingleLine(doc,part.code||'—',codeW-5,7.8);
+      servicePdfSetText(doc,SERVICE_PDF.ink);doc.setFontSize(fit.size);doc.text(fit.text,x+2.5,y+4.5);
+      doc.setFontSize(7.8);doc.setFont('helvetica','normal');doc.text(wrapped,x+codeW+2.5,y+4.5);
       doc.setFont('helvetica','bold');doc.text(servicePdfSafe(part.qty),x+width-2.5,y+4.5,{align:'right'});
-      if(part.oneOff){doc.setFontSize(5.7);doc.text('EENMALIG / LEVERANCIER',x+2.5,y+rowH-2);}
+      if(part.oneOff){doc.setFontSize(5.7);doc.setFont('helvetica','normal');doc.text('EENMALIG / LEVERANCIER',x+codeW+2.5,y+rowH-2);}
       y+=rowH;
     }
     return y;
