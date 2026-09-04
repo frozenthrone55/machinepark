@@ -169,7 +169,9 @@ if MARKER not in index:
     const sessionMinutes = sessions.reduce((sum, row) => sum + Math.max(0, Math.round(Number(row?.minutes) || 0)), 0);
     if (record?.serviceVisitId) {
       const minutes = Math.max(0, Math.round(Number(record?.serviceVisitTotalMinutes) || sessionMinutes || Number(record?.hours || 0) * 60));
-      const count = Math.max(1, Math.round(Number(record?.serviceVisitDeviceCount || record?.batchSize) || 1));
+      const linked = [...(state.maintenance || []), ...(state.breakdowns || [])].filter(item => item?.serviceVisitId === record.serviceVisitId);
+      const unique = new Set(linked.map(item => item?.deviceId).filter(Boolean)).size;
+      const count = Math.max(1, unique || Math.round(Number(record?.serviceVisitDeviceCount || record?.batchSize) || 1));
       return `${minutes} min / ${count} toestel${count === 1 ? '' : 'len'}`;
     }
     const minutes = sessionMinutes || Math.max(0, Math.round(Number(record?.hours || 0) * 60));
