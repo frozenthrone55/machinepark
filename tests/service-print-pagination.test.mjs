@@ -124,3 +124,25 @@ test('afdruk detailblad toont werksoort maar één keer bovenaan', () => {
   assert.match(css, /\.service-report-print-record-page \.service-record-kind-badge\{display:none!important\}/);
   assert.match(css, /\.service-report-print-record-meta\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
 });
+
+
+test('onderdelen worden in aparte kolommen weergegeven met vaste code en rechts uitgelijnd aantal', () => {
+  assert.match(js, /function svPartFields/);
+  assert.match(js, /function svOneOffPartFields/);
+  assert.match(js, /<th class="service-part-code">Onderdeel<\/th><th class="service-part-description">Omschrijving<\/th><th class="service-part-qty">Aantal<\/th>/);
+  assert.match(js, /class="service-part-code"/);
+  assert.match(js, /class="service-part-description"/);
+  assert.match(js, /class="service-part-qty"/);
+  assert.match(css, /\.service-part-code\{[^}]*white-space:nowrap/);
+  assert.match(css, /\.service-part-description\{[^}]*white-space:normal[^}]*overflow-wrap:anywhere/);
+  assert.match(css, /\.service-part-qty\{[^}]*text-align:right[^}]*white-space:nowrap/);
+});
+
+test('samengevoegde onderdelenlijsten gebruiken dezelfde code omschrijving aantal kolommen', () => {
+  const report=js.slice(js.indexOf('function reportHtml'),js.indexOf('function workOrderText'));
+  assert.match(report, /service-parts-columns/);
+  assert.match(report, /Omschrijving/);
+  const visit=js.slice(js.indexOf('function visitReportHtml'),js.indexOf('function visitNumber'));
+  assert.match(visit, /service-parts-columns/);
+  assert.match(visit, /Omschrijving/);
+});
