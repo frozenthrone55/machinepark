@@ -75,3 +75,21 @@ test('werkuren worden per afzonderlijke servicewerkzaamheid bewaard en afgedrukt
   assert.match(js, /const specific=Math\.max\(0,Math\.round\(Number\(item\?\.serviceItemMinutes\)\|\|0\)\)/);
   assert.match(js, /hours:\(itemMinutes>0\?itemMinutes:totalMinutes\)\/60/);
 });
+
+
+test('onderdelen staan in details in een eigen kader binnen de werkzaamhedenkaart', () => {
+  assert.match(js, /function recordPartsBoxHtml/);
+  assert.match(js, /service-record-parts-box/);
+  assert.match(js, /Onderdelen voor deze werkzaamheid/);
+  assert.match(js, /Geen onderdelen gebruikt\./);
+  assert.match(js, /Eenmalig \/ leverancier/);
+  assert.match(js, /\$\{recordPartsBoxHtml\(item\)\}/);
+});
+
+test('onderdelenkader krijgt ook duidelijke printopmaak', () => {
+  assert.match(css, /\.service-record-parts-box\{/);
+  assert.match(css, /\.service-record-parts-title\{/);
+  assert.match(css, /\.service-record-parts-table\{/);
+  assert.match(css, /\.service-visit-print-sheet \.service-record-parts-box\{/);
+  assert.match(css, /\.service-visit-print-sheet \.service-record-parts-title\{/);
+});
