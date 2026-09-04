@@ -14,7 +14,9 @@
   const svCan = permission => !window.machineparkAccessReady || typeof window.machineparkHasPermission !== 'function' || Boolean(window.machineparkHasPermission(permission));
   const svCanCreate = () => svCan('maintenance.add') || svCan('breakdowns.add');
   const svCanEdit = () => svCan('maintenance.edit') || svCan('breakdowns.edit');
-  const svCanDeleteReport = report => Boolean(report) && (!report.maintenanceCount || svCan('maintenance.delete')) && (!report.breakdownCount || svCan('breakdowns.delete'));
+  const svCanDeleteReport = report => Boolean(report) && (!report.maintenanceCount || svCan('maintenance.delete')) && (!(report.breakdownCount || report.otherWorkCount) || svCan('breakdowns.delete'));
+  const svIsOtherWork = item => Boolean(item?.serviceKind === 'other');
+  const svKindLabel = (kind,item={}) => kind === 'maintenance' ? 'Onderhoud' : (kind === 'otherworks' ? (item.workTypeName || 'Andere werken') : 'Depannage');
   const svDeviceShort = deviceId => {
     const d = (state.devices || []).find(item => item.id === deviceId);
     return [d?.assetCode, d?.brand, d?.model].filter(Boolean).join(' · ') || 'Onbekend toestel';
@@ -41,7 +43,7 @@
 
   function serviceVisitRecords(id) {
     const maintenance = (state.maintenance || []).filter(item => item?.isDraft !== true && item?.serviceVisitId === id).map(item => ({ kind:'maintenance', item }));
-    const breakdowns = (state.breakdowns || []).filter(item => item?.isDraft !== true && item?.serviceVisitId === id).map(item => ({ kind:'breakdowns', item }));
+    const breakdowns = (state.breakdowns || []).filter(item => item?.isDraft !== true && item?.serviceVisitId === id).map(item => ({ kind:svIsOtherWork(item)?'otherworks':'breakdowns', item }));
     return [...maintenance, ...breakdowns].sort((a,b) => String(recordMoment(a.item) || a.item.updatedAt || '').localeCompare(String(recordMoment(b.item) || b.item.updatedAt || '')));
   }
 
@@ -70,6 +72,7 @@
         deviceCount:new Set(all.map(item => item.deviceId).filter(Boolean)).size,
         maintenanceCount:records.filter(row => row.kind === 'maintenance').length,
         breakdownCount:records.filter(row => row.kind === 'breakdowns').length,
+        otherWorkCount:records.filter(row => row.kind === 'otherworks').length,
       };
     }).filter(v => v.records.length).sort((a,b) => String(b.closedAt || `${b.date}T${b.time || '00:00'}`).localeCompare(String(a.closedAt || `${a.date}T${a.time || '00:00'}`)));
   }
@@ -99,7 +102,8 @@
         locationCount:visits.length,
         deviceCount:new Set(reportRows.map(item=>item.deviceId).filter(Boolean)).size,
         maintenanceCount:reportRows.filter(item=>item.type !== undefined).length,
-        breakdownCount:reportRows.filter(item=>item.type === undefined).length,
+        breakdownCount:reportRows.filter(item=>item.type === undefined && !svIsOtherWork(item)).length,
+        otherWorkCount:reportRows.filter(item=>svIsOtherWork(item)).length,
       };
     }).filter(report=>report.visits.length).sort((a,b)=>String(b.closedAt||`${b.date}T${b.time||'00:00'}`).localeCompare(String(a.closedAt||`${a.date}T${a.time||'00:00'}`)));
   }
