@@ -912,6 +912,8 @@ required = [
     'servicePdfWorkPage',
     'ONDERDELEN VOOR DEZE WERKZAAMHEID',
     'servicePdfFitSingleLine',
+    'servicePdfCodeColumnWidth',
+    "doc.getTextWidth('          ')",
     "headers:['Onderdeel','Omschrijving','Aantal','Locaties / toestellen']",
     'nowrapCols:[0,2],rightCols:[2]',
     'green:[24,63,53]',
