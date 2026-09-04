@@ -239,19 +239,24 @@
   function recordSummary(kind, item, plain = false) {
     const lines = kind === 'maintenance'
       ? [`Type onderhoud: ${item.type || '—'}`, `Uitgevoerde werkzaamheden / notitie: ${item.notes || '—'}`]
-      : [`Prioriteit: ${item.priority || '—'} · Status: ${item.status || '—'}`, `Probleem / melding: ${item.issue || '—'}`, `Diagnose: ${item.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${item.solution || '—'}`];
+      : kind === 'otherworks'
+        ? [`Soort werkzaamheden: ${item.workTypeName || 'Andere werken'}`, `Prioriteit: ${item.priority || '—'} · Status: ${item.status || '—'}`, `Werkzaamheid / omschrijving: ${item.issue || '—'}`, `Extra info / diagnose: ${item.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${item.solution || '—'}`]
+        : [`Prioriteit: ${item.priority || '—'} · Status: ${item.status || '—'}`, `Probleem / melding: ${item.issue || '—'}`, `Diagnose: ${item.diagnosis || '—'}`, `Oplossing / uitgevoerde werken: ${item.solution || '—'}`];
     if (item.workOrder) lines.push(workOrderText(item.workOrder));
     if (kind === 'breakdowns' && item.faultRef) lines.push(`Gekoppelde storing: ${[item.faultRef.code,item.faultRef.name].filter(Boolean).join(' — ') || '—'}`);
     lines.push(`Onderdelen op dit toestel: ${perRecordPartsText(item)}`);
     if (plain) return lines.join('\n');
-    return `<div class="service-visit-report-record"><h4><span class="badge ${kind === 'maintenance' ? 'blue' : 'danger'}">${kind === 'maintenance' ? 'Onderhoud' : 'Depannage'}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div></div>`;
+    const badgeClass=kind === 'maintenance' ? 'blue' : (kind === 'otherworks' ? 'other-work-badge' : 'danger');
+    const badgeText=kind === 'maintenance' ? 'Onderhoud' : (kind === 'otherworks' ? 'Andere werken' : 'Depannage');
+    return `<div class="service-visit-report-record"><h4><span class="badge ${badgeClass}">${badgeText}</span>${svEsc(svDeviceShort(item.deviceId))}</h4><div class="service-visit-report-lines">${lines.map(line => `<div style="white-space:pre-wrap">${svEsc(line)}</div>`).join('')}</div></div>`;
   }
+
 
   function visitPhotos(visit) {
     const out = [];
     for (const row of visit?.records || []) {
       (row.item.photos || []).forEach((src,index) => {
-        if (typeof src === 'string' && src.trim()) out.push({ src, label:`${row.kind === 'maintenance' ? 'Onderhoud' : 'Depannage'} · ${svDeviceShort(row.item.deviceId)} · foto ${index + 1}` });
+        if (typeof src === 'string' && src.trim()) out.push({ src, label:`${svKindLabel(row.kind,row.item)} · ${svDeviceShort(row.item.deviceId)} · foto ${index + 1}` });
       });
     }
     return out;
@@ -328,9 +333,42 @@
   function partSection(kind,item={}) {
     const used = (item.usedParts?.length ? item.usedParts : [{partId:'',qty:1}]).map(u => usageRowHtml(u,true)).join('');
     const one = (item.oneOffParts?.length ? item.oneOffParts : [{}]).map(oneOffRowHtml).join('');
-    return `<div class="service-visit-parts"><div class="service-visit-parts-head"><strong>Gebruikte onderdelen</strong><button type="button" class="btn small sv-add-part">+ Onderdeelregel</button></div><div class="muted" style="font-size:11px;margin:-3px 0 7px">Onderdelen blijven gekoppeld aan dit toestel en deze ${kind === 'maintenance' ? 'onderhoudsregistratie' : 'depannage'}.</div><div class="usage-list sv-usage-list">${used}</div></div>
+    const recordLabel=kind === 'maintenance' ? 'onderhoudsregistratie' : (kind === 'otherworks' ? 'registratie Andere werken' : 'depannage');
+    const photoLabel=kind === 'maintenance' ? 'onderhoud' : (kind === 'otherworks' ? 'Andere werken' : 'depannage');
+    return `<div class="service-visit-parts"><div class="service-visit-parts-head"><strong>Gebruikte onderdelen</strong><button type="button" class="btn small sv-add-part">+ Onderdeelregel</button></div><div class="muted" style="font-size:11px;margin:-3px 0 7px">Onderdelen blijven gekoppeld aan dit toestel en deze ${recordLabel}.</div><div class="usage-list sv-usage-list">${used}</div></div>
       <div class="service-visit-oneoff"><div class="service-visit-parts-head"><strong>Eenmalige onderdelen / leverancier</strong><button type="button" class="btn small sv-add-oneoff">+ Eenmalig onderdeel</button></div><div class="service-visit-oneoff-list">${one}</div></div>
-      <div class="field full sv-photo-editor" data-existing-photos='${svEsc(JSON.stringify(item.photos || []))}'><label>Foto’s bij ${kind === 'maintenance' ? 'onderhoud' : 'depannage'}</label>${photoDraftHtml(item.photos || [])}<input class="sv-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 5 foto’s per toestelregistratie.</div></div>`;
+      <div class="field full sv-photo-editor" data-existing-photos='${svEsc(JSON.stringify(item.photos || []))}'><label>Foto’s bij ${photoLabel}</label>${photoDraftHtml(item.photos || [])}<input class="sv-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 5 foto’s per toestelregistratie.</div></div>`;
+  }
+
+  function svOtherWorkTypeNames(extra='') {
+    const names=['Plaatsing'];
+    (state.breakdowns || []).forEach(item=>{
+      if(item?.serviceKind === 'other' && String(item.workTypeName || '').trim())names.push(String(item.workTypeName).trim());
+    });
+    if(String(extra || '').trim())names.push(String(extra).trim());
+    return [...new Set(names)].sort((a,b)=>a==='Plaatsing'?-1:b==='Plaatsing'?1:a.localeCompare(b,'nl-BE',{numeric:true,sensitivity:'base'}));
+  }
+
+  function svOtherWorkTypeField(item={}) {
+    const selected=String(item.workTypeName || 'Plaatsing').trim() || 'Plaatsing';
+    const names=svOtherWorkTypeNames(selected),known=names.includes(selected),choice=known?selected:'__new__';
+    return `<div class="full sv-other-work-type" data-sv-other-work-type><label>Soort werkzaamheden *</label><select class="sv-other-work-type-choice">${names.map(name=>`<option value="${svEsc(name)}" ${choice===name?'selected':''}>${svEsc(name)}</option>`).join('')}<option value="__new__" ${choice==='__new__'?'selected':''}>+ Nieuwe naam toevoegen…</option></select><div class="sv-other-work-new" style="${choice==='__new__'?'margin-top:7px':'display:none;margin-top:7px'}"><label>Nieuwe naam *</label><input class="sv-other-work-new-name" maxlength="100" value="${choice==='__new__'?svEsc(selected):''}" placeholder="bv. Ombouw, Verplaatsing…"></div><div class="muted" style="font-size:11px;margin-top:4px">Plaatsing staat standaard klaar. Nieuwe namen worden na opslaan ook beschikbaar bij losse Andere werken.</div></div>`;
+  }
+
+  function syncSvOtherWorkType(root) {
+    const holder=root?.closest?.('[data-sv-other-work-type]') || root;
+    const choice=holder?.querySelector('.sv-other-work-type-choice'),newBox=holder?.querySelector('.sv-other-work-new'),newName=holder?.querySelector('.sv-other-work-new-name');
+    if(!choice)return;
+    const custom=choice.value==='__new__';
+    if(newBox)newBox.style.display=custom?'block':'none';
+    if(newName)newName.required=custom;
+  }
+
+  function collectSvOtherWorkType(panel) {
+    const holder=panel?.querySelector('[data-sv-other-work-type]'),choice=holder?.querySelector('.sv-other-work-type-choice');
+    const value=choice?.value==='__new__'?String(holder?.querySelector('.sv-other-work-new-name')?.value||'').trim():String(choice?.value||'').trim();
+    if(!value)throw new Error('Kies of vul een naam voor Andere werken in.');
+    return value;
   }
 
   function existingKinds(visit) {
@@ -343,7 +381,7 @@
   }
 
   function itemMap(items=[]) {
-    return new Map(items.map(item => [`${item.draftServiceKind || (item.issue !== undefined ? 'breakdowns' : 'maintenance')}:${item.deviceId}`,item]));
+    return new Map(items.map(item => [`${item.draftServiceKind || (item.serviceKind === 'other' ? 'otherworks' : (item.issue !== undefined ? 'breakdowns' : 'maintenance'))}:${item.deviceId}`,item]));
   }
 
   function deviceCard(device,visit=null,draftItems=[]) {
