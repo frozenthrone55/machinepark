@@ -159,3 +159,24 @@ test('service PDF toont werksoort slechts één keer bovenaan het detailblad', (
   assert.ok(!page.includes('const badge=servicePdfSafe(page.kindLabel)'));
   assert.ok(page.includes("doc.text(servicePdfSafe(page.device),cardX+3,cy)"));
 });
+
+
+test('service PDF splitst onderdeel omschrijving en aantal in aparte kolommen', () => {
+  assert.ok(build.includes("headers:['Onderdeel','Omschrijving','Aantal','Locaties / toestellen']"));
+  assert.ok(build.includes("nowrapCols:[0,2],rightCols:[2]"));
+  assert.ok(build.includes('function servicePdfFitSingleLine'));
+  assert.ok(build.includes("doc.text('OMSCHRIJVING'"));
+  assert.ok(build.includes("doc.text('AANTAL'"));
+  assert.ok(build.includes("part.description||'—'"));
+  assert.ok(build.includes("part.code||'—'"));
+  assert.ok(build.includes("{align:'right'}"));
+});
+
+test('service PDF houdt onderdeelcode op één regel en laat omschrijving doorlopen', () => {
+  const start=build.indexOf('function servicePdfPartsBox');
+  const end=build.indexOf('async function servicePdfWorkPhotos',start);
+  const box=build.slice(start,end);
+  assert.ok(box.includes('servicePdfFitSingleLine(doc,part.code'));
+  assert.ok(box.includes("doc.splitTextToSize(servicePdfSafe(part.description||'—')"));
+  assert.ok(box.includes("doc.text(servicePdfSafe(part.qty),x+width-2.5,y+4.5,{align:'right'})"));
+});
