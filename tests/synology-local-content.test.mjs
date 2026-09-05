@@ -35,3 +35,12 @@ test('content builder verwijst niet meer naar Netlify endpoints', () => {
   assert.match(builder, /synology\/api\/work-order-templates\.php/);
   assert.match(builder, /synology\/api\/fault-library\.php/);
 });
+
+
+test('Handleidingen krijgen expliciete lokale rolrechten', () => {
+  const roleLib = readFileSync(new URL('../synology/api/_role-lib.php', import.meta.url), 'utf8');
+  assert.match(roleLib, /view\.manuals/);
+  assert.match(roleLib, /manuals\.manage/);
+  assert.match(manual, /view\.manuals/);
+  assert.match(manual, /manuals\.manage/);
+});
