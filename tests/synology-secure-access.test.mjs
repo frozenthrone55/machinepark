@@ -44,3 +44,16 @@ test('foto-endpoints gebruiken dezelfde centrale request policy', () => {
   assert.match(photos, /mp_auth_require_request_access/);
   assert.match(photos, /mp_auth_access_error_payload/);
 });
+
+
+test('publieke loginruntime stuurt HTTP naar HTTPS', () => {
+  const runtime = readFileSync(new URL('../synology-local-auth.js', import.meta.url), 'utf8');
+  assert.match(runtime, /krisooms\.synology\.me/);
+  assert.match(runtime, /window\.location\.protocol === 'http:'/);
+  assert.match(runtime, /next\.protocol = 'https:'/);
+  assert.match(runtime, /window\.location\.replace/);
+});
+
+test('publieke HTTPS API zet HSTS', () => {
+  assert.match(lib, /Strict-Transport-Security: max-age=31536000/);
+});
