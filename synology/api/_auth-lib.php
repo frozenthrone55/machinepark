@@ -194,14 +194,18 @@ function mp_auth_permissions_for_role(string $role, bool $owner = false): array 
 }
 
 function mp_auth_public_user(array $user): array {
+    $owner = !empty($user['isOwner']);
+    $username = strtolower(trim((string)($user['username'] ?? '')));
+    if ($owner && $username === '') $username = 'admin';
     return [
         'id' => (string)($user['id'] ?? ''),
+        'username' => $username,
         'email' => (string)($user['email'] ?? ''),
         'firstName' => (string)($user['firstName'] ?? ''),
         'lastName' => (string)($user['lastName'] ?? ''),
         'fullName' => trim(((string)($user['firstName'] ?? '')) . ' ' . ((string)($user['lastName'] ?? ''))),
         'role' => (string)($user['role'] ?? 'gebruiker'),
-        'isOwner' => !empty($user['isOwner']),
+        'isOwner' => $owner,
     ];
 }
 
