@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_auth-lib.php';
+require_once __DIR__ . '/_audit-lib.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -72,6 +73,82 @@ function mp_normalize_etag($etag): ?string {
     if (!is_string($etag)) return null;
     $etag = trim($etag);
     return $etag === '' ? null : $etag;
+}
+
+function mp_list_map(array $items): array {
+    $map = [];
+    foreach ($items as $item) {
+        if (is_array($item) && !empty($item['id'])) $map[(string)$item['id']] = $item;
+    }
+    return $map;
+}
+
+function mp_changed_keys(array $before, array $after): array {
+    $keys = array_unique(array_merge(array_keys($before), array_keys($after)));
+    $changed = [];
+    foreach ($keys as $key) {
+        if ($key === 'updatedAt') continue;
+        $a = array_key_exists($key, $before) ? $before[$key] : null;
+        $b = array_key_exists($key, $after) ? $after[$key] : null;
+        if (json_encode($a) !== json_encode($b)) $changed[] = $key;
+    }
+    return $changed;
+}
+
+function mp_store_diff(array $before, array $after, string $store): array {
+    $a = mp_list_map(isset($before[$store]) && is_array($before[$store]) ? $before[$store] : []);
+    $b = mp_list_map(isset($after[$store]) && is_array($after[$store]) ? $after[$store] : []);
+    $added = []; $removed = []; $changed = [];
+    foreach ($b as $id => $item) {
+        if (!isset($a[$id])) $added[] = $item;
+        else {
+            $keys = mp_changed_keys($a[$id], $item);
+            if ($keys) $changed[] = ['before'=>$a[$id], 'after'=>$item, 'keys'=>$keys];
+        }
+    }
+    foreach ($a as $id => $item) if (!isset($b[$id])) $removed[] = $item;
+    return ['added'=>$added,'removed'=>$removed,'changed'=>$changed];
+}
+
+function mp_require_permission(array $permissions, string $key, string $message): void {
+    if (empty($permissions[$key])) mp_json(['error'=>$message], 403);
+}
+
+function mp_validate_write_permissions(array $before, array $after, array $user): void {
+    $permissions = mp_role_permissions((string)($user['role'] ?? 'gebruiker'), !empty($user['isOwner']));
+    $devices = mp_store_diff($before, $after, 'devices');
+    $maintenance = mp_store_diff($before, $after, 'maintenance');
+    $breakdowns = mp_store_diff($before, $after, 'breakdowns');
+    $parts = mp_store_diff($before, $after, 'parts');
+
+    if ($devices['added']) mp_require_permission($permissions, 'devices.add', 'Deze rol mag geen toestellen toevoegen.');
+    if ($devices['removed']) mp_require_permission($permissions, 'devices.delete', 'Deze rol mag geen toestellen verwijderen.');
+    foreach ($devices['changed'] as $change) {
+        $statusNotesOnly = count(array_diff($change['keys'], ['status','notes'])) === 0;
+        if ($statusNotesOnly && (!empty($permissions['devices.statusNotes']) || !empty($permissions['devices.edit']))) continue;
+        mp_require_permission($permissions, 'devices.edit', 'Deze rol mag toestelgegevens niet volledig wijzigen.');
+    }
+
+    if ($maintenance['added']) mp_require_permission($permissions, 'maintenance.add', 'Deze rol mag geen onderhoud registreren.');
+    if ($maintenance['removed']) mp_require_permission($permissions, 'maintenance.delete', 'Deze rol mag geen onderhoud verwijderen.');
+    if ($maintenance['changed']) mp_require_permission($permissions, 'maintenance.edit', 'Deze rol mag onderhoud niet wijzigen.');
+
+    if ($breakdowns['added']) mp_require_permission($permissions, 'breakdowns.add', 'Deze rol mag geen depannages registreren.');
+    if ($breakdowns['removed']) mp_require_permission($permissions, 'breakdowns.delete', 'Deze rol mag geen depannages verwijderen.');
+    if ($breakdowns['changed']) mp_require_permission($permissions, 'breakdowns.edit', 'Deze rol mag depannages niet wijzigen.');
+
+    if ($parts['added']) mp_require_permission($permissions, 'parts.add', 'Deze rol mag geen onderdelen toevoegen.');
+    if ($parts['removed']) mp_require_permission($permissions, 'parts.delete', 'Deze rol mag geen onderdelen verwijderen.');
+
+    $serviceMutationAllowed = false;
+    if ($maintenance['added'] || $maintenance['removed'] || $maintenance['changed'] || $breakdowns['added'] || $breakdowns['removed'] || $breakdowns['changed']) {
+        $serviceMutationAllowed = true;
+    }
+    foreach ($parts['changed'] as $change) {
+        $stockOnly = count(array_diff($change['keys'], ['stock'])) === 0;
+        if ($stockOnly && (!empty($permissions['parts.stock']) || !empty($permissions['parts.edit']) || $serviceMutationAllowed)) continue;
+        mp_require_permission($permissions, 'parts.edit', 'Deze rol mag onderdeelgegevens niet wijzigen.');
+    }
 }
 
 function mp_backup_current(): void {
@@ -213,12 +290,28 @@ if ($method === 'PUT') {
         ], 409);
     }
 
+    $before = mp_read_state();
+    if (!is_array($before)) {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        mp_json(['error'=>'Lokale database kon niet worden gelezen.'], 500);
+    }
+
+    mp_validate_write_permissions($before, $data, $authUser);
+    $changes = mp_audit_snapshot_changes($before, $data);
+
     mp_backup_current();
     $data['updatedAt'] = date(DATE_ATOM);
+    $data['updatedBy'] = (string)($authUser['id'] ?? '');
+    $data['updatedByEmail'] = (string)($authUser['email'] ?? '');
     $etag = mp_write_state($data);
 
     flock($lock, LOCK_UN);
     fclose($lock);
+
+    if ($changes) {
+        try { mp_audit_append($authUser, $changes); } catch (Throwable $auditError) {}
+    }
 
     mp_json(array_merge([
         'ok' => true,
