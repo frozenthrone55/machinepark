@@ -77,6 +77,7 @@ if ($method === 'GET') {
         'invitations'=>[],
         'currentUserId'=>(string)($currentUser['id'] ?? ''),
         'adminEmail'=>user_owner_email($users),
+        'roles'=>array_map(function ($role) { return ['value'=>$role['id'],'label'=>$role['label']]; }, mp_role_read_config()['roles']),
         'mode'=>'synology-local',
     ]);
 }
