@@ -41,8 +41,10 @@ function role_usage_count(string $roleId): int {
     return $count;
 }
 
-if (!mp_auth_is_local_ip(mp_auth_client_ip())) {
-    role_json(['error'=>'Lokaal rollenbeheer is tijdens de opbouw alleen via het lokale netwerk bereikbaar.'], 403);
+try {
+    mp_auth_require_request_access();
+} catch (Throwable $e) {
+    role_json(mp_auth_access_error_payload($e), 403);
 }
 
 try {
