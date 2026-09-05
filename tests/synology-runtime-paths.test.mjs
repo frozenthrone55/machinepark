@@ -31,8 +31,8 @@ test('runtime path builder draait na asset-extractie', () => {
 
 
 test('loginruntime krijgt een inhoudshash en service worker omzeilt cache', () => {
-  assert.match(source, /hashlib\.sha256\(AUTH\.read_bytes\(\)\)/);
-  assert.match(source, /synology-local-auth\.js\?v=/);
-  assert.match(source, /updateViaCache:'none'/);
-  assert.match(source, /sw\.js\?v=/);
+  assert.match(builder, /hashlib\.sha256\(AUTH\.read_bytes\(\)\)/);
+  assert.match(builder, /synology-local-auth\.js\?v=/);
+  assert.match(builder, /updateViaCache:'none'/);
+  assert.match(builder, /sw\.js\?v=/);
 });
