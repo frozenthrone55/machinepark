@@ -53,8 +53,9 @@ jobs:
           php -l synology/api/service-photos.php
           php -l synology/api/purge-service-audit-photos.php
           php -l synology/migrate-data.php
+          php -l synology/migrate-media.php
           node --check synology-local-auth.js
-          node --test tests/synology-local-data.test.mjs tests/synology-migrate-data.test.mjs tests/synology-local-auth.test.mjs tests/synology-local-admin.test.mjs tests/synology-local-content.test.mjs tests/synology-local-faults.test.mjs tests/synology-local-photos.test.mjs tests/synology-local-vendor.test.mjs tests/synology-runtime-paths.test.mjs
+          node --test tests/synology-local-data.test.mjs tests/synology-migrate-data.test.mjs tests/synology-local-auth.test.mjs tests/synology-local-admin.test.mjs tests/synology-local-content.test.mjs tests/synology-local-faults.test.mjs tests/synology-local-photos.test.mjs tests/synology-local-vendor.test.mjs tests/synology-media-migration.test.mjs tests/synology-runtime-paths.test.mjs
 
       - name: Synology runtime samenstellen
         run: |
