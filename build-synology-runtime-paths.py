@@ -40,47 +40,40 @@ if remaining:
 INDEX.write_text(index, encoding="utf-8")
 
 sw = SW.read_text(encoding="utf-8")
-for old, new in [
-    ("  '/',", "  './',"),
-    ("  '/index.html',", "  './index.html',"),
-    ("  '/manifest.webmanifest',", "  './manifest.webmanifest',"),
-    ("  '/machinepark-logo.svg',", "  './machinepark-logo.svg',"),
-    ("  '/machinepark-coffee-device-icon.png',", "  './machinepark-coffee-device-icon.png',"),
-    ("  '/offline-first.js',", "  './offline-first.js',"),
-]:
-    sw = sw.replace(old, new)
 
-sw = re.sub(
-    r"'/assets/machinepark-build\.js(\?v=[^']*)'",
-    r"'./assets/machinepark-build.js\1'",
-    sw,
-)
-sw = re.sub(
-    r"'/assets/machinepark-build\.css(\?v=[^']*)'",
-    r"'./assets/machinepark-build.css\1'",
-    sw,
-)
-sw = re.sub(
-    r"'/fault-library\.js(\?v=[^']*)?'",
-    lambda m: "'./fault-library.js" + (m.group(1) or "") + "'",
-    sw,
-)
-sw = re.sub(
-    r"'/fault-library\.css(\?v=[^']*)?'",
-    lambda m: "'./fault-library.css" + (m.group(1) or "") + "'",
-    sw,
-)
+# Maak de volledige precache-lijst canoniek. Eerdere builders voegen soms
+# versiegebonden regels toe; op Synology moeten ze allemaal relatief zijn en
+# elke regel moet syntactisch correct door een komma gescheiden worden.
+assets_match = re.search(r"const ASSETS=\[(.*?)\];", sw, re.S)
+if not assets_match:
+    raise SystemExit("Buildvalidatie mislukt: service-worker ASSETS-lijst ontbreekt")
+
+asset_values = re.findall(r"'([^']+)'", assets_match.group(1))
+if not asset_values:
+    raise SystemExit("Buildvalidatie mislukt: service-worker ASSETS-lijst is leeg")
+
+fixed_assets = []
+for value in asset_values:
+    if value == "/":
+        value = "./"
+    elif value.startswith("/") and not value.startswith("/.netlify/"):
+        value = "." + value
+    fixed_assets.append(value)
+
+asset_block = "const ASSETS=[\n" + "\n".join(
+    f"  {json.dumps(value)}," for value in fixed_assets
+) + "\n];"
+sw = sw[:assets_match.start()] + asset_block + sw[assets_match.end():]
+
 sw = sw.replace("c.put('/index.html',copy)", "c.put('./index.html',copy)")
 sw = sw.replace("caches.match('/index.html')", "caches.match('./index.html')")
 
-for forbidden in [
-    "  '/index.html',",
-    "  '/offline-first.js',",
-    "'/assets/machinepark-build.js",
-    "'/assets/machinepark-build.css",
-]:
-    if forbidden in sw:
-        raise SystemExit(f"Buildvalidatie mislukt: service worker bevat nog rootpad {forbidden}")
+remaining_sw_roots = [
+    value for value in fixed_assets
+    if value.startswith("/") and not value.startswith("/.netlify/")
+]
+if remaining_sw_roots:
+    raise SystemExit("Buildvalidatie mislukt: service worker bevat nog rootassets: " + ", ".join(remaining_sw_roots))
 
 SW.write_text(sw, encoding="utf-8")
 
