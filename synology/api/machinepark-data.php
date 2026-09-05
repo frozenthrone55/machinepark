@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/_auth-lib.php';
+
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -20,59 +22,10 @@ function mp_json(array $body, int $status = 200, array $headers = []): void {
     exit;
 }
 
-function mp_client_ip(): string {
-    return (string)($_SERVER['REMOTE_ADDR'] ?? '');
-}
-
-function mp_is_local_ip(string $ip): bool {
-    if ($ip === '127.0.0.1' || $ip === '::1') return true;
-    if (strpos($ip, '10.') === 0 || strpos($ip, '192.168.') === 0) return true;
-    if (strpos(strtolower($ip), 'fc') === 0 || strpos(strtolower($ip), 'fd') === 0 || strpos(strtolower($ip), 'fe80:') === 0) return true;
-
-    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-        $long = ip2long($ip);
-        $start = ip2long('172.16.0.0');
-        $end = ip2long('172.31.255.255');
-        if ($long !== false && $start !== false && $end !== false && $long >= $start && $long <= $end) return true;
-    }
-
-    return false;
-}
-
-function mp_require_local_network(): void {
-    $ip = mp_client_ip();
-    if (!mp_is_local_ip($ip)) {
-        mp_json([
-            'error' => 'Lokale Synology API is tijdens de opbouw alleen bereikbaar vanaf het lokale netwerk.',
-            'clientIp' => $ip,
-            'mode' => 'synology-local-only'
-        ], 403);
-    }
-}
-
-function mp_permissions_all(): array {
-    $keys = [
-        'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts','view.settings',
-        'devices.add','devices.edit','devices.statusNotes','devices.delete','devices.import',
-        'maintenance.add','maintenance.edit','maintenance.delete',
-        'breakdowns.add','breakdowns.edit','breakdowns.delete',
-        'faults.manage',
-        'parts.add','parts.edit','parts.stock','parts.delete','parts.export','parts.import',
-        'print','backup.export','backup.import','users.manage','audit.view','audit.undo','roles.manage'
-    ];
-    $result = [];
-    foreach ($keys as $key) $result[$key] = true;
-    return $result;
-}
-
-function mp_access_payload(): array {
-    return [
+function mp_access_payload(array $user): array {
+    return array_merge([
         'mode' => 'synology-local',
-        'authMode' => 'local-network-temporary',
-        'role' => 'beheerder',
-        'roleLabel' => 'Beheerder',
-        'permissions' => mp_permissions_all()
-    ];
+    ], mp_auth_access_payload($user));
 }
 
 function mp_ensure_storage(): void {
@@ -166,7 +119,19 @@ function mp_write_state(array $data): string {
     return $etag;
 }
 
-mp_require_local_network();
+if (!mp_auth_is_local_ip(mp_auth_client_ip())) {
+    mp_json([
+        'error' => 'Lokale Synology API is tijdens de opbouw alleen bereikbaar vanaf het lokale netwerk.',
+        'mode' => 'synology-local-only'
+    ], 403);
+}
+
+try {
+    $authUser = mp_auth_require_user();
+} catch (Throwable $e) {
+    mp_json(['error' => 'Niet aangemeld.', 'code' => 'not_authenticated'], 401);
+}
+
 mp_ensure_storage();
 
 $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -183,7 +148,7 @@ if ($method === 'GET') {
             'exists' => false,
             'etag' => null,
             'initialized' => false
-        ], mp_access_payload()));
+        ], mp_access_payload($authUser)));
     }
 
     $ifNoneMatch = mp_normalize_etag($_SERVER['HTTP_IF_NONE_MATCH'] ?? null);
@@ -194,7 +159,7 @@ if ($method === 'GET') {
             'etag' => $etag,
             'data' => null,
             'initialized' => true
-        ], mp_access_payload()), 200, ['ETag' => $etag]);
+        ], mp_access_payload($authUser)), 200, ['ETag' => $etag]);
     }
 
     mp_json(array_merge([
@@ -202,7 +167,7 @@ if ($method === 'GET') {
         'etag' => $etag,
         'data' => mp_read_state(),
         'initialized' => true
-    ], mp_access_payload()), 200, ['ETag' => $etag]);
+    ], mp_access_payload($authUser)), 200, ['ETag' => $etag]);
 }
 
 if ($method === 'PUT') {
@@ -259,7 +224,7 @@ if ($method === 'PUT') {
         'ok' => true,
         'etag' => $etag,
         'updatedAt' => $data['updatedAt']
-    ], mp_access_payload()), 200, ['ETag' => $etag]);
+    ], mp_access_payload($authUser)), 200, ['ETag' => $etag]);
 }
 
 mp_json(['error' => 'Methode niet toegestaan.'], 405, ['Allow' => 'GET, PUT, OPTIONS']);
