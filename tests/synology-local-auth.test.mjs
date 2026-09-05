@@ -41,6 +41,13 @@ test('lokale browserruntime heeft setup login logout en geen externe auth nodig'
   assert.match(runtime, /synology-local-session/);
 });
 
+test('lokale hoofdbeheerder behoudt expliciet toegang tot Beheer', () => {
+  assert.match(runtime, /machineparkIsAdmin = true/);
+  assert.match(runtime, /machineparkRole = 'beheerder'/);
+  assert.match(runtime, /machineparkPermissions\['view\.settings'\] = true/);
+  assert.match(lib, /\$enable = mp_auth_permission_keys\(\)/);
+});
+
 test('build verwijdert Clerk boot en gebruikt relatieve paden', () => {
   assert.match(builder, /synology-local-auth-v1/);
   assert.match(builder, /synology-local-auth\.js/);
