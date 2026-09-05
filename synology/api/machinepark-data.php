@@ -196,11 +196,10 @@ function mp_write_state(array $data): string {
     return $etag;
 }
 
-if (!mp_auth_is_local_ip(mp_auth_client_ip())) {
-    mp_json([
-        'error' => 'Lokale Synology API is tijdens de opbouw alleen bereikbaar vanaf het lokale netwerk.',
-        'mode' => 'synology-local-only'
-    ], 403);
+try {
+    mp_auth_require_request_access();
+} catch (Throwable $e) {
+    mp_json(mp_auth_access_error_payload($e), 403);
 }
 
 try {
