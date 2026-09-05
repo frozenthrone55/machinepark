@@ -49,12 +49,15 @@ def main() -> None:
     if assets.is_dir():
         shutil.copytree(assets, out / "assets")
 
-    # PHP-bestanden voor de lokale Synology-backend meenemen.
+    # PHP-bestanden en gegenereerde lokale seeddata voor de Synology-backend meenemen.
     synology = ROOT / "synology"
     if synology.is_dir():
         for src in synology.rglob("*.php"):
             relative = src.relative_to(ROOT)
             copy_file(src, out / relative)
+        seed = synology / "fault-seed.json"
+        if seed.is_file():
+            copy_file(seed, out / seed.relative_to(ROOT))
 
     if missing:
         raise SystemExit("Ontbrekende runtime-bestanden: " + ", ".join(missing))
