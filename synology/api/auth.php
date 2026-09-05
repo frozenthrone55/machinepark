@@ -13,11 +13,10 @@ function auth_json(array $body, int $status = 200): void {
     exit;
 }
 
-if (!mp_auth_is_local_ip(mp_auth_client_ip())) {
-    auth_json([
-        'error' => 'Lokale Machinepark-login is tijdens de opbouw alleen beschikbaar via het lokale IP-adres van de Synology.',
-        'localOnly' => true
-    ], 403);
+try {
+    mp_auth_require_request_access();
+} catch (Throwable $e) {
+    auth_json(mp_auth_access_error_payload($e), 403);
 }
 
 mp_auth_start_session();
