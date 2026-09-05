@@ -23,6 +23,21 @@ function mp_auth_is_local_ip(string $ip): bool {
     return false;
 }
 
+function mp_auth_effective_client_ip(): string {
+    $remote = mp_auth_client_ip();
+    if (!mp_auth_is_local_ip($remote)) return $remote;
+
+    // Alleen achter een lokale reverse proxy gebruiken we de laatste geldige
+    // X-Forwarded-For-adreswaarde voor logging/rate limiting.
+    $forwarded = trim((string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''));
+    if ($forwarded === '') return $remote;
+    $parts = array_reverse(array_map('trim', explode(',', $forwarded)));
+    foreach ($parts as $candidate) {
+        if (filter_var($candidate, FILTER_VALIDATE_IP)) return $candidate;
+    }
+    return $remote;
+}
+
 function mp_auth_request_host(): string {
     $raw = strtolower(trim((string)($_SERVER['HTTP_HOST'] ?? '')));
     if ($raw === '') return '';
