@@ -164,22 +164,51 @@ function media_public_source($value): string {
 }
 
 function media_fetch_url(string $url, int $maxBytes): array {
-    if (!function_exists('curl_init')) throw new RuntimeException('De PHP cURL-extensie is nodig voor de eenmalige cloudmigratie.');
+    $bytes = false;
+    $status = 0;
+    $type = '';
+    $error = '';
 
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 25);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Machinepark-Synology-Migration/1');
-    curl_setopt($ch, CURLOPT_FAILONERROR, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-    $bytes = curl_exec($ch);
-    $error = curl_error($ch);
-    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $type = strtolower(trim((string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE)));
-    curl_close($ch);
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 25);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Machinepark-Synology-Migration/1');
+        curl_setopt($ch, CURLOPT_FAILONERROR, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        $bytes = curl_exec($ch);
+        $error = curl_error($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $type = strtolower(trim((string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE)));
+        curl_close($ch);
+    } elseif (ini_get('allow_url_fopen')) {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 25,
+                'follow_location' => 0,
+                'max_redirects' => 0,
+                'user_agent' => 'Machinepark-Synology-Migration/1',
+                'ignore_errors' => true,
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+        $bytes = @file_get_contents($url, false, $context, 0, $maxBytes + 1);
+        $headers = isset($http_response_header) && is_array($http_response_header) ? $http_response_header : [];
+        foreach ($headers as $header) {
+            if (preg_match('#^HTTP/\\S+\\s+(\\d{3})#i', $header, $match)) $status = (int)$match[1];
+            if (stripos($header, 'Content-Type:') === 0) $type = strtolower(trim(substr($header, 13)));
+        }
+        if ($bytes === false) $error = 'PHP kon de HTTPS-bron niet openen';
+    } else {
+        throw new RuntimeException('Voor de eenmalige cloudmigratie moet PHP cURL of allow_url_fopen beschikbaar zijn.');
+    }
 
     if ($bytes === false) throw new RuntimeException('Download mislukt: ' . ($error ?: 'onbekende netwerkfout'));
     if ($status !== 200) throw new RuntimeException('De oude online foto gaf HTTP ' . $status . '.');
@@ -187,7 +216,8 @@ function media_fetch_url(string $url, int $maxBytes): array {
     if (strlen($bytes) > $maxBytes) throw new RuntimeException('De oude online foto is groter dan de toegestane migratielimiet.');
     if (strpos($type, 'image/') !== 0) throw new RuntimeException('De bron gaf geen afbeelding terug (' . ($type ?: 'onbekend type') . ').');
 
-    $type = explode(';', $type, 2)[0];
+    $typeParts = explode(';', $type, 2);
+    $type = $typeParts[0];
     return ['bytes'=>$bytes,'contentType'=>$type];
 }
 
