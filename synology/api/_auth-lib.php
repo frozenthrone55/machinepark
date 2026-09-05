@@ -71,9 +71,10 @@ function mp_auth_permissions_for_role(string $role): array {
     $all = array_fill_keys(mp_auth_permission_keys(), false);
     $enable = [];
     if ($role === 'beheerder') {
+        // Lokale hoofdbeheerder behoudt alle rechten. De Beheer-pagina moet
+        // altijd bereikbaar blijven; onderdelen die nog niet lokaal zijn
+        // aangesloten tonen afzonderlijk hun eigen status/foutmelding.
         $enable = mp_auth_permission_keys();
-        // Lokale gebruikers/rollen/logboek worden in een volgende migratiefase aan de beheerpagina gekoppeld.
-        $enable = array_values(array_diff($enable, ['users.manage','audit.view','audit.undo','roles.manage']));
     } elseif ($role === 'technieker') {
         $enable = ['view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts',
             'devices.statusNotes','maintenance.add','maintenance.edit','maintenance.delete',
