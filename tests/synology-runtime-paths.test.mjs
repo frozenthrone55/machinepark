@@ -16,7 +16,7 @@ test('Synology runtime path builder corrigeert alle belangrijke root-assets', ()
   ]) {
     assert.ok(builder.includes(name));
   }
-  assert.match(builder, /\\.\\/index\\.html/);
+  assert.ok(builder.includes("./index.html"));
   assert.match(builder, /start_url/);
   assert.match(builder, /scope/);
 });
