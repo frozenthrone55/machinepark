@@ -1,0 +1,72 @@
+name: Bouw Synology-versie
+
+on:
+  push:
+    branches:
+      - synology-selfhost
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-synology:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Synology-bron
+        uses: actions/checkout@v5
+
+      - name: Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Dependencies installeren
+        run: npm install --ignore-scripts
+
+      - name: Machinepark bouwen
+        run: npm run build
+
+      - name: Synology runtime samenstellen
+        run: |
+          rm -rf /tmp/machinepark-synology
+          python3 scripts/package-synology-runtime.py --output /tmp/machinepark-synology
+
+      - name: Versie-informatie schrijven
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          Path("/tmp/machinepark-synology/deploy-meta.json").write_text(
+              json.dumps({
+                  "source_sha": os.environ["SOURCE_SHA"],
+                  "built_at": datetime.now(timezone.utc).isoformat(),
+                  "source_branch": "synology-selfhost"
+              }, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Publiceer kant-en-klare Synology branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd /tmp/machinepark-synology
+          git init
+          git checkout -b synology-deploy
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Synology build van ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin synology-deploy
