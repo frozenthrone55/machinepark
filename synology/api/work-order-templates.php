@@ -124,7 +124,7 @@ function work_write(array $data, ?string $expected): string {
     return work_etag() ?: '';
 }
 
-if (!mp_auth_is_local_ip(mp_auth_client_ip())) work_json(['error'=>'Lokale werkbonnen zijn voorlopig alleen via het lokale netwerk bereikbaar.'],403);
+try { mp_auth_require_request_access(); } catch (Throwable $e) { work_json(mp_auth_access_error_payload($e),403); }
 try { $user = mp_auth_require_user(); } catch (Throwable $e) { work_json(['error'=>'Niet aangemeld.'],401); }
 $permissions = mp_role_permissions((string)($user['role'] ?? 'gebruiker'), !empty($user['isOwner']));
 $canRead = !empty($permissions['view.maintenance']) || !empty($permissions['maintenance.add']) || !empty($permissions['maintenance.edit']);
