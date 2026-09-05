@@ -164,8 +164,10 @@ function fault_has_permission(array $user, string $permission): bool {
     return !empty($permissions[$permission]);
 }
 
-if (!mp_auth_is_local_ip(mp_auth_client_ip())) {
-    fault_json(['error' => 'Lokale storingsbibliotheek is tijdens de opbouw alleen via het lokale netwerk bereikbaar.'], 403);
+try {
+    mp_auth_require_request_access();
+} catch (Throwable $e) {
+    fault_json(mp_auth_access_error_payload($e), 403);
 }
 
 try {
