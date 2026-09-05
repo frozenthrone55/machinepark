@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const api = readFileSync(new URL('../synology/api/machinepark-data.php', import.meta.url), 'utf8');
+const authLib = readFileSync(new URL('../synology/api/_auth-lib.php', import.meta.url), 'utf8');
 const builder = readFileSync(new URL('../build-synology-local-data.py', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -12,11 +13,11 @@ test('lokale data API schrijft buiten de webroot', () => {
   assert.match(api, /state-v1\.lock/);
 });
 
-test('lokale data API is tijdens migratie beperkt tot lokale netwerkadressen', () => {
-  assert.match(api, /mp_require_local_network\(\)/);
-  assert.match(api, /192\.168\./);
-  assert.match(api, /172\.16\.0\.0/);
+test('lokale data API is tijdens opbouw beperkt tot lokale netwerkadressen', () => {
+  assert.match(api, /mp_auth_is_local_ip\(mp_auth_client_ip\(\)\)/);
   assert.match(api, /synology-local-only/);
+  assert.match(authLib, /192\.168\./);
+  assert.match(authLib, /172\.16\.0\.0/);
 });
 
 test('lokale data API gebruikt etag locking en automatische backups', () => {
