@@ -131,10 +131,10 @@ function manual_remove_tree(string $dir): void {
 }
 
 function manual_can_read(array $p, array $user): bool {
-    return !empty($user['isOwner'])||!empty($p['view.devices'])||!empty($p['view.breakdowns'])||!empty($p['view.settings']);
+    return !empty($user['isOwner']) || !empty($p['view.manuals']);
 }
 function manual_can_manage(array $p, array $user): bool {
-    return !empty($user['isOwner'])||!empty($p['view.settings']);
+    return !empty($user['isOwner']) || !empty($p['manuals.manage']);
 }
 
 function manual_serve_pdf(array $config, string $key): void {
