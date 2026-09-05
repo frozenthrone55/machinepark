@@ -52,3 +52,11 @@ test('Beheer linkt naar de lokale cloudimportpagina', () => {
   assert.match(builder, /synology\/import-cloud\.php/);
   assert.match(builder, /Resterende cloudgegevens importeren/);
 });
+
+
+test('cloudimport rolt automatisch terug als een onderdeel faalt', () => {
+  assert.match(page, /cloud_backup_local_state/);
+  assert.match(page, /cloud_restore_local_state/);
+  assert.match(page, /MP_CLOUD_IMPORT_LOCK/);
+  assert.match(page, /automatisch teruggezet uit de veiligheidsback-up/);
+});
