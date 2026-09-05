@@ -28,3 +28,11 @@ test('runtime path builder draait na asset-extractie', () => {
   assert.ok(cmd.indexOf('python3 build-synology-runtime-paths.py') > cmd.indexOf('python3 scripts/extract-build-assets.py'));
   assert.ok(cmd.indexOf('node --check assets/machinepark-build.js') > cmd.indexOf('python3 build-synology-runtime-paths.py'));
 });
+
+
+test('loginruntime krijgt een inhoudshash en service worker omzeilt cache', () => {
+  assert.match(source, /hashlib\.sha256\(AUTH\.read_bytes\(\)\)/);
+  assert.match(source, /synology-local-auth\.js\?v=/);
+  assert.match(source, /updateViaCache:'none'/);
+  assert.match(source, /sw\.js\?v=/);
+});
