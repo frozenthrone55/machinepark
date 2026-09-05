@@ -154,7 +154,7 @@ function manual_serve_pdf(array $config, string $key): void {
     exit;
 }
 
-if(!mp_auth_is_local_ip(mp_auth_client_ip()))manual_json(['error'=>'Lokale handleidingen zijn voorlopig alleen via het lokale netwerk bereikbaar.'],403);
+try{mp_auth_require_request_access();}catch(Throwable $e){manual_json(mp_auth_access_error_payload($e),403);}
 try{$user=mp_auth_require_user();}catch(Throwable $e){manual_json(['error'=>'Niet aangemeld.'],401);}
 $permissions=mp_role_permissions((string)($user['role']??'gebruiker'),!empty($user['isOwner']));
 $canRead=manual_can_read($permissions,$user);$canManage=manual_can_manage($permissions,$user);
