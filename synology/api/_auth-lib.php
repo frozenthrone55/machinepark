@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/_role-lib.php';
+
 define('MP_USERS_FILE', '/volume1/MachineparkData/data/users.json');
 
 function mp_auth_client_ip(): string {
@@ -56,40 +58,11 @@ function mp_auth_write_users(array $users): void {
 }
 
 function mp_auth_permission_keys(): array {
-    return [
-        'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts','view.settings',
-        'devices.add','devices.edit','devices.statusNotes','devices.delete','devices.import',
-        'maintenance.add','maintenance.edit','maintenance.delete',
-        'breakdowns.add','breakdowns.edit','breakdowns.delete',
-        'faults.manage',
-        'parts.add','parts.edit','parts.stock','parts.delete','parts.export','parts.import',
-        'print','backup.export','backup.import','users.manage','audit.view','audit.undo','roles.manage'
-    ];
+    return mp_role_permission_keys();
 }
 
-function mp_auth_permissions_for_role(string $role): array {
-    $all = array_fill_keys(mp_auth_permission_keys(), false);
-    $enable = [];
-    if ($role === 'beheerder') {
-        // Lokale hoofdbeheerder behoudt alle rechten. De Beheer-pagina moet
-        // altijd bereikbaar blijven; onderdelen die nog niet lokaal zijn
-        // aangesloten tonen afzonderlijk hun eigen status/foutmelding.
-        $enable = mp_auth_permission_keys();
-    } elseif ($role === 'technieker') {
-        $enable = ['view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts',
-            'devices.statusNotes','maintenance.add','maintenance.edit','maintenance.delete',
-            'breakdowns.add','breakdowns.edit','breakdowns.delete','print'];
-    } elseif ($role === 'magazijnier') {
-        $enable = ['view.dashboard','view.parts','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print'];
-    } else {
-        $enable = ['view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts',
-            'devices.add','devices.edit','devices.delete',
-            'maintenance.add','maintenance.edit','maintenance.delete',
-            'breakdowns.add','breakdowns.edit','breakdowns.delete',
-            'parts.add','parts.edit','parts.stock','parts.delete','parts.export','print'];
-    }
-    foreach ($enable as $key) $all[$key] = true;
-    return $all;
+function mp_auth_permissions_for_role(string $role, bool $owner = false): array {
+    return mp_role_permissions($role, $owner);
 }
 
 function mp_auth_public_user(array $user): array {
@@ -125,11 +98,14 @@ function mp_auth_require_user(): array {
 
 function mp_auth_access_payload(array $user): array {
     $public = mp_auth_public_user($user);
+    $owner = !empty($public['isOwner']);
+    $role = $owner ? 'beheerder' : (string)$public['role'];
+    $public['role'] = $role;
     return [
         'authMode' => 'synology-local',
-        'role' => $public['role'],
-        'roleLabel' => ucfirst($public['role']),
-        'permissions' => mp_auth_permissions_for_role($public['role']),
+        'role' => $role,
+        'roleLabel' => mp_role_label($role, $owner),
+        'permissions' => mp_auth_permissions_for_role($role, $owner),
         'user' => $public,
     ];
 }
