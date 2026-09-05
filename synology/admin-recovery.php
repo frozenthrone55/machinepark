@@ -8,7 +8,7 @@ header('Pragma: no-cache');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 
-define('MP_RECOVERY_CODE_FILE', '/volume1/MachineparkData/data/admin-recovery-code.txt');
+define('MP_RECOVERY_CODE_FILE', '/volume1/MachineparkData/admin-recovery-code.txt');
 define('MP_RECOVERY_LOCK_FILE', '/volume1/MachineparkData/data/admin-recovery.lock');
 
 function recovery_h($value): string {
@@ -51,7 +51,7 @@ function recovery_code(): string {
     if (@file_put_contents(MP_RECOVERY_CODE_FILE, $code . PHP_EOL, LOCK_EX) === false) {
         throw new RuntimeException('De herstelcode kon niet op de NAS worden opgeslagen.');
     }
-    @chmod(MP_RECOVERY_CODE_FILE, 0600);
+    @chmod(MP_RECOVERY_CODE_FILE, 0644);
     return $code;
 }
 
@@ -186,7 +186,7 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST' && $err
     <?php else: ?>
       <div class="info">
         Open in Synology <strong>File Station</strong> het bestand:<br><br>
-        <span class="path">/volume1/MachineparkData/data/admin-recovery-code.txt</span><br><br>
+        <span class="path">/volume1/MachineparkData/admin-recovery-code.txt</span><br><br>
         Kopieer de code uit dat bestand en vul hem hieronder in. De code wordt na een geslaagde reset automatisch verwijderd.
       </div>
 
