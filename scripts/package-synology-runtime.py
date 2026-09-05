@@ -15,6 +15,7 @@ RUNTIME_FILES = [
     "manual-library.css",
     "offline-first.js",
     "sw.js",
+    "synology-local-auth.js",
     "manifest.webmanifest",
     "machinepark-logo.svg",
     "machinepark-coffee-device-icon.png",
