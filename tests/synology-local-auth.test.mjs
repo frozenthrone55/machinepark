@@ -67,3 +67,12 @@ test('hoofdbeheerder kan met admin aanmelden zonder lokaal e-mailadres', () => {
   assert.match(runtime, /login: String\(fd\.get\('login'\)/);
   assert.doesNotMatch(runtime, /<label>E-mailadres<\/label><input name="email" type="email" autocomplete="username" required>/);
 });
+
+
+test('oude lokale beheerder wordt automatisch admin na succesvolle login', () => {
+  assert.match(auth, /legacyAdminIndex/);
+  assert.match(auth, /count\(\$legacyCandidates\) === 1/);
+  assert.match(auth, /\$users\[\$idx\]\['username'\] = 'admin'/);
+  assert.match(auth, /\$users\[\$idx\]\['isOwner'\] = true/);
+  assert.match(auth, /\$users\[\$idx\]\['role'\] = 'beheerder'/);
+});
