@@ -55,3 +55,15 @@ test('build verwijdert Clerk boot en gebruikt relatieve paden', () => {
   assert.match(builder, /machinepark-logo\.svg/);
   assert.match(builder, /netlify\/functions\/clerk-config/);
 });
+
+
+test('hoofdbeheerder kan met admin aanmelden zonder lokaal e-mailadres', () => {
+  assert.match(auth, /\$identifier === 'admin'/);
+  assert.match(auth, /isOwner/);
+  assert.match(auth, /'username' => 'admin'|\$username = 'admin'/);
+  assert.match(runtime, /Gebruikersnaam of e-mailadres/);
+  assert.match(runtime, /name="login" type="text"/);
+  assert.match(runtime, /action: 'login'/);
+  assert.match(runtime, /login: String\(fd\.get\('login'\)/);
+  assert.doesNotMatch(runtime, /<label>E-mailadres<\/label><input name="email" type="email" autocomplete="username" required>/);
+});
