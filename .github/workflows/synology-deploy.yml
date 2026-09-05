@@ -34,6 +34,11 @@ jobs:
       - name: Machinepark bouwen
         run: npm run build
 
+      - name: Lokale Synology-data controleren
+        run: |
+          php -l synology/api/machinepark-data.php
+          node --test tests/synology-local-data.test.mjs
+
       - name: Synology runtime samenstellen
         run: |
           rm -rf /tmp/machinepark-synology
