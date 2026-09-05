@@ -9,8 +9,9 @@ STATE_FILE="$DATA_DIR/data/.machinepark-deploy-sha"
 LOG_FILE="$DATA_DIR/backups/synology-update.log"
 BACKUP_FILE="$DATA_DIR/backups/machinepark-web-last-good.tar.gz"
 
-META_URL="https://raw.githubusercontent.com/$REPO/$BRANCH/deploy-meta.json"
-ARCHIVE_URL="https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH"
+CACHE_BUST="$(date +%s)"
+META_URL="https://raw.githubusercontent.com/$REPO/$BRANCH/deploy-meta.json?machinepark=$CACHE_BUST"
+ARCHIVE_URL="https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH?machinepark=$CACHE_BUST"
 
 mkdir -p "$DATA_DIR/data" "$DATA_DIR/backups"
 
@@ -22,6 +23,12 @@ fail() {
   log "FOUT: $*"
   printf '%s\n' "FOUT: $*" >&2
   exit 1
+}
+
+read_source_sha() {
+  file="$1"
+  [ -f "$file" ] || return 0
+  sed -n 's/.*"source_sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" | head -n 1
 }
 
 log "Updater gestart"
@@ -49,21 +56,28 @@ if ! download "$META_URL" "$META_FILE"; then
   fail "deploy-meta.json kon niet van GitHub worden gedownload."
 fi
 
-REMOTE_SHA="$(sed -n 's/.*"source_sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$META_FILE" | head -n 1)"
+REMOTE_SHA="$(read_source_sha "$META_FILE")"
 if [ -z "$REMOTE_SHA" ]; then
   fail "source_sha kon niet uit deploy-meta.json worden gelezen."
 fi
-
 log "Beschikbare versie: $REMOTE_SHA"
 
-LOCAL_SHA=""
+STATE_SHA=""
 if [ -f "$STATE_FILE" ]; then
-  LOCAL_SHA="$(cat "$STATE_FILE" 2>/dev/null || true)"
+  STATE_SHA="$(cat "$STATE_FILE" 2>/dev/null || true)"
 fi
 
-if [ "$REMOTE_SHA" = "$LOCAL_SHA" ]; then
+WEB_SHA="$(read_source_sha "$WEB_DIR/deploy-meta.json")"
+log "State-versie: ${STATE_SHA:-onbekend}"
+log "Werkelijk geïnstalleerde webversie: ${WEB_SHA:-onbekend}"
+
+if [ "$REMOTE_SHA" = "$STATE_SHA" ] && [ "$REMOTE_SHA" = "$WEB_SHA" ]; then
   log "Geen update nodig: $REMOTE_SHA"
   exit 0
+fi
+
+if [ "$REMOTE_SHA" = "$STATE_SHA" ] && [ "$REMOTE_SHA" != "$WEB_SHA" ]; then
+  log "WAARSCHUWING: state-bestand en webmap verschillen; herstelupdate wordt geforceerd."
 fi
 
 ARCHIVE="$TMP_DIR/deploy.tar.gz"
@@ -93,6 +107,14 @@ if [ -z "$SOURCE_DIR" ]; then
 fi
 
 log "Uitgepakte programmamap: $SOURCE_DIR"
+ARCHIVE_SHA="$(read_source_sha "$SOURCE_DIR/deploy-meta.json")"
+if [ -z "$ARCHIVE_SHA" ]; then
+  fail "gedownloade build bevat geen geldige source_sha."
+fi
+if [ "$ARCHIVE_SHA" != "$REMOTE_SHA" ]; then
+  fail "GitHub metadata en gedownload archief verschillen ($REMOTE_SHA tegenover $ARCHIVE_SHA). Probeer de update opnieuw."
+fi
+log "Gedownload archief geverifieerd: $ARCHIVE_SHA"
 
 # Eén terugvalkopie bewaren van de huidige webapp.
 if [ -d "$WEB_DIR" ] && [ -f "$WEB_DIR/index.html" ]; then
@@ -114,6 +136,17 @@ if ! cp -R "$SOURCE_DIR"/. "$WEB_DIR"/; then
   fail "programmabestanden konden niet naar $WEB_DIR worden gekopieerd."
 fi
 
+DEPLOYED_SHA="$(read_source_sha "$WEB_DIR/deploy-meta.json")"
+if [ "$DEPLOYED_SHA" != "$REMOTE_SHA" ]; then
+  log "FOUT: verificatie na kopiëren mislukt. Verwacht $REMOTE_SHA, gevonden ${DEPLOYED_SHA:-geen geldige versie}."
+  if [ -f "$BACKUP_FILE" ]; then
+    log "Vorige webapp terugzetten uit backup."
+    rm -rf "$WEB_DIR"/* "$WEB_DIR"/.[!.]* "$WEB_DIR"/..?* 2>/dev/null || true
+    tar -xzf "$BACKUP_FILE" -C "$WEB_DIR" || fail "terugzetten van vorige webapp is mislukt."
+  fi
+  fail "update is teruggedraaid omdat de geïnstalleerde versie niet klopt."
+fi
+
 printf '%s' "$REMOTE_SHA" > "$STATE_FILE"
-log "Machinepark bijgewerkt naar $REMOTE_SHA"
+log "Machinepark bijgewerkt en geverifieerd naar $REMOTE_SHA"
 log "Updater klaar"
