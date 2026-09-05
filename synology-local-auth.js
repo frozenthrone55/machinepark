@@ -151,7 +151,7 @@
 
     form.innerHTML =
       '<form id="localLoginForm" style="width:100%;max-width:440px;display:grid;gap:12px">' +
-        '<div class="field"><label>E-mailadres</label><input name="email" type="email" autocomplete="username" required></div>' +
+        '<div class="field"><label>Gebruikersnaam of e-mailadres</label><input name="login" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>' +
         '<div class="field"><label>Wachtwoord</label><input name="password" type="password" autocomplete="current-password" required></div>' +
         '<button class="btn primary" type="submit">Aanmelden</button>' +
       '</form>';
@@ -166,7 +166,7 @@
         const fd = new FormData(login);
         const result = await request({
           action: 'login',
-          email: String(fd.get('email') || '').trim(),
+          login: String(fd.get('login') || '').trim(),
           password: String(fd.get('password') || ''),
         });
         await enterApp(result.session);
@@ -191,7 +191,8 @@
           '<div class="field"><label>Voornaam</label><input name="firstName" autocomplete="given-name"></div>' +
           '<div class="field"><label>Achternaam</label><input name="lastName" autocomplete="family-name"></div>' +
         '</div>' +
-        '<div class="field"><label>E-mailadres</label><input name="email" type="email" autocomplete="username" required></div>' +
+        '<div class="field"><label>Gebruikersnaam</label><input name="username" type="text" value="admin" readonly autocomplete="username"></div>' +
+        '<div class="field"><label>E-mailadres <span class="muted">(optioneel)</span></label><input name="email" type="email" autocomplete="email"></div>' +
         '<div class="field"><label>Wachtwoord</label><input name="password" type="password" minlength="10" autocomplete="new-password" required><div class="muted" style="font-size:11px;margin-top:4px">Minstens 10 tekens.</div></div>' +
         '<div class="field"><label>Wachtwoord herhalen</label><input name="password2" type="password" minlength="10" autocomplete="new-password" required></div>' +
         '<button class="btn primary" type="submit">Lokale beheerder aanmaken</button>' +
