@@ -75,10 +75,24 @@ if ! tar -xzf "$ARCHIVE" -C "$TMP_DIR"; then
   fail "GitHub-archief kon niet worden uitgepakt."
 fi
 
-SOURCE_DIR="$(find "$TMP_DIR" -maxdepth 1 -type d -name 'machinepark-*' | head -n 1)"
-if [ -z "$SOURCE_DIR" ] || [ ! -f "$SOURCE_DIR/index.html" ]; then
-  fail "gedownloade Synology-build is ongeldig."
+SOURCE_DIR=""
+for candidate in "$TMP_DIR"/machinepark-*; do
+  if [ -d "$candidate" ] && [ -f "$candidate/index.html" ]; then
+    SOURCE_DIR="$candidate"
+    break
+  fi
+done
+
+if [ -z "$SOURCE_DIR" ]; then
+  log "Inhoud tijdelijke map:"
+  for candidate in "$TMP_DIR"/*; do
+    [ -e "$candidate" ] || continue
+    log " - $candidate"
+  done
+  fail "gedownloade Synology-build is ongeldig of index.html werd niet gevonden."
 fi
+
+log "Uitgepakte programmamap: $SOURCE_DIR"
 
 # Eén terugvalkopie bewaren van de huidige webapp.
 if [ -d "$WEB_DIR" ] && [ -f "$WEB_DIR/index.html" ]; then
