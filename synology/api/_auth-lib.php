@@ -122,6 +122,11 @@ function mp_auth_require_request_access(): void {
     if (!mp_auth_request_allowed()) {
         throw new RuntimeException('SECURE_ACCESS_REQUIRED');
     }
+
+    if (mp_auth_is_public_host(mp_auth_request_host()) && mp_auth_request_is_https()) {
+        header('Strict-Transport-Security: max-age=31536000');
+    }
+
     $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     if (!in_array($method, ['GET','HEAD','OPTIONS'], true) && !mp_auth_mutation_origin_valid()) {
         throw new RuntimeException('INVALID_ORIGIN');
