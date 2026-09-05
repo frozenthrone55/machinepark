@@ -78,6 +78,12 @@ sw = re.sub(
     sw,
     count=1,
 )
+sw = re.sub(
+    r"\n  if\(url\.pathname\.startsWith\('/\.netlify/functions/'\)\)\{[\s\S]*?\n  \}\n\n  if\(e\.request\.mode==='navigate'\)",
+    "\n  if(e.request.mode==='navigate')",
+    sw,
+    count=1,
+)
 SW.write_text(sw, encoding="utf-8")
 
 built = INDEX.read_text(encoding="utf-8")
