@@ -18,7 +18,8 @@ test('lokale storings-API vereist Synology sessie en rechten', () => {
   assert.match(api, /mp_auth_require_user/);
   assert.match(api, /view\.faults/);
   assert.match(api, /faults\.manage/);
-  assert.match(api, /mp_auth_is_local_ip/);
+  assert.match(api, /mp_auth_require_request_access/);
+  assert.match(api, /mp_auth_access_error_payload/);
 });
 
 test('lokale storingen ondersteunen GET save delete en etag conflictcontrole', () => {
