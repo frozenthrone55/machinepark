@@ -23,10 +23,123 @@ function mp_auth_is_local_ip(string $ip): bool {
     return false;
 }
 
+function mp_auth_request_host(): string {
+    $raw = strtolower(trim((string)($_SERVER['HTTP_HOST'] ?? '')));
+    if ($raw === '') return '';
+    if ($raw[0] === '[') {
+        $end = strpos($raw, ']');
+        if ($end !== false) return substr($raw, 1, $end - 1);
+    }
+    $parts = explode(':', $raw, 2);
+    return rtrim($parts[0], '.');
+}
+
+function mp_auth_public_hosts(): array {
+    // Voorlopig bewust slechts één extern adres. DuckDNS kan later veilig
+    // worden toegevoegd zodra de Synology-migratie volledig is afgerond.
+    return ['krisooms.synology.me'];
+}
+
+function mp_auth_is_public_host(string $host): bool {
+    return in_array(strtolower(rtrim($host, '.')), mp_auth_public_hosts(), true);
+}
+
+function mp_auth_is_private_host(string $host): bool {
+    $host = strtolower(trim($host));
+    if ($host === 'localhost' || $host === '127.0.0.1' || $host === '::1') return true;
+    if (mp_auth_is_local_ip($host)) return true;
+    // Eenvoudige lokale NAS-hostnamen zonder publiek domein zijn alleen
+    // toegestaan wanneer de client zelf ook op het lokale netwerk zit.
+    return $host !== '' && strpos($host, '.') === false;
+}
+
+function mp_auth_request_is_https(): bool {
+    if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') return true;
+    if ((string)($_SERVER['SERVER_PORT'] ?? '') === '443') return true;
+
+    // Alleen een lokale reverse proxy mag X-Forwarded-Proto vertrouwen.
+    if (mp_auth_is_local_ip(mp_auth_client_ip())) {
+        $forwarded = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+        if ($forwarded === 'https') return true;
+    }
+    return false;
+}
+
+function mp_auth_request_allowed(): bool {
+    $host = mp_auth_request_host();
+    $clientIp = mp_auth_client_ip();
+
+    // Een publiek Machinepark-adres is ALTIJD HTTPS-only, ook als een
+    // Synology reverse proxy de aanvraag intern vanaf 127.0.0.1 doorstuurt.
+    if (mp_auth_is_public_host($host)) return mp_auth_request_is_https();
+
+    // Lokale HTTP-toegang blijft werken via het interne IP/NAS-hostnaam.
+    if (mp_auth_is_private_host($host) && mp_auth_is_local_ip($clientIp)) return true;
+
+    return false;
+}
+
+function mp_auth_request_mode(): string {
+    $host = mp_auth_request_host();
+    if (mp_auth_is_public_host($host)) return mp_auth_request_is_https() ? 'external-https' : 'external-http-blocked';
+    if (mp_auth_request_allowed()) return 'local';
+    return 'blocked';
+}
+
+function mp_auth_mutation_origin_valid(): bool {
+    $host = mp_auth_request_host();
+    if (!mp_auth_is_public_host($host)) return true;
+
+    $origin = trim((string)($_SERVER['HTTP_ORIGIN'] ?? ''));
+    if ($origin === '') {
+        $origin = trim((string)($_SERVER['HTTP_REFERER'] ?? ''));
+    }
+    if ($origin === '') return false;
+
+    $parts = parse_url($origin);
+    if (!is_array($parts)) return false;
+    $scheme = strtolower((string)($parts['scheme'] ?? ''));
+    $originHost = strtolower(rtrim((string)($parts['host'] ?? ''), '.'));
+    return $scheme === 'https' && $originHost === $host;
+}
+
+function mp_auth_require_request_access(): void {
+    if (!mp_auth_request_allowed()) {
+        throw new RuntimeException('SECURE_ACCESS_REQUIRED');
+    }
+    $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if (!in_array($method, ['GET','HEAD','OPTIONS'], true) && !mp_auth_mutation_origin_valid()) {
+        throw new RuntimeException('INVALID_ORIGIN');
+    }
+}
+
+function mp_auth_access_error_payload(Throwable $e): array {
+    if ($e->getMessage() === 'SECURE_ACCESS_REQUIRED') {
+        return [
+            'error' => mp_auth_is_public_host(mp_auth_request_host())
+                ? 'Externe Machinepark-toegang is alleen toegestaan via HTTPS.'
+                : 'Dit Machinepark-adres is niet toegestaan.',
+            'code' => 'secure_access_required',
+            'host' => mp_auth_request_host(),
+            'https' => mp_auth_request_is_https(),
+        ];
+    }
+    if ($e->getMessage() === 'INVALID_ORIGIN') {
+        return [
+            'error' => 'Deze wijziging werd geblokkeerd omdat de aanvraag niet van het actieve Machinepark-adres kwam.',
+            'code' => 'invalid_origin',
+        ];
+    }
+    return ['error' => $e->getMessage()];
+}
+
 function mp_auth_start_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
     session_name('MACHINEPARKSESSID');
-    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    @ini_set('session.use_only_cookies', '1');
+    @ini_set('session.use_strict_mode', '1');
+    @ini_set('session.cookie_httponly', '1');
+    $secure = mp_auth_request_is_https();
     // PHP 7.2-compatibel: gebruik de positionele signatuur.
     session_set_cookie_params(0, '/machinepark/', '', $secure, true);
     session_start();
