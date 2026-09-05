@@ -81,3 +81,34 @@ Plaats `synology/health.php` onder Web Station en open het via de browser. Een s
 ```
 
 Daarna bouwen we de eerste lokale data-API.
+
+
+## Opslagtest
+
+Na het aanmaken van de mappen onder `/volume1/MachineparkData`, kopieer ook:
+
+```
+synology/storage-test.php
+```
+
+naar:
+
+```
+/volume1/web/machinepark/synology/storage-test.php
+```
+
+Open daarna in de browser:
+
+```
+http://<NAS-IP>/machinepark/synology/storage-test.php
+```
+
+De test:
+- controleert of alle lokale mappen bestaan;
+- controleert lees- en schrijfrechten;
+- maakt tijdelijk `data/_machinepark_write_test.json`;
+- leest het bestand terug;
+- verwijdert het bestand daarna meteen weer.
+
+Bij een correcte configuratie staat bovenaan `"ok": true`.
+
