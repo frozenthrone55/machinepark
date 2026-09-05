@@ -1,3 +1,17 @@
+/* machinepark-public-https-redirect */
+(() => {
+  try {
+    const host = String(window.location.hostname || '').toLowerCase();
+    if (host === 'krisooms.synology.me' && window.location.protocol === 'http:') {
+      const next = new URL(window.location.href);
+      next.protocol = 'https:';
+      next.port = '';
+      window.location.replace(next.toString());
+      return;
+    }
+  } catch (_) {}
+})();
+
 'use strict';
 
 (() => {
