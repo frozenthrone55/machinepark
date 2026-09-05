@@ -37,7 +37,8 @@ jobs:
       - name: Lokale Synology-data controleren
         run: |
           php -l synology/api/machinepark-data.php
-          node --test tests/synology-local-data.test.mjs
+          php -l synology/migrate-data.php
+          node --test tests/synology-local-data.test.mjs tests/synology-migrate-data.test.mjs
 
       - name: Synology runtime samenstellen
         run: |
