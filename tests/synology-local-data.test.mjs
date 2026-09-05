@@ -13,11 +13,13 @@ test('lokale data API schrijft buiten de webroot', () => {
   assert.match(api, /state-v1\.lock/);
 });
 
-test('lokale data API is tijdens opbouw beperkt tot lokale netwerkadressen', () => {
-  assert.match(api, /mp_auth_is_local_ip\(mp_auth_client_ip\(\)\)/);
-  assert.match(api, /synology-local-only/);
+test('data API gebruikt de centrale veilige toegangslaag', () => {
+  assert.match(api, /mp_auth_require_request_access/);
+  assert.match(api, /mp_auth_access_error_payload/);
   assert.match(authLib, /192\.168\./);
   assert.match(authLib, /172\.16\.0\.0/);
+  assert.match(authLib, /krisooms\.synology\.me/);
+  assert.match(authLib, /mp_auth_request_is_https/);
 });
 
 test('lokale data API gebruikt etag locking en automatische backups', () => {
