@@ -172,7 +172,8 @@ function mp_photo_cleanup_bases(string $dir, array $keepTokens): void {
 }
 
 function mp_photo_require_local_user(): array {
-    if (!mp_auth_is_local_ip(mp_auth_client_ip())) mp_photo_json(['error'=>'Lokale foto-opslag is voorlopig alleen via het lokale netwerk bereikbaar.'],403);
+    try { mp_auth_require_request_access(); }
+    catch (Throwable $e) { mp_photo_json(mp_auth_access_error_payload($e),403); }
     try { return mp_auth_require_user(); }
     catch (Throwable $e) { mp_photo_json(['error'=>'Niet aangemeld.'],401); }
 }
