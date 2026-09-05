@@ -41,7 +41,7 @@ jobs:
           php -l synology/api/machinepark-data.php
           php -l synology/migrate-data.php
           node --check synology-local-auth.js
-          node --test tests/synology-local-data.test.mjs tests/synology-migrate-data.test.mjs tests/synology-local-auth.test.mjs
+          node --test tests/synology-local-data.test.mjs tests/synology-migrate-data.test.mjs tests/synology-local-auth.test.mjs tests/synology-runtime-paths.test.mjs
 
       - name: Synology runtime samenstellen
         run: |
