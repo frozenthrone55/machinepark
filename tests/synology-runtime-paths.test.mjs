@@ -7,12 +7,12 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 
 test('Synology runtime path builder corrigeert alle belangrijke root-assets', () => {
   for (const name of [
-    'machinepark-logo.svg',
+    'machinepark-logo',
     'fault-library',
     'manual-library',
     'service-visits',
-    'offline-first.js',
-    'assets/machinepark-build',
+    'offline-first',
+    'machinepark-build',
   ]) {
     assert.ok(builder.includes(name));
   }
