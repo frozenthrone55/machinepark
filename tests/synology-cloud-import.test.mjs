@@ -27,8 +27,10 @@ test('lokale configuratie en handleidingen krijgen eerst een veiligheidsback-up'
 
 test('Clerk-gebruikers overschrijven geen lokale wachtwoorden', () => {
   assert.match(page, /cloud-users-v1\.json/);
-  assert.match(page, /passwordHash/);
+  assert.doesNotMatch(page, /password_hash\(/);
   assert.doesNotMatch(page, /\['passwordHash'\]\s*=/);
+  assert.match(page, /firstName/);
+  assert.match(page, /lastName/);
   assert.match(page, /matchedLocal/);
   assert.match(page, /unmatched/);
 });
