@@ -10,6 +10,7 @@ function mp_role_catalog(): array {
         ['group'=>'Weergave','key'=>'view.maintenance','label'=>'Onderhoud bekijken'],
         ['group'=>'Weergave','key'=>'view.breakdowns','label'=>'Depannages bekijken'],
         ['group'=>'Weergave','key'=>'view.faults','label'=>'Storingen bekijken'],
+        ['group'=>'Weergave','key'=>'view.manuals','label'=>'Handleidingen bekijken'],
         ['group'=>'Weergave','key'=>'view.parts','label'=>'Onderdelen bekijken'],
         ['group'=>'Weergave','key'=>'view.settings','label'=>'Beheer bekijken'],
         ['group'=>'Toestellen','key'=>'devices.add','label'=>'Toestellen toevoegen'],
@@ -24,6 +25,7 @@ function mp_role_catalog(): array {
         ['group'=>'Depannages','key'=>'breakdowns.edit','label'=>'Depannages wijzigen'],
         ['group'=>'Depannages','key'=>'breakdowns.delete','label'=>'Depannages verwijderen'],
         ['group'=>'Storingen','key'=>'faults.manage','label'=>'Storingsbibliotheek beheren'],
+        ['group'=>'Handleidingen','key'=>'manuals.manage','label'=>'Handleidingen beheren'],
         ['group'=>'Onderdelen','key'=>'parts.add','label'=>'Onderdelen toevoegen'],
         ['group'=>'Onderdelen','key'=>'parts.edit','label'=>'Onderdeelgegevens wijzigen'],
         ['group'=>'Onderdelen','key'=>'parts.stock','label'=>'Voorraad aanpassen'],
@@ -58,14 +60,14 @@ function mp_role_defaults(): array {
     return ['version'=>1,'roles'=>[
         ['id'=>'beheerder','label'=>'Beheerder','builtIn'=>true,'permissions'=>mp_role_permission_set('all')],
         ['id'=>'gebruiker','label'=>'Gebruiker','builtIn'=>true,'permissions'=>mp_role_permission_set([
-            'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts',
+            'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.manuals','view.parts',
             'devices.add','devices.edit','devices.delete',
             'maintenance.add','maintenance.edit','maintenance.delete',
             'breakdowns.add','breakdowns.edit','breakdowns.delete',
             'parts.add','parts.edit','parts.stock','parts.delete','parts.export','print'
         ])],
         ['id'=>'technieker','label'=>'Technieker','builtIn'=>true,'permissions'=>mp_role_permission_set([
-            'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.parts',
+            'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.manuals','view.parts',
             'devices.statusNotes','maintenance.add','maintenance.edit','maintenance.delete',
             'breakdowns.add','breakdowns.edit','breakdowns.delete','print'
         ])],
@@ -100,8 +102,21 @@ function mp_role_normalize(array $config): array {
         $source = isset($item['permissions']) && is_array($item['permissions']) ? $item['permissions'] : [];
         $permissions = array_fill_keys($keys, false);
         foreach ($keys as $key) {
-            if (array_key_exists($key, $source)) $permissions[$key] = (bool)$source[$key];
-            elseif ($existing && !empty($existing['builtIn'])) $permissions[$key] = !empty($existing['permissions'][$key]);
+            if (array_key_exists($key, $source)) {
+                $permissions[$key] = (bool)$source[$key];
+            } elseif ($key === 'view.manuals') {
+                // Compatibiliteit met rollen die bestonden vóór Handleidingen
+                // een expliciet recht werd: dezelfde afleiding behouden.
+                $permissions[$key] = !empty($source['view.devices'])
+                    || !empty($source['view.breakdowns'])
+                    || !empty($source['view.settings'])
+                    || ($existing && !empty($existing['builtIn']) && !empty($existing['permissions'][$key]));
+            } elseif ($key === 'manuals.manage') {
+                $permissions[$key] = !empty($source['view.settings'])
+                    || ($existing && !empty($existing['builtIn']) && !empty($existing['permissions'][$key]));
+            } elseif ($existing && !empty($existing['builtIn'])) {
+                $permissions[$key] = !empty($existing['permissions'][$key]);
+            }
         }
         $byId[$id] = [
             'id'=>$id,
