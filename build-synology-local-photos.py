@@ -9,11 +9,15 @@ MARKER = 'data-machinepark-build-fix="synology-local-photos-v1"'
 
 if MARKER not in index:
     replacements = {
+        "'/.netlify/functions/device-photos?'": "'./synology/api/device-photos.php?'",
+        "'/.netlify/functions/part-photos?'": "'./synology/api/part-photos.php?'",
         "'/.netlify/functions/device-photos'": "'./synology/api/device-photos.php'",
         "'/.netlify/functions/part-photos'": "'./synology/api/part-photos.php'",
         "'/.netlify/functions/service-photos'": "'./synology/api/service-photos.php'",
         "'/.netlify/functions/service-photos?'": "'./synology/api/service-photos.php?'",
         "'/.netlify/functions/purge-service-audit-photos'": "'./synology/api/purge-service-audit-photos.php'",
+        '"/.netlify/functions/device-photos?"': '"./synology/api/device-photos.php?"',
+        '"/.netlify/functions/part-photos?"': '"./synology/api/part-photos.php?"',
         '"/.netlify/functions/device-photos"': '"./synology/api/device-photos.php"',
         '"/.netlify/functions/part-photos"': '"./synology/api/part-photos.php"',
         '"/.netlify/functions/service-photos"': '"./synology/api/service-photos.php"',
