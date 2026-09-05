@@ -18,6 +18,16 @@ log() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE"
 }
 
+fail() {
+  log "FOUT: $*"
+  printf '%s\n' "FOUT: $*" >&2
+  exit 1
+}
+
+log "Updater gestart"
+log "Webmap: $WEB_DIR"
+log "Datamap: $DATA_DIR"
+
 download() {
   url="$1"
   dest="$2"
@@ -26,8 +36,7 @@ download() {
   elif command -v wget >/dev/null 2>&1; then
     wget -qO "$dest" "$url"
   else
-    log "FOUT: curl en wget ontbreken."
-    exit 1
+    fail "curl en wget ontbreken."
   fi
 }
 
@@ -35,13 +44,17 @@ TMP_DIR="$(mktemp -d /tmp/machinepark-update.XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
 
 META_FILE="$TMP_DIR/deploy-meta.json"
-download "$META_URL" "$META_FILE"
+log "Versie-informatie ophalen van GitHub"
+if ! download "$META_URL" "$META_FILE"; then
+  fail "deploy-meta.json kon niet van GitHub worden gedownload."
+fi
 
 REMOTE_SHA="$(sed -n 's/.*"source_sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$META_FILE" | head -n 1)"
 if [ -z "$REMOTE_SHA" ]; then
-  log "FOUT: source_sha kon niet uit deploy-meta.json worden gelezen."
-  exit 1
+  fail "source_sha kon niet uit deploy-meta.json worden gelezen."
 fi
+
+log "Beschikbare versie: $REMOTE_SHA"
 
 LOCAL_SHA=""
 if [ -f "$STATE_FILE" ]; then
@@ -54,13 +67,17 @@ if [ "$REMOTE_SHA" = "$LOCAL_SHA" ]; then
 fi
 
 ARCHIVE="$TMP_DIR/deploy.tar.gz"
-download "$ARCHIVE_URL" "$ARCHIVE"
-tar -xzf "$ARCHIVE" -C "$TMP_DIR"
+log "Nieuwe programmaversie downloaden"
+if ! download "$ARCHIVE_URL" "$ARCHIVE"; then
+  fail "GitHub-archief kon niet worden gedownload."
+fi
+if ! tar -xzf "$ARCHIVE" -C "$TMP_DIR"; then
+  fail "GitHub-archief kon niet worden uitgepakt."
+fi
 
 SOURCE_DIR="$(find "$TMP_DIR" -maxdepth 1 -type d -name 'machinepark-*' | head -n 1)"
 if [ -z "$SOURCE_DIR" ] || [ ! -f "$SOURCE_DIR/index.html" ]; then
-  log "FOUT: gedownloade Synology-build is ongeldig."
-  exit 1
+  fail "gedownloade Synology-build is ongeldig."
 fi
 
 # Eén terugvalkopie bewaren van de huidige webapp.
@@ -73,10 +90,16 @@ if [ -d "$WEB_DIR" ] && [ -f "$WEB_DIR/index.html" ]; then
 fi
 
 mkdir -p "$WEB_DIR"
+if [ ! -d "$WEB_DIR" ] || [ ! -w "$WEB_DIR" ]; then
+  fail "webmap bestaat niet of is niet schrijfbaar: $WEB_DIR"
+fi
 
 # Alleen programmabestanden worden bijgewerkt.
 # /volume1/MachineparkData wordt nooit aangeraakt of verwijderd.
-cp -R "$SOURCE_DIR"/. "$WEB_DIR"/
+if ! cp -R "$SOURCE_DIR"/. "$WEB_DIR"/; then
+  fail "programmabestanden konden niet naar $WEB_DIR worden gekopieerd."
+fi
 
 printf '%s' "$REMOTE_SHA" > "$STATE_FILE"
 log "Machinepark bijgewerkt naar $REMOTE_SHA"
+log "Updater klaar"
