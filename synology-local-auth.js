@@ -76,10 +76,21 @@
     const user = session && session.user ? session.user : {};
     const name = String(user.fullName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || 'Gebruiker');
     const role = String((session && (session.roleLabel || session.role)) || user.role || 'Gebruiker');
+    const roleId = String((session && session.role) || user.role || '').toLowerCase();
     const nameEl = document.getElementById('accountDisplayName');
     const roleEl = document.getElementById('accountDisplayRole');
     if (nameEl) nameEl.textContent = name;
     if (roleEl) roleEl.textContent = role;
+
+    // De eerste lokale eigenaar is de vaste hoofdbeheerder. Zorg dat een
+    // bestaande browsercache/sessie Beheer nooit per ongeluk kan blokkeren.
+    if (roleId === 'beheerder' || user.isOwner === true) {
+      window.machineparkIsAdmin = true;
+      window.machineparkRole = 'beheerder';
+      if (window.machineparkPermissions && typeof window.machineparkPermissions === 'object') {
+        window.machineparkPermissions['view.settings'] = true;
+      }
+    }
   }
 
   async function databaseStatus() {
