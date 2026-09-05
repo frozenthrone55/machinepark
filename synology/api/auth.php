@@ -124,17 +124,19 @@ $action = is_array($body) ? (string)($body['action'] ?? '') : '';
 if ($action === 'setup') {
     if (count($users) > 0) auth_json(['error' => 'De lokale gebruikers zijn al ingesteld.'], 409);
 
+    $username = 'admin';
     $email = strtolower(trim((string)($body['email'] ?? '')));
     $password = (string)($body['password'] ?? '');
     $firstName = trim((string)($body['firstName'] ?? ''));
     $lastName = trim((string)($body['lastName'] ?? ''));
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) auth_json(['error' => 'Vul een geldig e-mailadres in.'], 400);
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) auth_json(['error' => 'Vul een geldig e-mailadres in of laat het veld leeg.'], 400);
     if (strlen($password) < 10) auth_json(['error' => 'Gebruik een wachtwoord van minstens 10 tekens.'], 400);
 
     $id = 'usr_' . bin2hex(random_bytes(10));
     $user = [
         'id' => $id,
+        'username' => $username,
         'email' => $email,
         'firstName' => $firstName,
         'lastName' => $lastName,
@@ -152,10 +154,11 @@ if ($action === 'setup') {
 }
 
 if ($action === 'login') {
-    $email = strtolower(trim((string)($body['email'] ?? '')));
+    $identifier = strtolower(trim((string)($body['login'] ?? ($body['email'] ?? ''))));
     $password = (string)($body['password'] ?? '');
+    if ($identifier === '') auth_json(['error'=>'Vul een gebruikersnaam of e-mailadres in.'],400);
 
-    $rate = auth_rate_status($email);
+    $rate = auth_rate_status($identifier);
     if (!empty($rate['blocked'])) {
         $retry = (int)($rate['retryAfter'] ?? 60);
         header('Retry-After: ' . $retry);
@@ -165,11 +168,18 @@ if ($action === 'login') {
     $found = null;
 
     foreach ($users as $idx => $user) {
-        if (strtolower((string)($user['email'] ?? '')) !== $email) continue;
+        $username = strtolower(trim((string)($user['username'] ?? '')));
+        $email = strtolower(trim((string)($user['email'] ?? '')));
+        $ownerAlias = $identifier === 'admin' && !empty($user['isOwner']);
+        $usernameMatch = $username !== '' && hash_equals($username, $identifier);
+        $emailMatch = $email !== '' && hash_equals($email, $identifier);
+        if (!$ownerAlias && !$usernameMatch && !$emailMatch) continue;
         if (!empty($user['disabled'])) break;
         $hash = (string)($user['passwordHash'] ?? '');
         if ($hash !== '' && password_verify($password, $hash)) {
-            $found = $user;
+            if (!empty($user['isOwner']) && $username === '') {
+                $users[$idx]['username'] = 'admin';
+            }
             $users[$idx]['lastSignInAt'] = date(DATE_ATOM);
             $found = $users[$idx];
             mp_auth_write_users($users);
@@ -178,12 +188,12 @@ if ($action === 'login') {
     }
 
     if (!$found) {
-        auth_rate_fail($email);
+        auth_rate_fail($identifier);
         usleep(350000);
-        auth_json(['error' => 'E-mailadres of wachtwoord is onjuist.'], 401);
+        auth_json(['error' => 'Gebruikersnaam of wachtwoord is onjuist.'], 401);
     }
 
-    auth_rate_success($email);
+    auth_rate_success($identifier);
     session_regenerate_id(true);
     $_SESSION['machinepark_user_id'] = (string)$found['id'];
     auth_json(['ok' => true, 'signedIn' => true, 'session' => mp_auth_access_payload($found)]);
