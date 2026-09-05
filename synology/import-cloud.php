@@ -13,6 +13,7 @@ define('MP_CLOUD_MANUAL_DIR', '/volume1/MachineparkData/manuals');
 define('MP_CLOUD_BACKUP_DIR', '/volume1/MachineparkData/backups');
 define('MP_CLOUD_MAX_BYTES', 150 * 1024 * 1024);
 define('MP_CLOUD_CHUNK_MAX', 2 * 1024 * 1024);
+define('MP_CLOUD_IMPORT_LOCK', '/volume1/MachineparkData/data/cloud-import.lock');
 
 function cloud_json(array $body, int $status = 200): void {
     header('Content-Type: application/json; charset=utf-8');
@@ -129,6 +130,54 @@ function cloud_counts(array $pkg): array {
         'users' => count((array)($pkg['users']['users'] ?? [])),
         'auditEntries' => count((array)($pkg['audit']['entries'] ?? [])),
     ];
+}
+
+function cloud_backup_local_state(string $backup): array {
+    $files = [
+        'role-config-v1.json',
+        'fault-library-v1.json',
+        'work-order-templates-v1.json',
+        'manual-library-v1.json',
+        'users.json',
+        'cloud-users-v1.json',
+    ];
+    $manifest = ['files'=>[],'manualsExisted'=>is_dir(MP_CLOUD_MANUAL_DIR)];
+    cloud_ensure_dir($backup . '/data');
+    foreach ($files as $name) {
+        $exists = is_file(MP_CLOUD_DATA_DIR . '/' . $name);
+        $manifest['files'][$name] = $exists;
+        if ($exists) cloud_copy_file_if_exists(MP_CLOUD_DATA_DIR . '/' . $name, $backup . '/data/' . $name);
+    }
+    if ($manifest['manualsExisted']) cloud_copy_dir(MP_CLOUD_MANUAL_DIR, $backup . '/manuals');
+    cloud_atomic_json($backup . '/backup-manifest.json', $manifest);
+    return $manifest;
+}
+
+function cloud_restore_local_state(string $backup): void {
+    $manifestPath = $backup . '/backup-manifest.json';
+    if (!is_file($manifestPath)) throw new RuntimeException('Terugrolmanifest ontbreekt.');
+    $raw = @file_get_contents($manifestPath);
+    $manifest = $raw !== false ? json_decode($raw, true) : null;
+    if (!is_array($manifest)) throw new RuntimeException('Terugrolmanifest is ongeldig.');
+
+    foreach ((array)($manifest['files'] ?? []) as $name=>$existed) {
+        $target = MP_CLOUD_DATA_DIR . '/' . basename((string)$name);
+        $source = $backup . '/data/' . basename((string)$name);
+        if ($existed) {
+            if (!is_file($source)) throw new RuntimeException('Back-upbestand ontbreekt: ' . basename((string)$name));
+            $tmp = $target . '.restore-' . bin2hex(random_bytes(4));
+            if (!@copy($source,$tmp) || !@rename($tmp,$target)) {
+                @unlink($tmp);
+                throw new RuntimeException('Terugrollen van ' . basename((string)$name) . ' mislukt.');
+            }
+        } else {
+            @unlink($target);
+        }
+    }
+
+    cloud_remove_dir(MP_CLOUD_MANUAL_DIR);
+    if (!empty($manifest['manualsExisted'])) cloud_copy_dir($backup . '/manuals', MP_CLOUD_MANUAL_DIR);
+    else cloud_ensure_dir(MP_CLOUD_MANUAL_DIR);
 }
 
 function cloud_prepare_manuals(array $pkg, string $sessionDir): array {
@@ -390,19 +439,12 @@ if ($action === 'import' && strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'G
         $pkg = cloud_load_package(cloud_package_path($id));
         $preparedManuals = cloud_prepare_manuals($pkg, cloud_session_path($id));
 
+        $importLock = @fopen(MP_CLOUD_IMPORT_LOCK,'c+');
+        if ($importLock === false || !flock($importLock,LOCK_EX|LOCK_NB)) throw new RuntimeException('Er loopt al een cloudimport. Probeer later opnieuw.');
+
         $backup = MP_CLOUD_BACKUP_DIR . '/cloud-import-before-' . date('Ymd-His');
         cloud_ensure_dir($backup);
-        foreach ([
-            'role-config-v1.json',
-            'fault-library-v1.json',
-            'work-order-templates-v1.json',
-            'manual-library-v1.json',
-            'users.json',
-            'cloud-users-v1.json',
-        ] as $name) {
-            cloud_copy_file_if_exists(MP_CLOUD_DATA_DIR . '/' . $name, $backup . '/data/' . $name);
-        }
-        cloud_copy_dir(MP_CLOUD_MANUAL_DIR, $backup . '/manuals');
+        cloud_backup_local_state($backup);
 
         $rolesCount = cloud_import_roles($pkg);
         $faultCount = cloud_import_faults($pkg);
@@ -415,6 +457,12 @@ if ($action === 'import' && strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'G
         $manifest['importedAt'] = date(DATE_ATOM);
         $manifest['backup'] = $backup;
         cloud_atomic_json(cloud_manifest_path($id),$manifest);
+
+        if (isset($importLock) && is_resource($importLock)) {
+            @flock($importLock,LOCK_UN);
+            @fclose($importLock);
+            $importLock = null;
+        }
 
         try {
             mp_audit_append($currentUser,[[
@@ -444,7 +492,22 @@ if ($action === 'import' && strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'G
             ],
             'users'=>$userResult,
         ]);
-    } catch (Throwable $e) { cloud_json(['error'=>$e->getMessage()],400); }
+    } catch (Throwable $e) {
+        $message = $e->getMessage();
+        if (isset($backup) && is_string($backup) && is_dir($backup)) {
+            try {
+                cloud_restore_local_state($backup);
+                $message .= ' De lokale gegevens zijn automatisch teruggezet uit de veiligheidsback-up.';
+            } catch (Throwable $rollbackError) {
+                $message .= ' Automatisch terugrollen mislukte: ' . $rollbackError->getMessage();
+            }
+        }
+        if (isset($importLock) && is_resource($importLock)) {
+            @flock($importLock,LOCK_UN);
+            @fclose($importLock);
+        }
+        cloud_json(['error'=>$message],400);
+    }
 }
 
 ?><!doctype html>
