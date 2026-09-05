@@ -126,8 +126,10 @@ function audit_reverse_fields(array $fields): array {
     }, $fields);
 }
 
-if (!mp_auth_is_local_ip(mp_auth_client_ip())) {
-    audit_json(['error'=>'Het lokale wijzigingslogboek is tijdens de opbouw alleen via het lokale netwerk bereikbaar.'], 403);
+try {
+    mp_auth_require_request_access();
+} catch (Throwable $e) {
+    audit_json(mp_auth_access_error_payload($e), 403);
 }
 
 try {
