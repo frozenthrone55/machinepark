@@ -13,6 +13,7 @@ define('MP_FAULT_LOCK', '/volume1/MachineparkData/data/fault-library-v1.lock');
 define('MP_FAULT_BACKUPS', '/volume1/MachineparkData/backups');
 define('MP_FAULT_SEED', dirname(__DIR__) . '/fault-seed.json');
 define('MP_FAULT_MAX', 5000);
+define('MP_FAULT_IMPORT_UNDO', '/volume1/MachineparkData/data/fault-import-undo-v1.json');
 
 function fault_json(array $body, int $status = 200, array $headers = []): void {
     http_response_code($status);
@@ -228,6 +229,112 @@ try {
     }
 
     $action = (string)($body['action'] ?? 'save-fault');
+
+    if ($action === 'undo-last-import') {
+        if (!is_file(MP_FAULT_IMPORT_UNDO)) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            fault_json(['error' => 'Er is geen recente storingsimport beschikbaar om terug te draaien.'], 409);
+        }
+        $undoRaw = @file_get_contents(MP_FAULT_IMPORT_UNDO);
+        $undo = $undoRaw !== false ? json_decode($undoRaw, true) : null;
+        if (!is_array($undo) || !isset($undo['before']) || !is_array($undo['before'])) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            fault_json(['error' => 'De herstelkopie van de laatste storingsimport is ongeldig.'], 409);
+        }
+        $expectedAfter = trim((string)($undo['afterEtag'] ?? ''));
+        if ($expectedAfter === '' || $expectedAfter !== (string)$currentEtag) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            fault_json(['error' => 'De storingsbibliotheek is na de import nog gewijzigd. Terugdraaien is daarom geblokkeerd.'], 409);
+        }
+        fault_backup();
+        $restored = fault_normalize($undo['before']);
+        $newEtag = fault_atomic_write($restored);
+        @unlink(MP_FAULT_IMPORT_UNDO);
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        try {
+            require_once __DIR__ . '/_audit-lib.php';
+            mp_audit_append($authUser, [[
+                'entityType'=>'Storingen',
+                'entityId'=>'excel-import',
+                'entityLabel'=>'Storingen Excel-import',
+                'action'=>'ongedaan gemaakt',
+                'fields'=>[['field'=>'Aantal storingen','before'=>(string)count($config['faults']),'after'=>(string)count($restored['faults'])]],
+            ]]);
+        } catch (Throwable $e) {}
+        fault_json(['ok'=>true,'faults'=>$restored['faults'],'etag'=>$newEtag,'canManage'=>true,'restoredCount'=>count($restored['faults'])], 200, ['ETag'=>$newEtag]);
+    }
+
+    if ($action === 'import-faults') {
+        $incomingFaults = isset($body['faults']) && is_array($body['faults']) ? array_slice($body['faults'], 0, MP_FAULT_MAX) : [];
+        if (!$incomingFaults) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            fault_json(['error'=>'Geen storingen gevonden om te importeren.'], 400);
+        }
+        $beforeImport = $config;
+        $added = 0;
+        $updated = 0;
+
+        foreach ($incomingFaults as $incoming) {
+            if (!is_array($incoming)) continue;
+            $requestedId = !empty($incoming['id']) ? fault_id($incoming['id']) : '';
+            $existing = null;
+            $existingIndex = -1;
+            if ($requestedId !== '') {
+                foreach ($config['faults'] as $idx => $item) {
+                    if ((string)$item['id'] === $requestedId) {
+                        $existing = $item;
+                        $existingIndex = (int)$idx;
+                        break;
+                    }
+                }
+            }
+            $fault = fault_sanitize($incoming, $existing);
+            if ($existingIndex >= 0) {
+                $config['faults'][$existingIndex] = $fault;
+                $updated++;
+            } else {
+                if (count($config['faults']) >= MP_FAULT_MAX) {
+                    flock($lock, LOCK_UN);
+                    fclose($lock);
+                    fault_json(['error'=>'Maximaal ' . MP_FAULT_MAX . ' storingen toegestaan.'], 400);
+                }
+                $config['faults'][] = $fault;
+                $added++;
+            }
+        }
+
+        fault_backup();
+        $newEtag = fault_atomic_write(['version'=>1,'faults'=>$config['faults']]);
+        @file_put_contents(MP_FAULT_IMPORT_UNDO, json_encode([
+            'at'=>date(DATE_ATOM),
+            'before'=>$beforeImport,
+            'afterEtag'=>$newEtag,
+            'added'=>$added,
+            'updated'=>$updated,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        try {
+            require_once __DIR__ . '/_audit-lib.php';
+            mp_audit_append($authUser, [[
+                'entityType'=>'Storingen',
+                'entityId'=>'excel-import',
+                'entityLabel'=>'Storingen Excel-import',
+                'action'=>'geïmporteerd',
+                'fields'=>[
+                    ['field'=>'Nieuwe storingen','before'=>'—','after'=>(string)$added],
+                    ['field'=>'Bijgewerkte storingen','before'=>'—','after'=>(string)$updated],
+                ],
+            ]]);
+        } catch (Throwable $e) {}
+        fault_json(['ok'=>true,'faults'=>$config['faults'],'etag'=>$newEtag,'canManage'=>true,'added'=>$added,'updated'=>$updated], 200, ['ETag'=>$newEtag]);
+    }
 
     if ($action === 'save-fault') {
         $incoming = isset($body['fault']) && is_array($body['fault']) ? $body['fault'] : [];
