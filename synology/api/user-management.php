@@ -50,8 +50,10 @@ function user_lock() {
     return $lock;
 }
 
-if (!mp_auth_is_local_ip(mp_auth_client_ip())) {
-    user_json(['error'=>'Lokaal gebruikersbeheer is tijdens de opbouw alleen via het lokale netwerk bereikbaar.'], 403);
+try {
+    mp_auth_require_request_access();
+} catch (Throwable $e) {
+    user_json(mp_auth_access_error_payload($e), 403);
 }
 
 try {
