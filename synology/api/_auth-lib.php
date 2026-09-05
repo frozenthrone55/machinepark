@@ -25,13 +25,8 @@ function mp_auth_start_session(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
     session_name('MACHINEPARKSESSID');
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/machinepark/',
-        'secure' => $secure,
-        'httponly' => true,
-        'samesite' => 'Strict',
-    ]);
+    // PHP 7.2-compatibel: gebruik de positionele signatuur.
+    session_set_cookie_params(0, '/machinepark/', '', $secure, true);
     session_start();
 }
 
