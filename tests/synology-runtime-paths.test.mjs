@@ -36,3 +36,10 @@ test('loginruntime krijgt een inhoudshash en service worker omzeilt cache', () =
   assert.match(builder, /updateViaCache:'none'/);
   assert.match(builder, /sw\.js\?v=/);
 });
+
+
+test('Synology service worker precachet alleen kleine install-assets', () => {
+  assert.match(builder, /machinepark-coffee-device-icon\.png/);
+  assert.match(builder, /value in \{/);
+  assert.doesNotMatch(builder, /fixed_assets\.append\(auth_asset\)/);
+});
