@@ -45,7 +45,8 @@ test('lokale hoofdbeheerder behoudt expliciet toegang tot Beheer', () => {
   assert.match(runtime, /machineparkIsAdmin = true/);
   assert.match(runtime, /machineparkRole = 'beheerder'/);
   assert.match(runtime, /machineparkPermissions\['view\.settings'\] = true/);
-  assert.match(lib, /\$enable = mp_auth_permission_keys\(\)/);
+  assert.match(lib, /mp_role_permissions\(\$role, \$owner\)/);
+  assert.match(lib, /mp_role_label\(\$role, \$owner\)/);
 });
 
 test('build verwijdert Clerk boot en gebruikt relatieve paden', () => {
