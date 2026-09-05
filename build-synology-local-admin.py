@@ -65,6 +65,23 @@ if MARKER not in index:
         "lokale gebruikersfeedback",
     )
 
+    # Ook de oudere basis-handler blijft als veilige fallback lokaal werken.
+    replace_once(
+        "const input=$('#inviteUserEmail'),email=String(input?.value||'').trim().toLowerCase();if(!email)return;const submit=e.target.querySelector('button[type=submit]');",
+        "const input=$('#inviteUserEmail'),email=String(input?.value||'').trim().toLowerCase(),passwordInput=$('#inviteUserPassword'),password=String(passwordInput?.value||'');if(!email)return;if(password.length<10){alert('Gebruik een eerste wachtwoord van minstens 10 tekens.');return}const submit=e.target.querySelector('button[type=submit]');",
+        "basis gebruikershandler wachtwoord",
+    )
+    replace_once(
+        "JSON.stringify({action:'invite',email})",
+        "JSON.stringify({action:'create-user',email,password,role:'gebruiker'})",
+        "basis lokale gebruiker-aanmaakactie",
+    )
+    replace_once(
+        "if(input)input.value='';toast('Uitnodiging verstuurd');",
+        "if(input)input.value='';if(passwordInput)passwordInput.value='';toast('Gebruiker toegevoegd');",
+        "basis lokale gebruikersfeedback",
+    )
+
     # Optioneel lokaal wachtwoord wijzigen bij het bewerken van een gebruiker.
     password_anchor = '<div class="field full"><div class="alert"><strong>Rollen & rechten</strong>'
     password_field = '<div class="field full"><label>Nieuw wachtwoord</label><input name="password" type="password" minlength="10" autocomplete="new-password" placeholder="Leeg laten om niet te wijzigen"><div class="muted" style="font-size:11px;margin-top:4px">Minstens 10 tekens wanneer je het wachtwoord wijzigt.</div></div>' + password_anchor
