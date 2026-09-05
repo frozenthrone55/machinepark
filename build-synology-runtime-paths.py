@@ -67,11 +67,19 @@ for value in asset_values:
     fixed_assets.append(value)
 
 auth_asset = f"./synology-local-auth.js?v={auth_hash}"
+
+# Op Synology geen volledige app meer tijdens service-worker-installatie
+# vooruit downloaden. Op een externe mobiele verbinding veroorzaakte dat een
+# tweede, gelijktijdige download van vrijwel alle runtimebestanden. De normale
+# fetch-handler bewaart gebruikte bestanden daarna automatisch in de cache.
 fixed_assets = [
     value for value in fixed_assets
-    if not value.startswith("./synology-local-auth.js")
+    if value in {
+        "./manifest.webmanifest",
+        "./machinepark-logo.svg",
+        "./machinepark-coffee-device-icon.png",
+    }
 ]
-fixed_assets.append(auth_asset)
 
 asset_block = "const ASSETS=[\n" + "\n".join(
     f"  {json.dumps(value)}," for value in fixed_assets
