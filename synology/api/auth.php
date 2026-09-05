@@ -166,19 +166,41 @@ if ($action === 'login') {
     }
 
     $found = null;
+    $legacyAdminIndex = -1;
+
+    if ($identifier === 'admin') {
+        $hasOwner = false;
+        $legacyCandidates = [];
+        foreach ($users as $candidateIndex => $candidate) {
+            if (!empty($candidate['isOwner'])) {
+                $hasOwner = true;
+                break;
+            }
+            if (!empty($candidate['disabled'])) continue;
+            if (strtolower(trim((string)($candidate['role'] ?? ''))) !== 'beheerder') continue;
+            if (trim((string)($candidate['passwordHash'] ?? '')) === '') continue;
+            $legacyCandidates[] = (int)$candidateIndex;
+        }
+        if (!$hasOwner && count($legacyCandidates) === 1) {
+            $legacyAdminIndex = $legacyCandidates[0];
+        }
+    }
 
     foreach ($users as $idx => $user) {
         $username = strtolower(trim((string)($user['username'] ?? '')));
         $email = strtolower(trim((string)($user['email'] ?? '')));
         $ownerAlias = $identifier === 'admin' && !empty($user['isOwner']);
+        $legacyOwnerAlias = $identifier === 'admin' && $legacyAdminIndex === (int)$idx;
         $usernameMatch = $username !== '' && hash_equals($username, $identifier);
         $emailMatch = $email !== '' && hash_equals($email, $identifier);
-        if (!$ownerAlias && !$usernameMatch && !$emailMatch) continue;
+        if (!$ownerAlias && !$legacyOwnerAlias && !$usernameMatch && !$emailMatch) continue;
         if (!empty($user['disabled'])) break;
         $hash = (string)($user['passwordHash'] ?? '');
         if ($hash !== '' && password_verify($password, $hash)) {
-            if (!empty($user['isOwner']) && $username === '') {
+            if ($ownerAlias || $legacyOwnerAlias) {
                 $users[$idx]['username'] = 'admin';
+                $users[$idx]['isOwner'] = true;
+                $users[$idx]['role'] = 'beheerder';
             }
             $users[$idx]['lastSignInAt'] = date(DATE_ATOM);
             $found = $users[$idx];
