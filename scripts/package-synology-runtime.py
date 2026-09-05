@@ -49,6 +49,10 @@ def main() -> None:
     if assets.is_dir():
         shutil.copytree(assets, out / "assets")
 
+    vendor = ROOT / "vendor"
+    if vendor.is_dir():
+        shutil.copytree(vendor, out / "vendor")
+
     # PHP-bestanden en gegenereerde lokale seeddata voor de Synology-backend meenemen.
     synology = ROOT / "synology"
     if synology.is_dir():
