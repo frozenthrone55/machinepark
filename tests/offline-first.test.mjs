@@ -46,3 +46,11 @@ test('service worker cachet offline runtime en cachebare API-data', () => {
   assert.match(sw, /device-photos/);
   assert.match(sw, /service-photos/);
 });
+
+
+test('mislukte push start geen snelle retrylus', () => {
+  assert.match(offline, /let pushFailed = false/);
+  assert.match(offline, /pushFailed = true/);
+  assert.match(offline, /if \(!pushFailed && centralSync\.pending && centralSync\.enabled && navigator\.onLine\)/);
+  assert.match(offline, /Synchronisatie wacht op controle/);
+});
