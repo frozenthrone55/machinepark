@@ -40,8 +40,8 @@ function usedPartsText(items=[]){if(!items.length)return '—';return items.map(
     )
 
     for old, new in {
-        "stock:Number(p.stock||0)-q": "stock:normalizePartQuantity(Number(p.stock||0)-q)",
         "stock:Number(p.stock||0)-qty": "stock:normalizePartQuantity(Number(p.stock||0)-qty)",
+        "stock:Number(p.stock||0)-q": "stock:normalizePartQuantity(Number(p.stock||0)-q)",
         "stock:Number(part.stock||0)+qty": "stock:normalizePartQuantity(Number(part.stock||0)+qty)",
         "stock:Number(part.stock || 0) - qty": "stock:normalizePartQuantity(Number(part.stock || 0)-qty)",
         "stock:Number(part.stock || 0) + qty": "stock:normalizePartQuantity(Number(part.stock || 0)+qty)",
