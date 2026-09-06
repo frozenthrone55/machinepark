@@ -1015,6 +1015,11 @@
     body.innerHTML=reports.length?reports.map(r=>{const acts=[r.maintenanceCount?`${r.maintenanceCount} onderhoud`:'',r.breakdownCount?`${r.breakdownCount} depannage`:'',r.otherWorkCount?`${r.otherWorkCount} andere werken`:''].filter(Boolean).join(' · '),locations=r.visits.map(v=>v.location).filter(Boolean);return `<tr><td><span class="service-visit-number">${svEsc(reportDisplayLabel(r))}</span><div class="muted" style="font-size:10px">v${svEsc(r.revision)}</div></td><td>${svEsc(svDateText(r.date))}${r.time?`<div class="muted" style="font-size:10px">${svEsc(r.time)}</div>`:''}</td><td><strong>${svEsc(r.locationCount)}</strong><div class="muted" style="font-size:10px">${svEsc(locations.join(' · ')||'—')}</div></td><td>${svEsc(r.deviceCount)}</td><td>${svEsc(acts||'—')}</td><td>${svEsc(r.technician||'—')}</td><td><span class="service-visit-status">Afgesloten</span></td><td><button type="button" class="btn small" data-service-visit-open="${svEsc(r.id)}">Details</button></td></tr>`;}).join(''):'<tr><td colspan="8"><div class="empty">Nog geen gezamenlijke serviceverslagen. Los onderhoud en losse depannages blijven gewoon in de historiek staan.</div></td></tr>';
   }
 
+  // Beschikbaar voor latere renderlagen. De klassieke onderhoud/depannage-conceptlaag
+  // filtert tijdelijk alle draftrecords uit state; na herstel van state moet de
+  // serviceconceptlijst daarom nogmaals met de volledige data kunnen renderen.
+  window.machineparkRenderServiceVisits = renderServiceVisits;
+
   document.addEventListener('click',e=>{const open=e.target.closest('[data-service-visit-open]');if(open){showServiceVisitDetails(open.dataset.serviceVisitOpen);return;}const draft=e.target.closest('[data-sv-draft-open]');if(draft){void openServiceVisit('',draft.dataset.svDraftOpen);return;}const del=e.target.closest('[data-sv-draft-delete]');if(del){void deleteVisitDraft(del.dataset.svDraftDelete);}});
 
   const baseRenderAll=renderAll;

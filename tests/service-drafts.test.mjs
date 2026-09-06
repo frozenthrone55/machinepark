@@ -106,3 +106,12 @@ test('serviceconcept patch bouwt na alle servicefuncties en vóór offline-first
   assert.ok(chain.indexOf('build-manual-native-sync.py') < chain.indexOf('build-service-drafts.py'));
   assert.ok(chain.indexOf('build-service-drafts.py') < chain.indexOf('build-offline-first.py'));
 });
+
+test('serviceconcepten worden na tijdelijke draftfilter opnieuw met volledige state gerenderd', () => {
+  assert.match(patch, /machinepark-service-visit-draft-rerender-v1/);
+  assert.match(patch, /typeof window\.machineparkRenderServiceVisits === 'function'/);
+  assert.match(patch, /window\.machineparkRenderServiceVisits\(\)/);
+  const filterPos = patch.indexOf('withRegularServiceState(() => baseRenderAllForDrafts())');
+  const rerenderPos = patch.indexOf('window.machineparkRenderServiceVisits()');
+  assert.ok(filterPos >= 0 && rerenderPos > filterPos);
+});

@@ -190,3 +190,8 @@ test('Andere werken gebruikt de gekozen werknaam in overzicht afdruk en PDF zond
   assert.match(pdf, /kindLabel:svKindLabel\(row\.kind,item\)/);
   assert.doesNotMatch(pdf, /Soort werkzaamheden:/);
 });
+
+test('serviceconcept renderer is beschikbaar voor rerender na tijdelijke draftfilter', () => {
+  assert.match(js, /window\.machineparkRenderServiceVisits = renderServiceVisits/);
+  assert.match(js, /function renderServiceVisits\(\)/);
+});

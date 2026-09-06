@@ -57,6 +57,14 @@ if MARKER not in index:
   renderAll = function() {
     withRegularServiceState(() => baseRenderAllForDrafts());
     renderDraftPanels();
+
+    // machinepark-service-visit-draft-rerender-v1
+    // baseRenderAllForDrafts bevat ook de serviceverslag-renderer, maar die werd
+    // hierboven aangeroepen terwijl alle draftrecords tijdelijk uit state waren.
+    // Nu state hersteld is, render de Serviceconcepten opnieuw met de echte data.
+    if (typeof window.machineparkRenderServiceVisits === 'function') {
+      window.machineparkRenderServiceVisits();
+    }
   };
   window.renderAll = renderAll;
 
