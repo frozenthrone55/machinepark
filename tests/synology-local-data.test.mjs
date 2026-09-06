@@ -43,3 +43,11 @@ test('Synology build wijst alleen centrale data naar PHP API', () => {
   assert.ok(cmd.indexOf('python3 build-synology-local-data.py') > cmd.indexOf('python3 build-unified-work-layout.py'));
   assert.ok(cmd.indexOf('python3 scripts/check-inline-scripts.py') > cmd.indexOf('python3 build-synology-local-data.py'));
 });
+
+
+test('Synology data API accepteert gzip-gecomprimeerde centrale snapshots', () => {
+  assert.match(api, /HTTP_CONTENT_ENCODING/);
+  assert.match(api, /gzdecode/);
+  assert.match(api, /gzip_unavailable/);
+  assert.match(api, /payload_too_large/);
+});
