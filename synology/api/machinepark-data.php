@@ -151,6 +151,93 @@ function mp_validate_write_permissions(array $before, array $after, array $user)
     }
 }
 
+function mp_cleanup_stale_sync_chunks(): void {
+    $files = glob(MP_DATA_DIR . '/.sync-upload-*.part');
+    if (!is_array($files)) return;
+    $cutoff = time() - 3600;
+    foreach ($files as $file) {
+        $mtime = @filemtime($file);
+        if ($mtime !== false && $mtime < $cutoff) @unlink($file);
+    }
+}
+
+function mp_receive_sync_chunk(string $raw, array $user): array {
+    $chunked = trim((string)($_SERVER['HTTP_X_MACHINEPARK_CHUNKED'] ?? '')) === '1';
+    if (!$chunked) {
+        return [
+            'raw' => $raw,
+            'encoding' => strtolower(trim((string)($_SERVER['HTTP_CONTENT_ENCODING'] ?? ($_SERVER['CONTENT_ENCODING'] ?? '')))),
+            'chunked' => false,
+        ];
+    }
+
+    $uploadId = trim((string)($_SERVER['HTTP_X_MACHINEPARK_UPLOAD_ID'] ?? ''));
+    $indexRaw = trim((string)($_SERVER['HTTP_X_MACHINEPARK_CHUNK_INDEX'] ?? ''));
+    $countRaw = trim((string)($_SERVER['HTTP_X_MACHINEPARK_CHUNK_COUNT'] ?? ''));
+    $encoding = strtolower(trim((string)($_SERVER['HTTP_X_MACHINEPARK_PAYLOAD_ENCODING'] ?? 'identity')));
+
+    if (!preg_match('/^[A-Za-z0-9_-]{8,80}$/', $uploadId)) {
+        mp_json(['error' => 'Ongeldige synchronisatie-upload-ID.', 'code' => 'chunk_invalid_id'], 400);
+    }
+    if (!preg_match('/^\d+$/', $indexRaw) || !preg_match('/^\d+$/', $countRaw)) {
+        mp_json(['error' => 'Ongeldige synchronisatiechunk.', 'code' => 'chunk_invalid_index'], 400);
+    }
+
+    $index = (int)$indexRaw;
+    $count = (int)$countRaw;
+    if ($count < 1 || $count > 256 || $index < 0 || $index >= $count) {
+        mp_json(['error' => 'Synchronisatiechunk valt buiten het toegestane bereik.', 'code' => 'chunk_out_of_range'], 400);
+    }
+    if (!in_array($encoding, ['identity','gzip'], true)) {
+        mp_json(['error' => 'Onbekende codering voor synchronisatiechunks.', 'code' => 'chunk_invalid_encoding'], 400);
+    }
+    if (strlen($raw) > 384 * 1024) {
+        mp_json(['error' => 'Synchronisatiechunk is te groot.', 'code' => 'chunk_too_large'], 413);
+    }
+
+    mp_cleanup_stale_sync_chunks();
+    $userKey = substr(hash('sha256', (string)($user['id'] ?? '') . '|' . $uploadId), 0, 32);
+    $prefix = MP_DATA_DIR . '/.sync-upload-' . $userKey . '-';
+    $partFile = $prefix . $index . '.part';
+
+    if (@file_put_contents($partFile, $raw, LOCK_EX) === false) {
+        mp_json(['error' => 'Synchronisatiechunk kon niet tijdelijk worden opgeslagen.', 'code' => 'chunk_write_failed'], 500);
+    }
+
+    if ($index < $count - 1) {
+        mp_json([
+            'ok' => true,
+            'chunked' => true,
+            'received' => $index,
+            'count' => $count,
+        ], 202);
+    }
+
+    $assembled = '';
+    for ($i = 0; $i < $count; $i++) {
+        $file = $prefix . $i . '.part';
+        if (!is_file($file)) {
+            mp_json([
+                'error' => 'Niet alle synchronisatiechunks zijn ontvangen.',
+                'code' => 'chunk_incomplete',
+                'missing' => $i,
+            ], 409);
+        }
+        $piece = @file_get_contents($file);
+        if ($piece === false) {
+            mp_json(['error' => 'Synchronisatiechunk kon niet worden gelezen.', 'code' => 'chunk_read_failed'], 500);
+        }
+        if (strlen($assembled) + strlen($piece) > 64 * 1024 * 1024) {
+            for ($j = 0; $j < $count; $j++) @unlink($prefix . $j . '.part');
+            mp_json(['error' => 'De samengestelde synchronisatie is te groot.', 'code' => 'payload_too_large'], 413);
+        }
+        $assembled .= $piece;
+    }
+    for ($i = 0; $i < $count; $i++) @unlink($prefix . $i . '.part');
+
+    return ['raw' => $assembled, 'encoding' => $encoding, 'chunked' => true];
+}
+
 function mp_backup_current(): void {
     if (!is_file(MP_STATE_FILE)) return;
 
@@ -257,7 +344,9 @@ if ($method === 'PUT') {
     $raw = file_get_contents('php://input');
     if ($raw === false) $raw = '';
 
-    $contentEncoding = strtolower(trim((string)($_SERVER['HTTP_CONTENT_ENCODING'] ?? ($_SERVER['CONTENT_ENCODING'] ?? ''))));
+    $received = mp_receive_sync_chunk($raw, $authUser);
+    $raw = (string)$received['raw'];
+    $contentEncoding = (string)$received['encoding'];
     if ($contentEncoding === 'gzip') {
         if (!function_exists('gzdecode')) {
             mp_json(['error' => 'Gzip-synchronisatie wordt niet ondersteund door deze PHP-installatie.', 'code' => 'gzip_unavailable'], 415);

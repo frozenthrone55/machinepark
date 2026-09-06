@@ -246,6 +246,65 @@
     }
   }
 
+  function syncUploadId() {
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID().replace(/-/g, '');
+      }
+      if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (_) {}
+    return String(Date.now()) + String(Math.random()).slice(2);
+  }
+
+  async function putSnapshotChunked(blob, encoding, payloadBytes) {
+    const chunkSize = 256 * 1024;
+    const count = Math.ceil(blob.size / chunkSize);
+    if (!count || count > 256) {
+      const error = new Error('Centrale synchronisatie is te groot om veilig in delen te verzenden.');
+      error.status = 413;
+      error.payloadBytes = payloadBytes;
+      error.compressedBytes = encoding === 'gzip' ? blob.size : 0;
+      throw error;
+    }
+
+    const uploadId = syncUploadId();
+    let lastResult = null;
+    for (let index = 0; index < count; index += 1) {
+      const headers = await centralHeaders(false);
+      headers['Content-Type'] = 'application/octet-stream';
+      headers['X-Machinepark-Chunked'] = '1';
+      headers['X-Machinepark-Upload-Id'] = uploadId;
+      headers['X-Machinepark-Chunk-Index'] = String(index);
+      headers['X-Machinepark-Chunk-Count'] = String(count);
+      headers['X-Machinepark-Payload-Encoding'] = encoding;
+
+      const res = await fetch(CENTRAL_SYNC_URL, {
+        method: 'PUT',
+        headers,
+        body: blob.slice(index * chunkSize, Math.min(blob.size, (index + 1) * chunkSize)),
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
+      const text = await res.text();
+      let body = {};
+      try { body = text ? JSON.parse(text) : {}; } catch (_) {}
+      lastResult = {
+        res,
+        body,
+        text,
+        payloadBytes,
+        compressedBytes: encoding === 'gzip' ? blob.size : 0,
+        chunked: true,
+      };
+      if (!res.ok) return lastResult;
+    }
+    return lastResult;
+  }
+
   async function putSnapshot(data, etag) {
     const headers = await centralHeaders(true);
     const payload = JSON.stringify({ data, etag: etag || null });
@@ -264,16 +323,32 @@
       }
     }
 
+    const requestBlob = requestBody instanceof Blob ? requestBody : new Blob([requestBody]);
+    const payloadEncoding = headers['Content-Encoding'] === 'gzip' ? 'gzip' : 'identity';
+
+    // Synology Web Station/reverse proxy kan grote request bodies blokkeren
+    // voordat PHP ze ziet. Vanaf 512 KiB verzenden we daarom rechtstreeks in
+    // stukken van 256 KiB. Een onverwachte 413 op een kleinere PUT valt ook
+    // automatisch terug op exact dezelfde chunkroute.
+    if (requestBlob.size >= 512 * 1024) {
+      return await putSnapshotChunked(requestBlob, payloadEncoding, payloadBytes);
+    }
+
     const res = await fetch(CENTRAL_SYNC_URL, {
       method: 'PUT',
       headers,
       body: requestBody,
       cache: 'no-store',
+      credentials: 'same-origin',
     });
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) {}
-    return { res, body, text, payloadBytes, compressedBytes };
+    const result = { res, body, text, payloadBytes, compressedBytes, chunked: false };
+    if (res.status === 413 && requestBlob.size > 0) {
+      return await putSnapshotChunked(requestBlob, payloadEncoding, payloadBytes);
+    }
+    return result;
   }
 
   function syncHttpError(result, fallback = 'Centrale synchronisatie mislukt') {
@@ -287,6 +362,8 @@
     const error = new Error(message || fallback);
     error.status = status;
     error.payloadBytes = Number(result?.payloadBytes || 0);
+    error.compressedBytes = Number(result?.compressedBytes || 0);
+    error.chunked = Boolean(result?.chunked);
     error.syncCode = String(result?.body?.code || '');
     return error;
   }
@@ -298,8 +375,11 @@
       .trim()
       .slice(0, 180);
     const size = Number(error?.payloadBytes || 0);
+    const compressed = Number(error?.compressedBytes || 0);
     const sizeText = size > 0 ? ' · ' + (size / 1024 / 1024).toFixed(2) + ' MB' : '';
-    return '☁ Synchronisatie mislukt' + (status ? ' · HTTP ' + status : '') + sizeText + ' · ' + message;
+    const transferText = compressed > 0 ? ' → ' + (compressed / 1024 / 1024).toFixed(2) + ' MB' : '';
+    const chunkText = error?.chunked ? ' · in delen' : '';
+    return '☁ Synchronisatie mislukt' + (status ? ' · HTTP ' + status : '') + sizeText + transferText + chunkText + ' · ' + message;
   }
 
   function installOfflineLayer() {
@@ -444,6 +524,7 @@
               centralSync.lastRemoteAt = local.updatedAt || '';
               centralSync.offlineDirty = false;
               centralSync.pending = false;
+              window.machineparkLastSyncError = null;
               await writeMeta({ etag: centralSync.etag || null, base: local, dirty: false });
               if (migratedPhotos) await refresh();
               setCentralSyncStatus(conflicts ? `☁ Gesynchroniseerd · ${conflicts} conflict(en) lokaal behouden` : '☁ Alles centraal opgeslagen', 'ok');
@@ -474,6 +555,15 @@
           // De wijziging blijft als dirty lokaal bewaard en de normale polling
           // probeert later opnieuw. Zo blijft de status stabiel en ontstaat er
           // geen eindeloze sync-flikkerlus.
+          window.machineparkLastSyncError = {
+            at: new Date().toISOString(),
+            status: Number(error?.status || 0),
+            code: String(error?.syncCode || ''),
+            message: String(error?.message || error || ''),
+            payloadBytes: Number(error?.payloadBytes || 0),
+            compressedBytes: Number(error?.compressedBytes || 0),
+            chunked: Boolean(error?.chunked),
+          };
           setCentralSyncStatus(syncErrorStatus(error), 'error');
           console.error('Offline synchronisatie', error);
           throw error;

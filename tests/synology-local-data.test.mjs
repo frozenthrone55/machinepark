@@ -51,3 +51,16 @@ test('Synology data API accepteert gzip-gecomprimeerde centrale snapshots', () =
   assert.match(api, /gzip_unavailable/);
   assert.match(api, /payload_too_large/);
 });
+
+test('Synology data API assembleert grote PUTs veilig in kleine chunks', () => {
+  assert.match(api, /HTTP_X_MACHINEPARK_CHUNKED/);
+  assert.match(api, /HTTP_X_MACHINEPARK_UPLOAD_ID/);
+  assert.match(api, /HTTP_X_MACHINEPARK_CHUNK_INDEX/);
+  assert.match(api, /HTTP_X_MACHINEPARK_CHUNK_COUNT/);
+  assert.match(api, /HTTP_X_MACHINEPARK_PAYLOAD_ENCODING/);
+  assert.match(api, /\.sync-upload-/);
+  assert.match(api, /chunk_incomplete/);
+  assert.match(api, /chunk_too_large/);
+  assert.match(api, /384 \* 1024/);
+  assert.match(api, /64 \* 1024 \* 1024/);
+});

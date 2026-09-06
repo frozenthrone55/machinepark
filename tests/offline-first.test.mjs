@@ -77,3 +77,20 @@ test('grote Synology snapshots worden gecomprimeerd en syncfouten tonen HTTP-sta
   assert.match(offline, /HTTP ' \+ status/);
   assert.match(offline, /syncErrorStatus/);
 });
+
+test('Synology sync valt bij grote request bodies terug op veilige chunks en bewaart cookie-sessie', () => {
+  assert.match(offline, /putSnapshotChunked/);
+  assert.match(offline, /const chunkSize = 256 \* 1024/);
+  assert.match(offline, /requestBlob\.size >= 512 \* 1024/);
+  assert.match(offline, /X-Machinepark-Chunked/);
+  assert.match(offline, /X-Machinepark-Upload-Id/);
+  assert.match(offline, /X-Machinepark-Payload-Encoding/);
+  assert.match(offline, /credentials: 'same-origin'/);
+  assert.match(offline, /res\.status === 413/);
+});
+
+test('exacte laatste syncfout blijft beschikbaar voor diagnose', () => {
+  assert.match(offline, /machineparkLastSyncError/);
+  assert.match(offline, /compressedBytes/);
+  assert.match(offline, /chunked: Boolean\(error\?\.chunked\)/);
+});
