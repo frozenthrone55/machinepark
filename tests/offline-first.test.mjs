@@ -94,3 +94,12 @@ test('exacte laatste syncfout blijft beschikbaar voor diagnose', () => {
   assert.match(offline, /compressedBytes/);
   assert.match(offline, /chunked: Boolean\(error\?\.chunked\)/);
 });
+
+test('409-herstel haalt centrale data altijd via een unieke netwerk-URL', () => {
+  assert.match(offline, /machinepark-synology-fresh-central-get-v1/);
+  assert.match(offline, /function centralFreshUrl\(\)/);
+  assert.match(offline, /searchParams\.set\('machineparkSync'/);
+  assert.match(offline, /fetch\(centralFreshUrl\(\), \{ method: 'GET'/);
+  assert.match(offline, /credentials: 'same-origin'/);
+  assert.doesNotMatch(offline, /fetch\(CENTRAL_SYNC_URL, \{ method: 'GET', headers, cache: 'no-store' \}\)/);
+});

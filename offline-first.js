@@ -223,9 +223,20 @@
     return String(value || '').startsWith('data:image/');
   }
 
+  // machinepark-synology-fresh-central-get-v1
+  // Een oudere service worker cachete op Synology onbedoeld ook API-GETs.
+  // Gebruik daarom voor centrale data altijd een unieke same-origin URL.
+  // Zo kan de herstel-GET na HTTP 409 nooit een verouderde ETag teruggeven,
+  // zelfs niet terwijl een oude service worker de huidige pagina nog bestuurt.
+  function centralFreshUrl() {
+    const url = new URL(CENTRAL_SYNC_URL, window.location.href);
+    url.searchParams.set('machineparkSync', String(Date.now()) + '-' + String(Math.random()).slice(2));
+    return url.toString();
+  }
+
   async function fetchRemoteCurrent() {
     const headers = await centralHeaders(false);
-    const res = await fetch(CENTRAL_SYNC_URL, { method: 'GET', headers, cache: 'no-store' });
+    const res = await fetch(centralFreshUrl(), { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' });
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) {}
@@ -603,7 +614,7 @@
       const headers = await centralHeaders(false);
       const etag = meta.etag || centralSync.etag || null;
       if (etag) headers['If-None-Match'] = etag;
-      const res = await fetch(CENTRAL_SYNC_URL, { method: 'GET', headers, cache: 'no-store' });
+      const res = await fetch(centralFreshUrl(), { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' });
       const text = await res.text();
       let body = {};
       try { body = text ? JSON.parse(text) : {}; } catch (_) {}

@@ -50,3 +50,10 @@ test('offline runtime krijgt een inhoudshash', () => {
   assert.match(builder, /hashlib\.sha256\(OFFLINE\.read_bytes\(\)\)/);
   assert.match(builder, /offline-first\.js\?v=/);
 });
+
+test('Synology service worker laat PHP API en no-store altijd rechtstreeks naar netwerk', () => {
+  assert.match(builder, /machinepark-synology-api-network-only-v1/);
+  assert.match(builder, /url\.pathname\.includes\('\/synology\/api\/'\)/);
+  assert.match(builder, /e\.request\.cache==='no-store'/);
+  assert.match(builder, /e\.respondWith\(fetch\(e\.request\)\)/);
+});

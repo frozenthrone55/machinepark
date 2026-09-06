@@ -93,6 +93,25 @@ sw = sw[:assets_match.start()] + asset_block + sw[assets_match.end():]
 sw = sw.replace("c.put('/index.html',copy)", "c.put('./index.html',copy)")
 sw = sw.replace("caches.match('/index.html')", "caches.match('./index.html')")
 
+# Synology PHP API mag nooit via de service-worker assetcache lopen.
+# Dit is essentieel voor ETag-conflictherstel: na een 409 moet de volgende GET
+# gegarandeerd de actuele state-v1.json/ETag van de NAS ophalen.
+fetch_anchor = """  if(url.hostname!==self.location.hostname)return;
+
+  if(url.pathname.startsWith('/.netlify/functions/')){"""
+fetch_bypass = """  if(url.hostname!==self.location.hostname)return;
+
+  // machinepark-synology-api-network-only-v1
+  if(url.pathname.includes('/synology/api/') || e.request.cache==='no-store'){
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
+  if(url.pathname.startsWith('/.netlify/functions/')){"""
+if fetch_anchor not in sw:
+    raise SystemExit("Buildvalidatie mislukt: service-worker fetchanker ontbreekt")
+sw = sw.replace(fetch_anchor, fetch_bypass, 1)
+
 remaining_sw_roots = [
     value for value in fixed_assets
     if value.startswith("/") and not value.startswith("/.netlify/")
