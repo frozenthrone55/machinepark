@@ -255,7 +255,24 @@ if ($method === 'PUT') {
     }
 
     $raw = file_get_contents('php://input');
-    $body = json_decode($raw === false ? '' : $raw, true);
+    if ($raw === false) $raw = '';
+
+    $contentEncoding = strtolower(trim((string)($_SERVER['HTTP_CONTENT_ENCODING'] ?? ($_SERVER['CONTENT_ENCODING'] ?? ''))));
+    if ($contentEncoding === 'gzip') {
+        if (!function_exists('gzdecode')) {
+            mp_json(['error' => 'Gzip-synchronisatie wordt niet ondersteund door deze PHP-installatie.', 'code' => 'gzip_unavailable'], 415);
+        }
+        $decoded = @gzdecode($raw);
+        if ($decoded === false) {
+            mp_json(['error' => 'Gecomprimeerde synchronisatie kon niet worden uitgepakt.', 'code' => 'gzip_invalid'], 400);
+        }
+        if (strlen($decoded) > 64 * 1024 * 1024) {
+            mp_json(['error' => 'De uitgepakte synchronisatie is te groot.', 'code' => 'payload_too_large'], 413);
+        }
+        $raw = $decoded;
+    }
+
+    $body = json_decode($raw, true);
     $data = is_array($body) ? ($body['data'] ?? null) : null;
     $expected = is_array($body) ? mp_normalize_etag($body['etag'] ?? null) : null;
 
