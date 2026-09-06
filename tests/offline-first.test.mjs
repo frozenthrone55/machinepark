@@ -68,3 +68,12 @@ test('sync-stabiliteitsbuilder draait na drift-herstel', () => {
   assert.ok(cmd.includes('python3 build-sync-status-stability.py'));
   assert.ok(cmd.indexOf('python3 build-sync-status-stability.py') > cmd.indexOf('python3 build-sync-drift-recovery.py'));
 });
+
+
+test('grote Synology snapshots worden gecomprimeerd en syncfouten tonen HTTP-status', () => {
+  assert.match(offline, /CompressionStream\('gzip'\)/);
+  assert.match(offline, /Content-Encoding.*gzip/);
+  assert.match(offline, /payloadBytes >= 128 \* 1024/);
+  assert.match(offline, /HTTP ' \+ status/);
+  assert.match(offline, /syncErrorStatus/);
+});
