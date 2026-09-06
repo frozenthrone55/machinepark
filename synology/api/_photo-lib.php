@@ -122,7 +122,8 @@ function mp_photo_serve(string $basePath, bool $thumb, bool $headOnly): void {
 }
 
 function mp_photo_ref(string $endpoint, string $key, bool $thumb = false): string {
-    return './synology/api/' . $endpoint . '?key=' . rawurlencode($key) . ($thumb ? '&variant=thumb' : '');
+    // Canonieke ref werkt zowel op /machinepark als /machinepark/.
+    return '/machinepark/synology/api/' . $endpoint . '?key=' . rawurlencode($key) . ($thumb ? '&variant=thumb' : '');
 }
 
 function mp_photo_key_from_ref($value, string $endpoint, string $prefix): string {

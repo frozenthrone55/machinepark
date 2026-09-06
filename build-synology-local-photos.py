@@ -64,6 +64,37 @@ if MARKER not in index:
         "if (value.includes('./synology/api/part-photos.php?') || value.includes('/machinepark/synology/api/part-photos.php?')) return value;",
     )
 
+    # Canonieke Machinepark-route voorkomt dat ./synology bij /machinepark zonder
+    # trailing slash naar Synology DSM zelf resolveert.
+    index = index.replace("./synology/api/", "/machinepark/synology/api/")
+
+    old_thumb = """    const value = String(src || '').trim();
+    if (!value || !ownPhotoEndpoint(value)) return value;
+    try {
+      const url = new URL(value, location.href);"""
+    new_thumb = """    const value = String(src || '').trim();
+    const normalized = value
+      .replace(/^\\.\\/synology\\/api\\//, '/machinepark/synology/api/')
+      .replace(/^synology\\/api\\//, '/machinepark/synology/api/');
+    if (!value || !ownPhotoEndpoint(normalized)) return value;
+    try {
+      const url = new URL(normalized, location.origin);"""
+    if old_thumb not in index:
+        raise SystemExit("Buildvalidatie mislukt: thumbnail-router niet gevonden")
+    index = index.replace(old_thumb, new_thumb, 1)
+
+    old_post = "const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), cache: 'no-store' });"
+    new_post = "const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), cache: 'no-store', credentials: 'same-origin' });"
+    if old_post not in index:
+        raise SystemExit("Buildvalidatie mislukt: foto-POST niet gevonden")
+    index = index.replace(old_post, new_post, 1)
+
+    old_error = "if (!res.ok) throw new Error(data.error || text || `${errorLabel} (${res.status})`);"
+    new_error = "if (!res.ok) { const raw=String(data.error || text || errorLabel || 'Foto-aanvraag mislukt'); const clean=raw.replace(/<script[\\s\\S]*?<\\/script>/gi,' ').replace(/<style[\\s\\S]*?<\\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\\s+/g,' ').trim().slice(0,180); const message=errorLabel+' · HTTP '+res.status+(clean?' · '+clean:''); const error=new Error(message); error.status=res.status; error.endpoint=res.url||String(url||''); window.machineparkLastPhotoError={at:new Date().toISOString(),status:res.status,endpoint:error.endpoint,message}; throw error; } window.machineparkLastPhotoError=null;"
+    if old_error not in index:
+        raise SystemExit("Buildvalidatie mislukt: foto-foutafhandeling niet gevonden")
+    index = index.replace(old_error, new_error, 1)
+
     index = index.replace(
         "</head>",
         f'<meta {MARKER}><meta name="machinepark-photo-backend" content="synology-local">\n</head>',
@@ -88,10 +119,10 @@ SW.write_text(sw, encoding="utf-8")
 
 built = INDEX.read_text(encoding="utf-8")
 for needle in [
-    "./synology/api/device-photos.php",
-    "./synology/api/part-photos.php",
-    "./synology/api/service-photos.php",
-    "./synology/api/purge-service-audit-photos.php",
+    "/machinepark/synology/api/device-photos.php",
+    "/machinepark/synology/api/part-photos.php",
+    "/machinepark/synology/api/service-photos.php",
+    "/machinepark/synology/api/purge-service-audit-photos.php",
     MARKER,
 ]:
     if needle not in built:

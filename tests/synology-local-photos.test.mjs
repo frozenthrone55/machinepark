@@ -54,3 +54,11 @@ test('servicefoto API herstelt stale refs en dedupliceert identieke beelden', ()
   assert.match(service, /\$seenHashes=\[\]/);
   assert.match(service, /if\(isset\(\$seenHashes\[\$hash\]\)\)continue/);
 });
+test('Synology foto-API gebruikt canonieke machinepark-route en compacte HTTP-fouten', () => {
+  assert.match(lib, /return '\/machinepark\/synology\/api\/'/);
+  assert.match(builder, /index = index\.replace\("\.\/synology\/api\/", "\/machinepark\/synology\/api\/"\)/);
+  assert.match(builder, /credentials: 'same-origin'/);
+  assert.match(builder, /machineparkLastPhotoError/);
+  assert.match(builder, /HTTP /);
+  assert.match(builder, /<script/);
+});
