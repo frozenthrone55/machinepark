@@ -551,12 +551,26 @@
         }
 
         if (meta.dirty) {
+          // Lokale wijzigingen mogen de appstart nooit blokkeren. Open eerst
+          // de lokale gegevens en probeer de centrale push daarna best-effort.
           bind();
           await refresh();
           centralSync.enabled = true;
           startCentralPolling();
-          setCentralSyncStatus('☁ Verbinding hersteld · lokale wijzigingen synchroniseren…', 'busy');
-          await centralPush({ initial: true });
+          setCentralSyncStatus('☁ Lokale wijzigingen wachten op synchronisatie', 'busy');
+          try {
+            const pushed = await centralPush({ initial: true });
+            if (pushed?.offline) {
+              setOfflineStatus();
+            }
+          } catch (error) {
+            console.warn('Opstartsynchronisatie mislukt; lokale gegevens blijven actief', error);
+            const message = String(error?.message || error || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+            setCentralSyncStatus(
+              message ? '☁ Synchronisatie wacht op controle · ' + message : '☁ Synchronisatie wacht op controle',
+              'error'
+            );
+          }
           primeOfflineExtras();
           return;
         }
@@ -602,7 +616,12 @@
         }
         window.__koffieServiceStarted = false;
         console.error(error);
-        alert('Machinepark kon niet worden gestart. De lokale gegevens zijn niet aangepast.');
+        const startupMessage = String(error?.message || error || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+        alert(
+          startupMessage
+            ? 'Machinepark kon niet worden gestart: ' + startupMessage
+            : 'Machinepark kon niet worden gestart. De lokale gegevens zijn niet aangepast.'
+        );
       }
     };
     window.startKoffieServiceApp = startKoffieServiceApp;
