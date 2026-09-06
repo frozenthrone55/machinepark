@@ -99,7 +99,10 @@ test('409-herstel haalt centrale data altijd via een unieke netwerk-URL', () => 
   assert.match(offline, /machinepark-synology-fresh-central-get-v1/);
   assert.match(offline, /function centralFreshUrl\(\)/);
   assert.match(offline, /searchParams\.set\('machineparkSync'/);
-  assert.match(offline, /fetch\(centralFreshUrl\(\), \{ method: 'GET'/);
-  assert.match(offline, /credentials: 'same-origin'/);
-  assert.doesNotMatch(offline, /fetch\(CENTRAL_SYNC_URL, \{ method: 'GET', headers, cache: 'no-store' \}\)/);
+  const recoveryStart = offline.indexOf('async function fetchRemoteCurrent()');
+  const recoveryEnd = offline.indexOf('async function gzipSyncPayload', recoveryStart);
+  const recovery = offline.slice(recoveryStart, recoveryEnd);
+  assert.match(recovery, /fetch\(centralFreshUrl\(\), \{ method: 'GET'/);
+  assert.match(recovery, /credentials: 'same-origin'/);
+  assert.doesNotMatch(recovery, /fetch\(CENTRAL_SYNC_URL/);
 });

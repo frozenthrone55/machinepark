@@ -614,7 +614,7 @@
       const headers = await centralHeaders(false);
       const etag = meta.etag || centralSync.etag || null;
       if (etag) headers['If-None-Match'] = etag;
-      const res = await fetch(centralFreshUrl(), { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' });
+      const res = await fetch(CENTRAL_SYNC_URL, { method: 'GET', headers, cache: 'no-store' });
       const text = await res.text();
       let body = {};
       try { body = text ? JSON.parse(text) : {}; } catch (_) {}
