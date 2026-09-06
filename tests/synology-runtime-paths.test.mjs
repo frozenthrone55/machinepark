@@ -43,3 +43,10 @@ test('Synology service worker precachet alleen kleine install-assets', () => {
   assert.match(builder, /value in \{/);
   assert.doesNotMatch(builder, /fixed_assets\.append\(auth_asset\)/);
 });
+
+
+test('offline runtime krijgt een inhoudshash', () => {
+  assert.match(builder, /OFFLINE = ROOT \/ "offline-first\.js"/);
+  assert.match(builder, /hashlib\.sha256\(OFFLINE\.read_bytes\(\)\)/);
+  assert.match(builder, /offline-first\.js\?v=/);
+});
