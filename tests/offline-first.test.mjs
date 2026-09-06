@@ -54,3 +54,10 @@ test('mislukte push start geen snelle retrylus', () => {
   assert.match(offline, /if \(!pushFailed && centralSync\.pending && centralSync\.enabled && navigator\.onLine\)/);
   assert.match(offline, /Synchronisatie wacht op controle/);
 });
+
+
+test('dirty opstart blokkeert Machinepark niet als centrale push faalt', () => {
+  assert.match(offline, /Lokale wijzigingen mogen de appstart nooit blokkeren/);
+  assert.match(offline, /Opstartsynchronisatie mislukt; lokale gegevens blijven actief/);
+  assert.match(offline, /Synchronisatie wacht op controle/);
+});
