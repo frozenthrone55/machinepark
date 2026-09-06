@@ -234,19 +234,46 @@
     return body;
   }
 
+  async function gzipSyncPayload(payload) {
+    if (typeof CompressionStream !== 'function') return null;
+    try {
+      const source = new Blob([payload]);
+      const stream = source.stream().pipeThrough(new CompressionStream('gzip'));
+      return await new Response(stream).blob();
+    } catch (error) {
+      console.warn('Gzip synchronisatie niet beschikbaar; gewone JSON wordt gebruikt', error);
+      return null;
+    }
+  }
+
   async function putSnapshot(data, etag) {
     const headers = await centralHeaders(true);
     const payload = JSON.stringify({ data, etag: etag || null });
+    const payloadBytes = new Blob([payload]).size;
+    let requestBody = payload;
+    let compressedBytes = 0;
+
+    // Grote snapshots comprimeren. Dit houdt externe Synology-sync sneller en
+    // voorkomt dat Web Station/nginx een onnodig grote JSON-PUT weigert.
+    if (payloadBytes >= 128 * 1024) {
+      const gzipped = await gzipSyncPayload(payload);
+      if (gzipped && gzipped.size > 0 && gzipped.size < payloadBytes) {
+        requestBody = gzipped;
+        compressedBytes = gzipped.size;
+        headers['Content-Encoding'] = 'gzip';
+      }
+    }
+
     const res = await fetch(CENTRAL_SYNC_URL, {
       method: 'PUT',
       headers,
-      body: payload,
+      body: requestBody,
       cache: 'no-store',
     });
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) {}
-    return { res, body, text, payloadBytes: new Blob([payload]).size };
+    return { res, body, text, payloadBytes, compressedBytes };
   }
 
   function syncHttpError(result, fallback = 'Centrale synchronisatie mislukt') {
