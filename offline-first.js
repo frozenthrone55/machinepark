@@ -372,6 +372,7 @@
 
       centralSync.pushing = true;
       centralSync.pending = false;
+      let pushFailed = false;
       setCentralSyncStatus('☁ Wijzigingen synchroniseren…', 'busy');
       const run = (async () => {
         try {
@@ -409,11 +410,16 @@
           }
           throw new Error('De centrale gegevens wijzigden meerdere keren tegelijk. Lokale wijzigingen blijven bewaard en worden opnieuw geprobeerd.');
         } catch (error) {
+          pushFailed = true;
           await markDirty();
           if (isNetworkFailure(error)) {
             setOfflineStatus();
             return { offline: true, error };
           }
+          // Bij een server-/rechtenfout niet elke 250 ms opnieuw pushen.
+          // De wijziging blijft als dirty lokaal bewaard en de normale polling
+          // probeert later opnieuw. Zo blijft de status stabiel en ontstaat er
+          // geen eindeloze sync-flikkerlus.
           setCentralSyncStatus('☁ Synchronisatie wacht op controle', 'error');
           console.error('Offline synchronisatie', error);
           throw error;
@@ -425,7 +431,7 @@
       finally {
         centralSync.pushing = false;
         centralSync.pushPromise = null;
-        if (centralSync.pending && centralSync.enabled && navigator.onLine) {
+        if (!pushFailed && centralSync.pending && centralSync.enabled && navigator.onLine) {
           clearTimeout(centralSync.pushTimer);
           centralSync.pushTimer = setTimeout(() => {
             centralSync.pushTimer = null;
