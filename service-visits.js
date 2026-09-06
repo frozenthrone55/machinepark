@@ -682,21 +682,63 @@
 
   function collectUsed(panel){return [...(panel?.querySelectorAll('.sv-usage-list .usage-row')||[])].map(r=>({partId:r.querySelector('.usage-part')?.value||'',qty:Number(r.querySelector('.usage-qty')?.value||1)})).filter(u=>u.partId&&u.qty>0);}
   function collectOneOff(panel){return [...(panel?.querySelectorAll('.service-visit-oneoff-row')||[])].map(r=>({supplier:String(r.querySelector('.sv-oneoff-supplier')?.value||'').trim(),supplierCode:String(r.querySelector('.sv-oneoff-code')?.value||'').trim(),description:String(r.querySelector('.sv-oneoff-description')?.value||'').trim(),qty:Math.max(1,Math.round(Number(r.querySelector('.sv-oneoff-qty')?.value)||1))})).filter(p=>p.supplier||p.supplierCode||p.description);}
-  function existingPhotoList(panel){const editor=panel?.querySelector('.sv-photo-editor');if(!editor)return[];try{return JSON.parse(editor.dataset.existingPhotos||'[]').filter(v=>typeof v==='string'&&v.trim());}catch(_){return[];}}
+  function uniquePhotoList(values=[]) {
+    const seen=new Set(),out=[];
+    for(const value of Array.isArray(values)?values:[]){
+      if(typeof value!=='string'||!value.trim())continue;
+      const clean=value.trim();
+      if(seen.has(clean))continue;
+      seen.add(clean);out.push(clean);
+      if(out.length>=5)break;
+    }
+    return out;
+  }
+  function existingPhotoList(panel){const editor=panel?.querySelector('.sv-photo-editor');if(!editor)return[];try{return uniquePhotoList(JSON.parse(editor.dataset.existingPhotos||'[]'));}catch(_){return[];}}
+
+  function syncPhotoEditorState(editor,photos) {
+    if(!editor)return;
+    const list=uniquePhotoList(photos);
+    editor.dataset.existingPhotos=JSON.stringify(list);
+    const current=editor.querySelector('.sv-existing-photos');
+    const html=photoDraftHtml(list);
+    if(current){
+      if(html)current.outerHTML=html;
+      else current.remove();
+    } else if(html) {
+      const input=editor.querySelector('.sv-photo-files');
+      if(input)input.insertAdjacentHTML('beforebegin',html);
+      else editor.insertAdjacentHTML('beforeend',html);
+    }
+    const input=editor.querySelector('.sv-photo-files');
+    if(input)input.value='';
+  }
 
   async function collectPhotos(panel,kind,recordId,old=[]) {
     const editor=panel?.querySelector('.sv-photo-editor');
-    if(!editor)return old||[];
-    const current=existingPhotoList(panel).length?existingPhotoList(panel):(old||[]);
-    const remove=new Set([...editor.querySelectorAll('.sv-remove-photo:checked')].map(x=>Number(x.value)));
+    if(!editor)return uniquePhotoList(old||[]);
+    const fromEditor=existingPhotoList(panel);
+    const current=uniquePhotoList(fromEditor.length?fromEditor:(old||[]));
+    const remove=new Set([...editor.querySelectorAll('.sv-remove-photo:checked')].map(x=>Number(x.value)).filter(Number.isFinite));
     const kept=current.filter((_,i)=>!remove.has(i));
-    const files=[...(editor.querySelector('.sv-photo-files')?.files||[])].filter(f=>f&&f.size);
+    const fileMap=new Map();
+    for(const file of [...(editor.querySelector('.sv-photo-files')?.files||[])].filter(f=>f&&f.size)){
+      const key=[file.name,file.size,file.lastModified,file.type].join('|');
+      if(!fileMap.has(key))fileMap.set(key,file);
+    }
+    const files=[...fileMap.values()];
     if(kept.length+files.length>5)throw new Error(`Maximaal 5 foto’s per toestelregistratie (${svDeviceShort(panel.closest('.service-visit-device')?.dataset.serviceVisitDevice)}).`);
     const added=[];for(const file of files)added.push(await compressImage(file));
-    const merged=[...kept,...added].filter(Boolean);
+    const merged=uniquePhotoList([...kept,...added]);
     const store=kind==='maintenance'?'maintenance':'breakdowns';
-    if(typeof window.machineparkPersistServicePhotos==='function')return await window.machineparkPersistServicePhotos(store,recordId,merged);
-    return merged;
+    let saved=merged;
+    if(typeof window.machineparkPersistServicePhotos==='function')saved=await window.machineparkPersistServicePhotos(store,recordId,merged);
+    saved=uniquePhotoList(saved);
+    // machinepark-service-photo-editor-state-v1
+    // Na autosave moet de DOM dezelfde fotolijst bevatten als het concept.
+    // Anders blijft hetzelfde File-object geselecteerd en kan een volgende save
+    // die foto opnieuw uploaden of een verwijderde foto terug inlezen.
+    syncPhotoEditorState(editor,saved);
+    return saved;
   }
 
   function collectHeader() {

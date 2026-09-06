@@ -195,3 +195,18 @@ test('serviceconcept renderer is beschikbaar voor rerender na tijdelijke draftfi
   assert.match(js, /window\.machineparkRenderServiceVisits = renderServiceVisits/);
   assert.match(js, /function renderServiceVisits\(\)/);
 });
+
+test('serviceconcept foto-editor verwerkt één gekozen bestand maar één keer en houdt delete-state vast', () => {
+  assert.match(js, /machinepark-service-photo-editor-state-v1/);
+  assert.match(js, /function uniquePhotoList\(values=\[\]\)/);
+  assert.match(js, /function syncPhotoEditorState\(editor,photos\)/);
+  assert.match(js, /editor\.dataset\.existingPhotos=JSON\.stringify\(list\)/);
+  assert.match(js, /if\(input\)input\.value=''/);
+  assert.match(js, /const fileMap=new Map\(\)/);
+  assert.match(js, /file\.lastModified/);
+  const collectStart=js.indexOf('async function collectPhotos');
+  const collectEnd=js.indexOf('function collectHeader',collectStart);
+  const collect=js.slice(collectStart,collectEnd);
+  assert.match(collect, /syncPhotoEditorState\(editor,saved\)/);
+  assert.match(collect, /uniquePhotoList\(\[\.\.\.kept,\.\.\.added\]\)/);
+});
