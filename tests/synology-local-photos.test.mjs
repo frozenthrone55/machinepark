@@ -45,3 +45,12 @@ test('Synology build vervangt alle foto-endpoints en Clerk purge-token', () => {
   assert.match(builder, /centralHeaders\(true\)/);
   assert.match(builder, /CACHEABLE_API=new Set\(\[\]\)/);
 });
+
+test('servicefoto API herstelt stale refs en dedupliceert identieke beelden', () => {
+  assert.match(service, /machinepark-service-photo-self-heal-v1/);
+  assert.match(service, /if\(!mp_photo_exists\(\$base\)\)continue/);
+  assert.match(service, /hash_file\('sha256',\$base\.'\.bin'\)/);
+  assert.match(service, /hash\('sha256',\$parsed\['bytes'\]\)/);
+  assert.match(service, /\$seenHashes=\[\]/);
+  assert.match(service, /if\(isset\(\$seenHashes\[\$hash\]\)\)continue/);
+});

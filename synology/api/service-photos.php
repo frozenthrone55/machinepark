@@ -70,7 +70,7 @@ $photos = isset($body['photos']) && is_array($body['photos']) ? array_values($bo
 $thumbnails = isset($body['thumbnails']) && is_array($body['thumbnails']) ? array_values($body['thumbnails']) : [];
 if (count($photos)>5) mp_photo_json(['error'=>'Een onderhouds- of depannageverslag kan maximaal 5 foto’s bevatten.'],400);
 
-$refs=[];$keepTokens=[];$totalBytes=0;
+$refs=[];$keepTokens=[];$totalBytes=0;$seenHashes=[];$seenLegacy=[];
 foreach($photos as $index=>$photoValue){
     $photo=trim((string)$photoValue);
     $thumbnail=trim((string)($thumbnails[$index]??''));
@@ -79,7 +79,19 @@ foreach($photos as $index=>$photoValue){
     if($existingKey!==''){
         if(strpos($existingKey,$prefix)!==0)mp_photo_json(['error'=>'Een fotoreferentie hoort niet bij dit dossier.'],400);
         list($_dir,$base)=service_photo_location($existingKey);
-        if(!mp_photo_exists($base))mp_photo_json(['error'=>'Een bestaande verslagfoto ontbreekt op de NAS.'],404);
+
+        // machinepark-service-photo-self-heal-v1
+        // Oude concepten kunnen nog een ref bevatten naar een bestand dat door een
+        // eerdere dubbele upload al is opgeschoond. Zo'n stale ref mag verwijderen
+        // niet blokkeren; laat hem gewoon uit de nieuwe lijst verdwijnen.
+        if(!mp_photo_exists($base))continue;
+
+        $hash=@hash_file('sha256',$base.'.bin');
+        if(is_string($hash)&&$hash!==''){
+            if(isset($seenHashes[$hash]))continue;
+            $seenHashes[$hash]=true;
+        }
+
         $token=basename($base);
         $keepTokens[]=$token;
         $refs[]=mp_photo_ref('service-photos.php',$existingKey,false);
@@ -88,12 +100,19 @@ foreach($photos as $index=>$photoValue){
     }
 
     if(mp_photo_is_legacy_ref($photo,'service-photos.php')){
+        if(isset($seenLegacy[$photo]))continue;
+        $seenLegacy[$photo]=true;
         $refs[]=$photo;
         continue;
     }
 
     try{$parsed=mp_photo_parse_data_image($photo,1200000);}
     catch(Throwable $e){mp_photo_json(['error'=>$e->getMessage()],strpos($e->getMessage(),'te groot')!==false?413:400);}
+
+    $hash=hash('sha256',$parsed['bytes']);
+    if(isset($seenHashes[$hash]))continue;
+    $seenHashes[$hash]=true;
+
     $totalBytes+=strlen($parsed['bytes']);
     if($totalBytes>4000000)mp_photo_json(['error'=>'De geselecteerde verslagfoto’s zijn samen te groot.'],413);
     $token=bin2hex(random_bytes(16));
