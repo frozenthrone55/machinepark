@@ -61,3 +61,10 @@ test('dirty opstart blokkeert Machinepark niet als centrale push faalt', () => {
   assert.match(offline, /Opstartsynchronisatie mislukt; lokale gegevens blijven actief/);
   assert.match(offline, /Synchronisatie wacht op controle/);
 });
+
+
+test('sync-stabiliteitsbuilder draait na drift-herstel', () => {
+  const cmd = packageJson.scripts.build;
+  assert.ok(cmd.includes('python3 build-sync-status-stability.py'));
+  assert.ok(cmd.indexOf('python3 build-sync-status-stability.py') > cmd.indexOf('python3 build-sync-drift-recovery.py'));
+});
