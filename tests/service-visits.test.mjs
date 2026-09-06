@@ -146,7 +146,7 @@ test('servicebezoek bouwt na Werkzaamheden, wordt syntax-gecontroleerd en cachev
 
 test('servicebezoek volgt bestaande regel dat voorraad negatief mag worden', () => {
   assert.doesNotMatch(js, /if\(Number\(p\.stock\|\|0\)<qty\)throw new Error/);
-  assert.match(js, /stock:Number\(p\.stock\|\|0\)-qty/);
+  assert.match(js, /stock:normalizePartQuantity\(Number\(p\.stock\|\|0\)-qty\)/);
 });
 
 test('serviceconcepten passen binnen bestaande serverrechten voor onderhoud en depannage', () => {
