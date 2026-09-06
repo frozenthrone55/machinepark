@@ -236,16 +236,43 @@
 
   async function putSnapshot(data, etag) {
     const headers = await centralHeaders(true);
+    const payload = JSON.stringify({ data, etag: etag || null });
     const res = await fetch(CENTRAL_SYNC_URL, {
       method: 'PUT',
       headers,
-      body: JSON.stringify({ data, etag: etag || null }),
+      body: payload,
       cache: 'no-store',
     });
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) {}
-    return { res, body, text };
+    return { res, body, text, payloadBytes: new Blob([payload]).size };
+  }
+
+  function syncHttpError(result, fallback = 'Centrale synchronisatie mislukt') {
+    const raw = String(result?.body?.error || result?.text || fallback);
+    const message = raw
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 220);
+    const status = Number(result?.res?.status || 0);
+    const error = new Error(message || fallback);
+    error.status = status;
+    error.payloadBytes = Number(result?.payloadBytes || 0);
+    error.syncCode = String(result?.body?.code || '');
+    return error;
+  }
+
+  function syncErrorStatus(error) {
+    const status = Number(error?.status || 0);
+    const message = String(error?.message || 'Onbekende synchronisatiefout')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 180);
+    const size = Number(error?.payloadBytes || 0);
+    const sizeText = size > 0 ? ' · ' + (size / 1024 / 1024).toFixed(2) + ' MB' : '';
+    return '☁ Synchronisatie mislukt' + (status ? ' · HTTP ' + status : '') + sizeText + ' · ' + message;
   }
 
   function installOfflineLayer() {
@@ -396,7 +423,7 @@
               return { ok: true, conflicts };
             }
 
-            if (result.res.status !== 409) throw new Error(result.body?.error || result.text || `Cloud opslaan mislukt (${result.res.status})`);
+            if (result.res.status !== 409) throw syncHttpError(result, `Centraal opslaan mislukt (HTTP ${result.res.status})`);
             const remote = await fetchRemoteCurrent();
             if (!remote?.exists || !remote?.data) {
               expectedEtag = remote?.etag || null;
@@ -420,7 +447,7 @@
           // De wijziging blijft als dirty lokaal bewaard en de normale polling
           // probeert later opnieuw. Zo blijft de status stabiel en ontstaat er
           // geen eindeloze sync-flikkerlus.
-          setCentralSyncStatus('☁ Synchronisatie wacht op controle', 'error');
+          setCentralSyncStatus(syncErrorStatus(error), 'error');
           console.error('Offline synchronisatie', error);
           throw error;
         }
@@ -518,7 +545,7 @@
         } catch (error) {
           console.warn('Centrale polling', error);
           if (isNetworkFailure(error)) setOfflineStatus();
-          else setCentralSyncStatus('☁ Synchronisatie wacht op controle', 'error');
+          else setCentralSyncStatus(syncErrorStatus(error), 'error');
         }
       }, 20000);
     };
