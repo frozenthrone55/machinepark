@@ -8,12 +8,16 @@ INDEX = ROOT / "index.html"
 SW = ROOT / "sw.js"
 MANIFEST = ROOT / "manifest.webmanifest"
 AUTH = ROOT / "synology-local-auth.js"
+OFFLINE = ROOT / "offline-first.js"
 
 index = INDEX.read_text(encoding="utf-8")
 
 if not AUTH.is_file():
     raise SystemExit("Buildvalidatie mislukt: synology-local-auth.js ontbreekt")
 auth_hash = hashlib.sha256(AUTH.read_bytes()).hexdigest()[:12]
+if not OFFLINE.is_file():
+    raise SystemExit("Buildvalidatie mislukt: offline-first.js ontbreekt")
+offline_hash = hashlib.sha256(OFFLINE.read_bytes()).hexdigest()[:12]
 
 # De app draait onder /machinepark/. Absolute /...-paden wijzen dan naar de
 # domeinroot en breken features zoals Beheer. Maak alleen runtime-assets relatief.
@@ -109,6 +113,14 @@ index, auth_count = re.subn(
 if auth_count != 1:
     raise SystemExit(f"Buildvalidatie mislukt: loginruntime verwacht 1x, gevonden {auth_count}x")
 
+index, offline_count = re.subn(
+    r'src="\./offline-first\.js(?:\?v=[^"]*)?"',
+    f'src="./offline-first.js?v={offline_hash}"',
+    index,
+)
+if offline_count != 1:
+    raise SystemExit(f"Buildvalidatie mislukt: offline runtime verwacht 1x, gevonden {offline_count}x")
+
 sw_hash = hashlib.sha256(SW.read_bytes()).hexdigest()[:12]
 index, sw_count = re.subn(
     r"navigator\.serviceWorker\.register\('\./sw\.js(?:\?v=[^']*)?'(?:,\s*\{[^}]*\})?\)",
@@ -130,4 +142,4 @@ for icon in manifest.get("icons", []):
         icon["src"] = "." + src
 MANIFEST.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-print(f"[Machinepark] Synology runtimepaden relatief gemaakt ({count} HTML-assets), login v={auth_hash} en service worker v={sw_hash}")
+print(f"[Machinepark] Synology runtimepaden relatief gemaakt ({count} HTML-assets), login v={auth_hash}, offline v={offline_hash} en service worker v={sw_hash}")
