@@ -67,7 +67,7 @@ test('meerdere locaties delen één rapport maar behouden een eigen serviceVisit
   assert.match(js, /serviceReportNumber/);
   assert.match(js, /serviceReports\(\)/);
   assert.match(js, /draftLocationKey/);
-  assert.match(js, /locations,activeLocationKey/);
+  assert.match(js, /locations,removedLocations,activeLocationKey/);
   assert.match(js, /groups=new Map\(\)/);
   assert.match(js, /existing\?\.id\|\|loc\.visitId\|\|uid\('sv'\)/);
   assert.match(js, /reportId=report\?\.id\|\|header\.appendToReportId\|\|uid\('sr'\)/);
