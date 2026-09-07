@@ -1052,7 +1052,23 @@
 
   function showServiceVisitDetails(id) { return showServiceReportDetails(id); }
 
+  function ensureServiceVisitTableStyles() {
+    if(document.getElementById('serviceVisitLandscapeWidths'))return;
+    const style=document.createElement('style');
+    style.id='serviceVisitLandscapeWidths';
+    style.textContent=`
+      @media (orientation: landscape) and (max-width: 1050px) {
+        .service-visit-table { min-width: 1040px; }
+        .service-visit-table th:first-child,
+        .service-visit-table td:first-child { min-width: 300px; width: 300px; }
+        .service-visit-number { display:block; line-height:1.35; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function ensurePanel() {
+    ensureServiceVisitTableStyles();
     const work=document.getElementById('view-work');if(!work)return null;let panel=document.getElementById('serviceVisitPanel');if(panel)return panel;
     panel=document.createElement('section');panel.id='serviceVisitPanel';panel.className='service-visit-panel';panel.innerHTML=`<div class="service-visit-panel-head"><div><h3>Serviceverslagen</h3><p>Één verslag kan meerdere locaties bevatten. Onderhoud en depannage blijven per toestel en per locatie opgeslagen.</p></div><button type="button" class="btn primary" id="serviceVisitAdd">+ Serviceverslag</button></div><div id="serviceVisitDraftList"></div><div class="table-wrap"><table class="table service-visit-table"><thead><tr><th>Verslag</th><th>Datum</th><th>Locaties</th><th>Toestellen</th><th>Werkzaamheden</th><th>Technieker</th><th>Status</th><th></th></tr></thead><tbody id="serviceVisitBody"></tbody></table></div>`;
     const drafts=document.getElementById('workDraftPanels');if(drafts?.parentNode===work)drafts.insertAdjacentElement('afterend',panel);else work.insertBefore(panel,work.firstChild);

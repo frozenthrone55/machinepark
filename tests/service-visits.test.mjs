@@ -240,3 +240,13 @@ test('interne service-identifiers en revisies blijven wel behouden voor systeemw
   assert.match(js, /function reportFilenameLabel\(report\)/);
   assert.doesNotMatch(js, /filenameTitle:.*serviceReportNumber/);
 });
+
+test('liggende gsm geeft kolom Verslag extra breedte zonder navigatie te wijzigen', () => {
+  assert.match(js, /function ensureServiceVisitTableStyles\(\)/);
+  assert.match(js, /orientation: landscape/);
+  assert.match(js, /max-width: 1050px/);
+  assert.match(js, /service-visit-table th:first-child/);
+  assert.match(js, /min-width: 300px/);
+  assert.match(js, /service-visit-table \{ min-width: 1040px; \}/);
+  assert.match(js, /ensureServiceVisitTableStyles\(\)/);
+});
