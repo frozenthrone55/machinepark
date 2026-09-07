@@ -1058,10 +1058,10 @@
     style.id='serviceVisitLandscapeWidths';
     style.textContent=`
       @media (orientation: landscape) and (max-width: 1050px) {
-        .service-visit-table { min-width: 1040px; }
+        .service-visit-table { min-width: 1180px; }
         .service-visit-table th:first-child,
-        .service-visit-table td:first-child { min-width: 300px; width: 300px; }
-        .service-visit-number { display:block; line-height:1.35; }
+        .service-visit-table td:first-child { min-width: 420px; width: 420px; }
+        .service-visit-number { display:block; line-height:1.35; white-space:normal; word-break:normal; overflow-wrap:normal; }
       }
     `;
     document.head.appendChild(style);
