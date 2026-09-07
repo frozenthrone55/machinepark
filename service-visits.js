@@ -15,6 +15,7 @@
   const svCanCreate = () => svCan('maintenance.add') || svCan('breakdowns.add');
   const svCanEdit = () => svCan('maintenance.edit') || svCan('breakdowns.edit');
   const svCanDeleteReport = report => Boolean(report) && (!report.maintenanceCount || svCan('maintenance.delete')) && (!(report.breakdownCount || report.otherWorkCount) || svCan('breakdowns.delete'));
+  const svCanDeleteVisit = visitId => { const rows=serviceVisitRecords(visitId); return (!rows.some(row=>row.kind==='maintenance')||svCan('maintenance.delete')) && (!rows.some(row=>row.kind!=='maintenance')||svCan('breakdowns.delete')); };
   const svIsOtherWork = item => Boolean(item?.serviceKind === 'other');
   const svKindLabel = (kind,item={}) => kind === 'maintenance' ? 'Onderhoud' : (kind === 'otherworks' ? (item.workTypeName || 'Andere werken') : 'Depannage');
   const svDeviceShort = deviceId => {
@@ -474,7 +475,7 @@
     if(!report)return null;
     const locations=(report.visits||[]).map(visit=>({key:visit.locationKey||svKey(visit.location),label:visit.location||'—',visitId:visit.id}));
     const reportSessions=reportWorkSessions(report).map(row=>({date:String(row.date||''),minutes:Math.max(0,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0);
-    return {locations,activeLocationKey:locations[0]?.key||'',date:report.date||todayISO(),time:report.time||nowLocalTime(),technician:report.technician==='—'?'':report.technician||'',reportSessions,workSessions:reportSessions,appendToReportId:report.id,editReportId:report.id};
+    return {locations,removedLocations:[],activeLocationKey:locations[0]?.key||'',date:report.date||todayISO(),time:report.time||nowLocalTime(),technician:report.technician==='—'?'':report.technician||'',reportSessions,workSessions:reportSessions,appendToReportId:report.id,editReportId:report.id};
   }
 
   function reportEditItems(report,draftBatchId) {
@@ -499,7 +500,7 @@
   function draftLocationList(report=null,header=null) {
     const fromReport=(report?.visits||[]).map(visit=>({key:visit.locationKey||svKey(visit.location),label:visit.location||'—',visitId:visit.id}));
     const fromHeader=Array.isArray(header?.locations)?header.locations.map(loc=>({key:String(loc?.key||''),label:String(loc?.label||''),visitId:String(loc?.visitId||'')})).filter(loc=>loc.key&&loc.label):[];
-    if(fromHeader.length)return fromHeader;
+    if(Array.isArray(header?.locations))return fromHeader;
     if(fromReport.length)return fromReport;
     if(header?.locationKey&&header?.locationLabel)return[{key:header.locationKey,label:header.locationLabel,visitId:header.appendToVisitId||''}];
     return[];
@@ -624,7 +625,7 @@
   function renderLocationChips() {
     const box=document.getElementById('serviceReportLocationChips');if(!box||!activeVisitDraft)return;
     box.innerHTML=(activeVisitDraft.locations||[]).length
-      ?activeVisitDraft.locations.map(loc=>`<span class="service-report-location-chip-wrap"><button type="button" class="service-report-location-chip ${loc.key===activeVisitDraft.activeLocationKey?'active':''}" data-sv-location-switch="${svEsc(loc.key)}"><span>${svEsc(loc.label)}</span>${loc.visitId?'<small>Bestaande locatie</small>':'<small>Concept</small>'}</button>${loc.visitId?'':`<button type="button" class="service-report-location-remove" data-sv-location-remove="${svEsc(loc.key)}" title="Locatie verwijderen">×</button>`}</span>`).join('')
+      ?activeVisitDraft.locations.map(loc=>{const removable=!loc.visitId||(activeVisitDraft.editMode&&svCanDeleteVisit(loc.visitId));return `<span class="service-report-location-chip-wrap"><button type="button" class="service-report-location-chip ${loc.key===activeVisitDraft.activeLocationKey?'active':''}" data-sv-location-switch="${svEsc(loc.key)}"><span>${svEsc(loc.label)}</span>${loc.visitId?'<small>Bestaande locatie</small>':'<small>Concept</small>'}</button>${removable?`<button type="button" class="service-report-location-remove" data-sv-location-remove="${svEsc(loc.key)}" title="Locatie verwijderen">×</button>`:''}</span>`;}).join('')
       :'<span class="muted">Nog geen locatie gekozen.</span>';
   }
 
@@ -646,6 +647,23 @@
     activeVisitDraft.touched=true;scheduleDraft();
   }
 
+  function serviceLocationDeleteImpact(loc) {
+    const rows=loc?.visitId?serviceVisitRecords(loc.visitId):[];
+    let usedQty=0,oneOff=0,photos=0;
+    for(const row of rows){
+      for(const usage of row.item?.usedParts||[])usedQty+=Math.max(0,Number(usage?.qty||0));
+      oneOff+=(row.item?.oneOffParts||[]).filter(item=>item&&(item.supplier||item.supplierCode||item.description)).length;
+      photos+=(row.item?.photos||[]).filter(src=>typeof src==='string'&&src.trim()).length;
+    }
+    return {
+      rows,
+      maintenance:rows.filter(row=>row.kind==='maintenance').length,
+      breakdowns:rows.filter(row=>row.kind==='breakdowns').length,
+      otherWorks:rows.filter(row=>row.kind==='otherworks').length,
+      usedQty,oneOff,photos
+    };
+  }
+
   function initVisitForm({report=null,visit=null,header=null,items=[]}={}) {
     const input=document.getElementById('serviceVisitLocationSearch'),hidden=document.getElementById('serviceVisitLocationKey'),suggestions=document.getElementById('serviceVisitLocationSuggestions'),form=document.getElementById('modalForm'),add=document.getElementById('serviceReportAddLocation');if(!input||!hidden||!suggestions||!form||!activeVisitDraft)return;
     const initialLocations=draftLocationList(report,header);
@@ -662,9 +680,35 @@
     input.addEventListener('input',()=>{hidden.value='';render();});
     input.addEventListener('keydown',e=>{if(e.key==='Escape')hide();if(e.key==='Enter'&&suggestions.classList.contains('show')){const first=suggestions.querySelector('[data-sv-location]');if(first){e.preventDefault();first.click();}}});
     suggestions.addEventListener('click',e=>{const choice=e.target.closest('[data-sv-location]');if(!choice)return;const group=locationGroups().find(g=>g.key===choice.dataset.svLocation);if(!group)return;hide();void switchDraftLocation(group);});
-    document.getElementById('serviceReportLocationChips')?.addEventListener('click',e=>{
+    document.getElementById('serviceReportLocationChips')?.addEventListener('click',async e=>{
       const remove=e.target.closest('[data-sv-location-remove]');
-      if(remove){const key=remove.dataset.svLocationRemove||'',loc=(activeVisitDraft.locations||[]).find(x=>x.key===key);if(!loc||loc.visitId)return;if(!confirm(`Locatie ${loc.label} uit dit concept verwijderen? De reeds afgesloten locaties worden niet geraakt.`))return;activeVisitDraft.items=(activeVisitDraft.items||[]).filter(item=>String(item.draftLocationKey||'')!==key);activeVisitDraft.locations=activeVisitDraft.locations.filter(x=>x.key!==key);if(activeVisitDraft.activeLocationKey===key){activeVisitDraft.activeLocationKey=activeVisitDraft.locations[0]?.key||'';const next=activeVisitDraft.locations[0],group=next?findGroup(next.key,next.label):null;if(group)void switchDraftLocation(group,{capture:false});else renderDevices(null);}renderLocationChips();scheduleDraft();return;}
+      if(remove){
+        const key=remove.dataset.svLocationRemove||'',loc=(activeVisitDraft.locations||[]).find(x=>x.key===key);if(!loc)return;
+        if(loc.visitId&&!activeVisitDraft.editMode){toast('Een bestaande locatie kan alleen via Bewerken uit het serviceverslag worden verwijderd.');return;}
+        if(loc.visitId&&!svCanDeleteVisit(loc.visitId)){toast('Deze rol mist het verwijderrecht voor één of meer werkzaamheden op deze locatie.');return;}
+        if(activeVisitDraft.activeLocationKey&&activeVisitDraft.activeLocationKey!==key)activeVisitDraft.items=await collectItems();
+        const impact=serviceLocationDeleteImpact(loc),lines=[`Locatie ${loc.label} uit dit serviceverslag verwijderen?`];
+        if(loc.visitId){
+          lines.push('',`• ${impact.maintenance} onderhoudsregistratie${impact.maintenance===1?'':'s'}`,`• ${impact.breakdowns} depannageregistratie${impact.breakdowns===1?'':'s'}`,`• ${impact.otherWorks} registratie${impact.otherWorks===1?'':'s'} Andere werken`);
+          if(impact.usedQty)lines.push(`• ${impact.usedQty} gebruikt${impact.usedQty===1?' onderdeel':'e onderdelen'} wordt/worden terug op voorraad gezet`);
+          if(impact.oneOff)lines.push(`• ${impact.oneOff} eenmalig onderdeel${impact.oneOff===1?'':'delen'} wordt/worden verwijderd`);
+          if(impact.photos)lines.push(`• ${impact.photos} foto${impact.photos===1?'':'’s'} wordt/worden na synchronisatie opgeruimd`);
+          lines.push('','De andere locaties in dit serviceverslag blijven behouden. De verwijdering wordt definitief bij Opslaan.');
+        }else lines.push('','Alle tijdelijke gegevens van deze conceptlocatie worden uit het serviceconcept verwijderd.');
+        if(!confirm(lines.join('\n')))return;
+        activeVisitDraft.items=(activeVisitDraft.items||[]).filter(item=>String(item.draftLocationKey||'')!==key);
+        activeVisitDraft.locations=activeVisitDraft.locations.filter(x=>x.key!==key);
+        if(loc.visitId){
+          activeVisitDraft.removedLocations=activeVisitDraft.removedLocations||[];
+          if(!activeVisitDraft.removedLocations.some(item=>String(item.visitId||'')===String(loc.visitId)||String(item.key||'')===String(loc.key)))activeVisitDraft.removedLocations.push({key:loc.key,label:loc.label,visitId:loc.visitId});
+        }
+        if(activeVisitDraft.activeLocationKey===key){
+          activeVisitDraft.activeLocationKey=activeVisitDraft.locations[0]?.key||'';
+          const next=activeVisitDraft.locations[0],group=next?findGroup(next.key,next.label):null;
+          if(group)await switchDraftLocation(group,{capture:false});else{const input=document.getElementById('serviceVisitLocationSearch'),hidden=document.getElementById('serviceVisitLocationKey');if(input)input.value='';if(hidden)hidden.value='';renderDevices(null);}
+        }
+        activeVisitDraft.touched=true;renderLocationChips();scheduleDraft();return;
+      }
       const chip=e.target.closest('[data-sv-location-switch]');if(!chip)return;const loc=(activeVisitDraft.locations||[]).find(x=>x.key===chip.dataset.svLocationSwitch);const group=loc?findGroup(loc.key,loc.label):null;if(group)void switchDraftLocation(group);
     });
     if(add)add.onclick=async()=>{if(activeVisitDraft.activeLocationKey){activeVisitDraft.items=await collectItems();}activeVisitDraft.activeLocationKey='';hidden.value='';input.value='';renderLocationChips();renderDevices(null);input.focus();render();scheduleDraft();};
@@ -706,7 +750,8 @@
     captureReportSessions();
     const reportSessions=Array.isArray(activeVisitDraft.reportSessions)?activeVisitDraft.reportSessions:[];
     const locations=(activeVisitDraft?.locations||[]).map(loc=>({key:String(loc.key||''),label:String(loc.label||''),visitId:String(loc.visitId||'')})).filter(loc=>loc.key&&loc.label);
-    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions:reportSessions,reportSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',editMode:Boolean(activeVisitDraft.editMode),createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:4};
+    const removedLocations=(activeVisitDraft?.removedLocations||[]).map(loc=>({key:String(loc.key||''),label:String(loc.label||''),visitId:String(loc.visitId||'')})).filter(loc=>loc.key||loc.visitId);
+    return {...(existing||{}),id:activeVisitDraft.id,isDraft:true,draftRole:'header',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftHeaderStore:activeVisitDraft.headerStore,locationKey:active?.key||'',locationLabel:active?.label||'',locations,removedLocations,activeLocationKey:active?.key||'',date:String(form?.elements.date?.value||''),time:String(form?.elements.time?.value||''),technician:String(form?.elements.technician?.value||'').trim(),workSessions:reportSessions,reportSessions,appendToVisitId:activeVisitDraft.appendToVisitId||'',appendToReportId:activeVisitDraft.appendToReportId||'',editMode:Boolean(activeVisitDraft.editMode),createdAt:existing?.createdAt||activeVisitDraft.createdAt||now,updatedAt:now,draftSchema:4};
   }
 
   async function collectItems() {
@@ -782,12 +827,13 @@
     form.addEventListener('input',scheduleDraft);form.addEventListener('change',scheduleDraft);form.addEventListener('click',e=>{if(e.target.closest('.sv-add-part,.sv-add-oneoff,.remove-line,.usage-suggestion,[data-sv-location],[data-kind],[data-fault-pick],[data-add-work-session],[data-remove-work-session]'))scheduleDraft();});
   }
 
-  function stockUpdates(items,{editMode=false}={}) {
+  function stockUpdates(items,{editMode=false,restoreItems=[]}={}) {
     const totals={};
     items.forEach(item=>{
       (item.usedParts||[]).forEach(u=>{const id=String(u?.partId||'').trim(),qty=Number(u?.qty||0);if(id&&qty>0)totals[id]=(totals[id]||0)+qty;});
       if(editMode&&(item.sourceRecordId||item.sourceUsedParts)){(item.sourceUsedParts||[]).forEach(u=>{const id=String(u?.partId||'').trim(),qty=Number(u?.qty||0);if(id&&qty>0)totals[id]=(totals[id]||0)-qty;});}
     });
+    (restoreItems||[]).forEach(item=>(item?.usedParts||[]).forEach(u=>{const id=String(u?.partId||'').trim(),qty=Number(u?.qty||0);if(id&&qty>0)totals[id]=(totals[id]||0)-qty;}));
     const now=new Date().toISOString(),updates=[];
     for(const[id,qty]of Object.entries(totals)){if(!qty)continue;const p=(state.parts||[]).find(x=>x.id===id);if(!p)throw new Error(`Onderdeel ${id} bestaat niet meer.`);updates.push({...p,stock:Number(p.stock||0)-qty,updatedAt:now});}
     return updates;
@@ -805,12 +851,16 @@
   }
 
   function finalizeDraftTransaction(header,allItems,selected,report) {
-    const updates=stockUpdates(selected,{editMode:Boolean(header.editMode)}),now=new Date().toISOString(),reportId=report?.id||header.appendToReportId||uid('sr'),reportNumberValue=report?.number||reportNumber(reportId,header.date),reportRevision=report?Math.max(1,Number(report.revision)||1)+1:1;
+    const now=new Date().toISOString(),reportId=report?.id||header.appendToReportId||uid('sr'),reportNumberValue=report?.number||reportNumber(reportId,header.date),reportRevision=report?Math.max(1,Number(report.revision)||1)+1:1;
+    const removedLocations=Array.isArray(header.removedLocations)?header.removedLocations:[];
+    const removedVisitIds=new Set(removedLocations.map(loc=>String(loc?.visitId||'')).filter(Boolean)),removedLocationKeys=new Set(removedLocations.map(loc=>String(loc?.key||'')).filter(Boolean));
+    const existingRows=(report?.records||[]).filter(row=>row?.item),removedRows=existingRows.filter(row=>removedVisitIds.has(String(row.item.serviceVisitId||''))||removedLocationKeys.has(String(row.item.serviceVisitLocationKey||svKey(row.item.serviceVisitLocation||''))));
+    const removedRecordIds=new Set(removedRows.map(row=>String(row.item.id||''))),updates=stockUpdates(selected,{editMode:Boolean(header.editMode),restoreItems:removedRows.map(row=>row.item)});
     const reportSessions=(Array.isArray(header.reportSessions)?header.reportSessions:(Array.isArray(header.workSessions)?header.workSessions:[])).map(row=>({date:String(row.date||''),minutes:Math.max(1,Math.round(Number(row.minutes)||0))})).filter(row=>row.date&&row.minutes>0);
     const reportTotalMinutes=reportSessions.reduce((sum,row)=>sum+Number(row.minutes||0),0);
-    const existingRecords=(report?.records||[]).map(row=>row.item).filter(Boolean);
+    const existingRecords=existingRows.map(row=>row.item);
     const replacedIds=new Set(selected.map(item=>String(item.sourceRecordId||'')).filter(Boolean));
-    const retainedExisting=existingRecords.filter(item=>!replacedIds.has(String(item.id||'')));
+    const retainedExisting=existingRecords.filter(item=>!replacedIds.has(String(item.id||''))&&!removedRecordIds.has(String(item.id||'')));
     const reportDeviceCount=Math.max(1,new Set([...retainedExisting,...selected].map(item=>String(item.deviceId||'')).filter(Boolean)).size);
     const groups=new Map();
     for(const item of selected){const key=String(item.draftLocationKey||header.locationKey||'');if(!key)continue;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
@@ -833,7 +883,7 @@
       if(!visitMeta.has(serviceVisitId))visitMeta.set(serviceVisitId,{id:serviceVisitId,number:item.serviceVisitNumber||serviceVisitId,location:item.serviceVisitLocation||existingVisit?.location||'',locationKey:item.serviceVisitLocationKey||existingVisit?.locationKey||'',revision:Math.max(1,Number(item.serviceVisitRevision)||existingVisit?.revision||1),deviceCount:localCount});
     }
     const visits=[...visitMeta.values()].map(meta=>({...meta,count:finals.filter(item=>item.serviceVisitId===meta.id).length}));
-    return new Promise((resolve,reject)=>{let tr;try{tr=db.transaction(['maintenance','breakdowns','parts'],'readwrite');}catch(e){reject(e);return;}const ms=tr.objectStore('maintenance'),bs=tr.objectStore('breakdowns'),ps=tr.objectStore('parts');updates.forEach(p=>ps.put(p));(header.draftHeaderStore==='maintenance'?ms:bs).delete(header.id);allItems.forEach(i=>(i.draftServiceKind==='maintenance'?ms:bs).delete(i.id));finals.forEach(i=>(i.type!==undefined?ms:bs).put(i));tr.oncomplete=()=>{scheduleCentralSync();resolve({id:reportId,number:reportNumberValue,revision:reportRevision,visits,finals});};tr.onerror=()=>reject(tr.error||new Error('Serviceverslag afsluiten mislukt.'));tr.onabort=()=>reject(tr.error||new Error('Serviceverslag afsluiten afgebroken.'));});
+    return new Promise((resolve,reject)=>{let tr;try{tr=db.transaction(['maintenance','breakdowns','parts'],'readwrite');}catch(e){reject(e);return;}const ms=tr.objectStore('maintenance'),bs=tr.objectStore('breakdowns'),ps=tr.objectStore('parts');updates.forEach(p=>ps.put(p));removedRows.forEach(row=>(row.kind==='maintenance'?ms:bs).delete(row.item.id));(header.draftHeaderStore==='maintenance'?ms:bs).delete(header.id);allItems.forEach(i=>(i.draftServiceKind==='maintenance'?ms:bs).delete(i.id));finals.forEach(i=>(i.type!==undefined?ms:bs).put(i));tr.oncomplete=()=>{scheduleCentralSync();resolve({id:reportId,number:reportNumberValue,revision:reportRevision,visits,finals});};tr.onerror=()=>reject(tr.error||new Error('Serviceverslag afsluiten mislukt.'));tr.onabort=()=>reject(tr.error||new Error('Serviceverslag afsluiten afgebroken.'));});
   }
 
   async function finalizeActiveVisit() {
@@ -872,7 +922,7 @@
     const locations=draftLocationList(report,header);
     const activeKey=header?.activeLocationKey||locations[0]?.key||'';
     const activeVisit=report?.visits?.find(v=>String(v.locationKey||svKey(v.location))===activeKey)||report?.visits?.[0]||null;
-    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,activeLocationKey:activeKey,reportSessions:Array.isArray(header?.reportSessions)?header.reportSessions:(Array.isArray(header?.workSessions)?header.workSessions:reportWorkSessions(report)),appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',editMode,createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(draftId),touched:false,finalizing:false,restoring:Boolean(header&&draftId)};
+    activeVisitDraft={id:draftKey,headerStore:draftHeaderStore,header,items,report,locations,removedLocations:Array.isArray(header?.removedLocations)?header.removedLocations.map(loc=>({...loc})):[],activeLocationKey:activeKey,reportSessions:Array.isArray(header?.reportSessions)?header.reportSessions:(Array.isArray(header?.workSessions)?header.workSessions:reportWorkSessions(report)),appendToReportId:report?.id||header?.appendToReportId||'',appendToVisitId:activeVisit?.id||header?.appendToVisitId||'',editMode,createdAt:header?.createdAt||new Date().toISOString(),persisted:Boolean(draftId),touched:false,finalizing:false,restoring:Boolean(header&&draftId)};
     showModal(report?(editMode?`Serviceverslag bewerken · ${reportDisplayLabel(report)}`:`Serviceverslag aanvullen · ${reportDisplayLabel(report)}`):(header?'Serviceconcept verderzetten':'Nieuw serviceverslag'),serviceVisitForm({report,visit:activeVisit,header,items}),'Serviceverslag opslaan',async()=>finalizeActiveVisit());
     setTimeout(()=>{initVisitForm({report,visit:activeVisit,header,items});decorateDraftModal();if(activeVisitDraft){activeVisitDraft.restoring=false;activeVisitDraft.touched=false;}},0);
   }
