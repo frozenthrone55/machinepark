@@ -246,7 +246,14 @@ test('liggende gsm geeft kolom Verslag extra breedte zonder navigatie te wijzige
   assert.match(js, /orientation: landscape/);
   assert.match(js, /max-width: 1050px/);
   assert.match(js, /service-visit-table th:first-child/);
-  assert.match(js, /min-width: 300px/);
+  assert.match(js, /min-width: 420px/);
   assert.match(js, /service-visit-table \{ min-width: 1040px; \}/);
   assert.match(js, /ensureServiceVisitTableStyles\(\)/);
+});
+
+test('kolom Verslag blijft ruim leesbaar in landscape', () => {
+  assert.match(js, /min-width: 420px; width: 420px/);
+  assert.match(js, /white-space:normal/);
+  assert.match(js, /word-break:normal/);
+  assert.match(js, /overflow-wrap:normal/);
 });
