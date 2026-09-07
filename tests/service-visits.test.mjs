@@ -55,7 +55,7 @@ test('serviceverslag bewerken behoudt bestaande record ids en corrigeert alleen 
   assert.match(js, /sourceRecordId/);
   assert.match(js, /sourceUsedParts/);
   assert.match(js, /id:item\.sourceRecordId\|\|item\.id/);
-  assert.match(js, /stockUpdates\(selected,\{editMode:Boolean\(header\.editMode\)\}\)/);
+  assert.match(js, /stockUpdates\(selected,\{editMode:Boolean\(header\.editMode\),restoreItems:removedRows\.map\(row=>row\.item\)\}\)/);
   assert.match(js, /totals\[id\]=\(totals\[id\]\|\|0\)-qty/);
   assert.match(js, /serviceReportRevision/);
 });
@@ -99,7 +99,7 @@ test('volledig servicebezoek heeft concept autosave en boekt voorraad pas bij af
   assert.match(js, /draftKind:'serviceVisit'/);
   assert.match(js, /scheduleDraft/);
   assert.match(js, /saveDraftInternal/);
-  assert.match(js, /stockUpdates\(selected,\{editMode:Boolean\(header\.editMode\)\}\)/);
+  assert.match(js, /stockUpdates\(selected,\{editMode:Boolean\(header\.editMode\),restoreItems:removedRows\.map\(row=>row\.item\)\}\)/);
   assert.match(js, /db\.transaction\(\['maintenance','breakdowns','parts'\]/);
   assert.match(js, /machineparkSyncOnlineNow/);
 });
@@ -189,4 +189,30 @@ test('Andere werken gebruikt de gekozen werknaam in overzicht afdruk en PDF zond
   const pdf=js.slice(js.indexOf('const workPages=\[\]'),js.indexOf('return \{',js.indexOf('const workPages=\[\]')));
   assert.match(pdf, /kindLabel:svKindLabel\(row\.kind,item\)/);
   assert.doesNotMatch(pdf, /Soort werkzaamheden:/);
+});
+
+
+test('bestaande locatie kan in bewerkmodus afzonderlijk uit serviceverslag worden verwijderd', () => {
+  assert.match(js, /const svCanDeleteVisit = visitId/);
+  assert.match(js, /activeVisitDraft\.editMode&&svCanDeleteVisit\(loc\.visitId\)/);
+  assert.match(js, /Een bestaande locatie kan alleen via Bewerken uit het serviceverslag worden verwijderd/);
+  assert.match(js, /De andere locaties in dit serviceverslag blijven behouden/);
+  assert.match(js, /removedLocations/);
+});
+
+test('verwijderde servicelocatie ruimt records conceptregels en voorraad atomair op', () => {
+  assert.match(js, /removedVisitIds=new Set/);
+  assert.match(js, /removedLocationKeys=new Set/);
+  assert.match(js, /removedRows=existingRows\.filter/);
+  assert.match(js, /restoreItems:removedRows\.map\(row=>row\.item\)/);
+  assert.match(js, /removedRows\.forEach\(row=>\(row\.kind==='maintenance'\?ms:bs\)\.delete\(row\.item\.id\)\)/);
+  assert.match(js, /activeVisitDraft\.items=\(activeVisitDraft\.items\|\|\[\]\)\.filter\(item=>String\(item\.draftLocationKey\|\|''\)!==key\)/);
+  assert.match(js, /previous\.forEach\(item=>.*\.delete\(item\.id\)\)/);
+});
+
+test('verwijderde locatie blijft uit autosaved serviceconcept na heropenen', () => {
+  assert.match(js, /const removedLocations=\(activeVisitDraft\?\.removedLocations\|\|\[\]\)/);
+  assert.match(js, /locations,removedLocations,activeLocationKey/);
+  assert.match(js, /if\(Array\.isArray\(header\?\.locations\)\)return fromHeader/);
+  assert.match(js, /removedLocations:Array\.isArray\(header\?\.removedLocations\)/);
 });
