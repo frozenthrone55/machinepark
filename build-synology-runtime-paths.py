@@ -120,26 +120,29 @@ SW.write_text(sw, encoding="utf-8")
 # Toon bovenaan het Synology-dashboard wanneer de gepubliceerde runtime gebouwd is.
 # De bron is deploy-meta.json uit synology-deploy; daardoor verandert dit automatisch
 # bij elke geslaagde publicatie en blijft de tijd los van browser-/serviceworkercache.
-DASHBOARD_VERSION_MARKER = 'data-machinepark-synology-version="v2"'
+DASHBOARD_VERSION_MARKER = 'data-machinepark-synology-version="v3"'
 index = INDEX.read_text(encoding="utf-8")
 if DASHBOARD_VERSION_MARKER not in index:
-    sync_anchor = '<div id="centralSyncStatus" class="sync-status" role="status" aria-live="polite">☁ Verbinden met centrale gegevens…</div>'
-    dashboard_stamp = sync_anchor + '<div id="dashboardVersionStamp" class="dashboard-version-stamp" data-machinepark-synology-version="v2" role="status" aria-live="polite">Laatste versie: laden…</div>'
-    if sync_anchor not in index:
-        raise SystemExit("Buildvalidatie mislukt: synchronisatiestatus ontbreekt voor versiedatum")
-    index = index.replace(sync_anchor, dashboard_stamp, 1)
+    account_anchor = '<div class="account-summary" id="accountSummary">'
+    account_stamp = account_anchor + '<div id="dashboardVersionStamp" class="dashboard-version-stamp" data-machinepark-synology-version="v3" role="status" aria-live="polite">Laatste versie: laden…</div>'
+    if account_anchor not in index:
+        raise SystemExit("Buildvalidatie mislukt: aangemelde gebruiker ontbreekt voor versiedatum")
+    index = index.replace(account_anchor, account_stamp, 1)
 
-    dashboard_style = """<style data-machinepark-synology-version="v2">
-.dashboard-version-stamp{display:flex;align-items:center;width:max-content;max-width:100%;margin-top:7px;padding:7px 10px;border:1px solid #c7d9d2;border-radius:9px;background:#eef6f2;color:#164f3e;font-size:12px;font-weight:800;line-height:1.2;box-shadow:0 1px 0 rgba(16,78,58,.05)}
-.dashboard-version-stamp::before{content:'↻';display:inline-block;margin-right:6px;font-size:12px}
-@media(max-width:700px){.dashboard-version-stamp{font-size:11px;margin-top:6px}}
+    dashboard_style = """<style data-machinepark-synology-version="v3">
+.account-summary{display:grid!important;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'version version' 'copy user';align-items:center;column-gap:9px;row-gap:5px}
+.account-summary .account-copy{grid-area:copy}
+.account-summary .clerk-user-slot{grid-area:user}
+.dashboard-version-stamp{grid-area:version;justify-self:end;display:flex;align-items:center;width:max-content;max-width:100%;padding:5px 9px;border:1px solid #c7d9d2;border-radius:9px;background:#eef6f2;color:#164f3e;font-size:11px;font-weight:800;line-height:1.2;white-space:nowrap}
+.dashboard-version-stamp::before{content:'↻';display:inline-block;margin-right:5px;font-size:11px}
+@media(max-width:700px){.account-summary{row-gap:3px}.dashboard-version-stamp{font-size:10px;padding:4px 7px}.dashboard-version-stamp::before{font-size:10px}}
 </style>
 """
     if "</head>" not in index:
         raise SystemExit("Buildvalidatie mislukt: HTML-head ontbreekt voor versiedatum")
     index = index.replace("</head>", dashboard_style + "</head>", 1)
 
-    dashboard_script = """<script data-machinepark-synology-version="v1">
+    dashboard_script = """<script data-machinepark-synology-version="v3">
 (() => {
   async function machineparkLoadDashboardVersion() {
     const node = document.getElementById('dashboardVersionStamp');

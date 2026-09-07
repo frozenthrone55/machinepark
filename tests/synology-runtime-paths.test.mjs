@@ -62,7 +62,7 @@ test('Synology dashboard toont automatisch datum en uur van laatste gepubliceerd
   assert.match(builder, /dashboardVersionStamp/);
   assert.match(builder, /centralSyncStatus/);
   assert.match(builder, /Laatste versie: laden/);
-  assert.match(builder, /data-machinepark-synology-version="v2"/);
+  assert.match(builder, /data-machinepark-synology-version="v3"/);
   assert.match(builder, /\.\/deploy-meta\.json\?ts=/);
   assert.match(builder, /cache: 'no-store'/);
   assert.match(builder, /timeZone: 'Europe\/Brussels'/);
@@ -71,12 +71,14 @@ test('Synology dashboard toont automatisch datum en uur van laatste gepubliceerd
   assert.match(builder, /visibilitychange/);
 });
 
-test('versiedatum staat zichtbaar bij Dashboardtitel en synchronisatiestatus', () => {
+test('versiedatum staat direct boven de aangemelde gebruiker', () => {
   const versionPos = builder.indexOf('id="dashboardVersionStamp"');
-  const syncPos = builder.indexOf('id="centralSyncStatus"');
-  assert.ok(versionPos >= 0 && syncPos >= 0);
-  assert.match(builder, /sync_anchor/);
-  assert.doesNotMatch(builder, /dashboard_anchor = '<section class="view active" id="view-dashboard">/);
-  assert.match(builder, /font-weight:800/);
-  assert.match(builder, /background:#eef6f2/);
+  const accountPos = builder.indexOf('id="accountSummary"');
+  assert.ok(versionPos >= 0 && accountPos >= 0);
+  assert.match(builder, /account_anchor/);
+  assert.match(builder, /account_stamp/);
+  assert.match(builder, /grid-template-areas:'version version' 'copy user'/);
+  assert.match(builder, /justify-self:end/);
+  assert.match(builder, /data-machinepark-synology-version="v3"/);
+  assert.doesNotMatch(builder, /sync_anchor/);
 });
