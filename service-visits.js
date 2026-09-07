@@ -713,7 +713,7 @@
     if(input)input.value='';
   }
 
-  async function collectPhotos(panel,kind,recordId,old=[]) {
+  async function collectPhotos(panel,kind,recordId,old=[],persistRecordId='') {
     const editor=panel?.querySelector('.sv-photo-editor');
     if(!editor)return uniquePhotoList(old||[]);
     const fromEditor=existingPhotoList(panel);
@@ -727,11 +727,21 @@
     }
     const files=[...fileMap.values()];
     if(kept.length+files.length>5)throw new Error(`Maximaal 5 foto’s per toestelregistratie (${svDeviceShort(panel.closest('.service-visit-device')?.dataset.serviceVisitDevice)}).`);
+
+    // machinepark-service-photo-edit-id-v1
+    // Een gewone servicebewerking mag bestaande foto’s niet opnieuw naar de API sturen.
+    // Bestaande refs horen bij het originele record-id, niet bij het tijdelijke draft-id.
+    const changed=remove.size>0||files.length>0;
+    if(!changed){
+      syncPhotoEditorState(editor,current);
+      return current;
+    }
+
     const added=[];for(const file of files)added.push(await compressImage(file));
     const merged=uniquePhotoList([...kept,...added]);
-    const store=kind==='maintenance'?'maintenance':'breakdowns';
+    const store=kind==='maintenance'?'maintenance':'breakdowns',targetRecordId=String(persistRecordId||recordId||'');
     let saved=merged;
-    if(typeof window.machineparkPersistServicePhotos==='function')saved=await window.machineparkPersistServicePhotos(store,recordId,merged);
+    if(typeof window.machineparkPersistServicePhotos==='function')saved=await window.machineparkPersistServicePhotos(store,targetRecordId,merged);
     saved=uniquePhotoList(saved);
     // machinepark-service-photo-editor-state-v1
     // Na autosave moet de DOM dezelfde fotolijst bevatten als het concept.
@@ -766,7 +776,8 @@
         const checked=card.querySelector(`[data-kind="${kind}"]`)?.checked;
         if(!checked)continue;
         const panel=card.querySelector(`[data-panel-kind="${kind}"]`),old=oldMap.get(`${kind}:${deviceId}`)||null,id=old?.id||uid(kind==='maintenance'?'mntdraft':'brkdraft');
-        const photos=await collectPhotos(panel,kind,id,old?.photos||[]);
+        const photoRecordId=old?.sourceRecordId||old?.id||id;
+        const photos=await collectPhotos(panel,kind,id,old?.photos||[],photoRecordId);
         const editor=panel?.querySelector('[data-workorder-editor]');
         const workOrder=editor&&typeof window.machineparkCollectWorkOrder==='function'?window.machineparkCollectWorkOrder(editor):old?.workOrder||null;
         const base={...(old||{}),id,isDraft:true,draftRole:'item',draftKind:'serviceVisit',draftBatchId:activeVisitDraft.id,draftServiceKind:kind,draftLocationKey:activeKey,draftLocationLabel:activeLoc?.label||'',targetVisitId:activeLoc?.visitId||old?.targetVisitId||'',deviceId,usedParts:collectUsed(panel),oneOffParts:collectOneOff(panel),photos,workOrder,createdAt:old?.createdAt||now,updatedAt:now,draftSchema:2};
