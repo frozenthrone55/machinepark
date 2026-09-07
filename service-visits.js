@@ -1058,6 +1058,14 @@
     style.id='serviceVisitLandscapeWidths';
     style.textContent=`
       @media (orientation: landscape) and (max-width: 1050px) {
+        #view-work,
+        #serviceVisitPanel,
+        #view-work .service-visit-panel,
+        #view-work .work-overview-panel {
+          width:100%;
+          max-width:none;
+          box-sizing:border-box;
+        }
         .service-visit-table { min-width: 1180px; }
         .service-visit-table th:first-child,
         .service-visit-table td:first-child { min-width: 420px; width: 420px; }

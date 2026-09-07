@@ -257,3 +257,13 @@ test('kolom Verslag blijft ruim leesbaar in landscape', () => {
   assert.match(js, /word-break:normal/);
   assert.match(js, /overflow-wrap:normal/);
 });
+
+test('Werkzaamheden gebruikt in landscape de volledige hoofdinhoud-breedte', () => {
+  assert.match(js, /#view-work,/);
+  assert.match(js, /#serviceVisitPanel,/);
+  assert.match(js, /#view-work \.service-visit-panel/);
+  assert.match(js, /#view-work \.work-overview-panel/);
+  assert.match(js, /width:100%/);
+  assert.match(js, /max-width:none/);
+  assert.match(js, /box-sizing:border-box/);
+});
