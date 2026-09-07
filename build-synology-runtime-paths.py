@@ -71,19 +71,32 @@ for value in asset_values:
     fixed_assets.append(value)
 
 auth_asset = f"./synology-local-auth.js?v={auth_hash}"
+offline_asset = f"./offline-first.js?v={offline_hash}"
 
-# Op Synology geen volledige app meer tijdens service-worker-installatie
-# vooruit downloaden. Op een externe mobiele verbinding veroorzaakte dat een
-# tweede, gelijktijdige download van vrijwel alle runtimebestanden. De normale
-# fetch-handler bewaart gebruikte bestanden daarna automatisch in de cache.
-fixed_assets = [
-    value for value in fixed_assets
-    if value in {
-        "./manifest.webmanifest",
-        "./machinepark-logo.svg",
-        "./machinepark-coffee-device-icon.png",
-    }
-]
+# machinepark-synology-offline-shell-v1
+# Een koude herstart zonder mobiel bereik moet volledig uit de service-worker-
+# cache kunnen starten. Cache daarom de app-shell (HTML + runtime JS/CSS), maar
+# geen foto's, centrale data of PHP-API-responses.
+critical_assets = {
+    "./index.html",
+    "./manifest.webmanifest",
+    "./machinepark-logo.svg",
+    "./machinepark-coffee-device-icon.png",
+    auth_asset,
+    offline_asset,
+}
+runtime_asset_pattern = re.compile(
+    r'(?:src|href)="(?P<asset>\./(?:'
+    r'fault-library\.(?:js|css)(?:\?v=[^"]*)?|'
+    r'manual-library\.(?:js|css)(?:\?v=[^"]*)?|'
+    r'service-visits\.(?:js|css)(?:\?v=[^"]*)?|'
+    r'assets/machinepark-build\.(?:js|css)(?:\?v=[^"]*)?'
+    r'))"'
+)
+for match in runtime_asset_pattern.finditer(index):
+    critical_assets.add(match.group("asset"))
+
+fixed_assets = sorted(critical_assets)
 
 asset_block = "const ASSETS=[\n" + "\n".join(
     f"  {json.dumps(value)}," for value in fixed_assets

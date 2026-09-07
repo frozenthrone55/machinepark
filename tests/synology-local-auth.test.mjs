@@ -76,3 +76,10 @@ test('oude lokale beheerder wordt automatisch admin na succesvolle login', () =>
   assert.match(auth, /\$users\[\$idx\]\['isOwner'\] = true/);
   assert.match(auth, /\$users\[\$idx\]\['role'\] = 'beheerder'/);
 });
+
+test('lokale login valt bij netwerkuitval automatisch terug op offline sessie', () => {
+  assert.match(runtime, /function tryOfflineBootAfterNetworkFailure/);
+  assert.match(runtime, /machineparkOfflineBootRequested = true/);
+  assert.match(runtime, /machineparkTryOfflineSession\(\{ force: true \}\)/);
+  assert.match(runtime, /!error\.status && await tryOfflineBootAfterNetworkFailure\(\)/);
+});

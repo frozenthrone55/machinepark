@@ -241,6 +241,28 @@
     };
   }
 
+  async function tryOfflineBootAfterNetworkFailure() {
+    // Safari/iOS kan navigator.onLine nog true laten terwijl er feitelijk geen
+    // mobiel bereik is. Vraag de offline-laag daarom expliciet om de laatst
+    // geldige lokale sessie te gebruiken zodra auth.php niet bereikbaar is.
+    window.machineparkOfflineBootRequested = true;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      if (typeof window.machineparkTryOfflineSession === 'function') {
+        try {
+          const started = await window.machineparkTryOfflineSession({ force: true });
+          if (started) {
+            window.machineparkOfflineBootRequested = false;
+            return true;
+          }
+        } catch (offlineError) {
+          console.warn('Offline sessie starten', offlineError);
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return false;
+  }
+
   async function boot() {
     try {
       const status = await request();
@@ -254,6 +276,8 @@
     } catch (error) {
       if (error.status === 403) {
         showError('Open Machinepark voorlopig via het lokale IP-adres van je Synology. Externe toegang zetten we later veilig op HTTPS.');
+      } else if (!error.status && await tryOfflineBootAfterNetworkFailure()) {
+        // Offline app is gestart met de eerder bevestigde lokale rechten/data.
       } else {
         showError(error.message || 'De lokale Synology-login kon niet worden gestart.');
       }

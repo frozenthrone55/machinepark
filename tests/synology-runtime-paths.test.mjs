@@ -38,10 +38,17 @@ test('loginruntime krijgt een inhoudshash en service worker omzeilt cache', () =
 });
 
 
-test('Synology service worker precachet alleen kleine install-assets', () => {
-  assert.match(builder, /machinepark-coffee-device-icon\.png/);
-  assert.match(builder, /value in \{/);
-  assert.doesNotMatch(builder, /fixed_assets\.append\(auth_asset\)/);
+test('Synology service worker precachet volledige app-shell voor koude offline start', () => {
+  assert.match(builder, /machinepark-synology-offline-shell-v1/);
+  assert.match(builder, /"\.\/index\.html"/);
+  assert.match(builder, /auth_asset/);
+  assert.match(builder, /offline_asset/);
+  assert.match(builder, /runtime_asset_pattern/);
+  assert.match(builder, /fault-library/);
+  assert.match(builder, /manual-library/);
+  assert.match(builder, /service-visits/);
+  assert.match(builder, /assets\/machinepark-build/);
+  assert.match(builder, /fixed_assets = sorted\(critical_assets\)/);
 });
 
 
@@ -81,4 +88,12 @@ test('versiedatum staat direct boven de aangemelde gebruiker', () => {
   assert.match(builder, /justify-self:end/);
   assert.match(builder, /data-machinepark-synology-version="v3"/);
   assert.doesNotMatch(builder, /sync_anchor/);
+});
+
+test('offline opstart kan ook doorgaan wanneer browser onterecht online rapporteert', () => {
+  const offline = readFileSync(new URL('../offline-first.js', import.meta.url), 'utf8');
+  assert.match(offline, /machineparkOfflineBootRequested === true/);
+  assert.match(offline, /machineparkTryOfflineSession\(\{ force: true \}\)/);
+  assert.match(offline, /let offlineBootPromise = null/);
+  assert.match(offline, /window\.machineparkOfflineBootRequested = false/);
 });

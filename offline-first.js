@@ -767,17 +767,24 @@
     };
     window.startKoffieServiceApp = startKoffieServiceApp;
 
+    let offlineBootPromise = null;
     window.machineparkTryOfflineSession = async function({ force = false } = {}) {
       if (!force && navigator.onLine) return false;
-      if (!restoreAccess()) return false;
-      document.documentElement.classList.add('machinepark-offline-session');
-      const gate = document.getElementById('authGate');
-      const shell = document.getElementById('appShell');
-      if (gate) gate.classList.add('hidden');
-      if (shell) shell.style.display = 'block';
-      await startKoffieServiceApp();
-      setOfflineStatus();
-      return true;
+      if (offlineBootPromise) return offlineBootPromise;
+      offlineBootPromise = (async () => {
+        if (!restoreAccess()) return false;
+        document.documentElement.classList.add('machinepark-offline-session');
+        const gate = document.getElementById('authGate');
+        const shell = document.getElementById('appShell');
+        if (gate) gate.classList.add('hidden');
+        if (shell) shell.style.display = 'block';
+        await startKoffieServiceApp();
+        setOfflineStatus();
+        window.machineparkOfflineBootRequested = false;
+        return true;
+      })();
+      try { return await offlineBootPromise; }
+      finally { offlineBootPromise = null; }
     };
 
     window.addEventListener('offline', () => {
@@ -834,8 +841,8 @@
       }, 500);
     }
 
-    if (!navigator.onLine) {
-      window.machineparkTryOfflineSession().catch((error) => console.warn('Offline opstart', error));
+    if (!navigator.onLine || window.machineparkOfflineBootRequested === true) {
+      window.machineparkTryOfflineSession({ force: true }).catch((error) => console.warn('Offline opstart', error));
     } else {
       primeOfflineExtras();
     }
