@@ -130,23 +130,26 @@
     return m?`${m[3]}/${m[2]}/${m[1]}`:raw||'—';
   }
 
-  function visibleCode(number,prefix='SR') {
-    const raw=String(number||'').trim();
-    const match=raw.match(new RegExp(`^${prefix}-\\d{4}-(.+)$`,'i'));
-    return (match?.[1]||raw||'—').toUpperCase();
-  }
-
+  // Interne serviceReportNumber/serviceVisitNumber en revisies blijven in de data
+  // voor synchronisatie en versiebeheer, maar worden nergens aan de gebruiker getoond.
   function reportDisplayLabel(report) {
     if(!report)return '—';
     const locations=(report.visits||[]).map(v=>String(v.location||'').trim()).filter(Boolean);
     const first=locations[0]||'Locatie onbekend';
     const extra=locations.length>1?` +${locations.length-1}`:'';
-    return `${shortDate(report.date)} · ${first}${extra} · ${visibleCode(report.number,'SR')}`;
+    return `${shortDate(report.date)} · ${first}${extra}`;
   }
 
   function visitDisplayLabel(visit) {
     if(!visit)return '—';
-    return `${shortDate(visit.date)} · ${visit.location||'Locatie onbekend'} · ${visibleCode(visit.number,'SV')}`;
+    return `${shortDate(visit.date)} · ${visit.location||'Locatie onbekend'}`;
+  }
+
+  function reportFilenameLabel(report) {
+    const date=shortDate(report?.date).replace(/\//g,'-');
+    const location=String(report?.visits?.[0]?.location||'locatie')
+      .replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'').slice(0,48)||'locatie';
+    return `Serviceverslag_${date}_${location}`;
   }
 
   function svPartFields(partId) {
@@ -278,7 +281,6 @@
           <div><small>Datum / uur</small><strong>${svEsc(svDateText(report.date))}${report.time?` · ${svEsc(report.time)}`:''}</strong></div>
           <div><small>Technieker</small><strong>${svEsc(report.technician||'—')}</strong></div>
           <div><small>Status</small><strong>Afgesloten</strong></div>
-          <div><small>Versie</small><strong>v${svEsc(report.revision)}</strong></div>
         </div>
         <div><div class="section-title">Werkdagen en tijd</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal: ${svEsc(totalMinutes)} min</strong></div></div></div>
         <div class="service-report-print-location-summary"><div class="section-title">Totaaloverzicht werkzaamheden</div><table class="service-visit-merged-parts service-report-print-summary-table"><thead><tr><th>Locatie</th><th>Toestellen</th><th>Onderhoud</th><th>Depannage</th><th>Andere werken</th></tr></thead><tbody>${(report.visits||[]).map(visit=>`<tr><td><strong>${svEsc(visit.location||'—')}</strong></td><td>${svEsc(visit.deviceCount||0)}</td><td>${svEsc(visit.maintenanceCount||0)}</td><td>${svEsc(visit.breakdownCount||0)}</td><td>${svEsc(visit.otherWorkCount||0)}</td></tr>`).join('')||'<tr><td colspan="5">Geen werkzaamheden.</td></tr>'}</tbody></table></div>
@@ -352,7 +354,6 @@
         <div><small>Datum / uur</small><strong>${svEsc(svDateText(visit.date))}${visit.time ? ` · ${svEsc(visit.time)}` : ''}</strong></div>
         <div><small>Technieker</small><strong>${svEsc(visit.technician || '—')}</strong></div>
         <div><small>Status</small><strong>Afgesloten</strong></div>
-        <div><small>Versie</small><strong>v${svEsc(visit.revision)}</strong></div>
       </div>
       <div><div class="section-title">Servicetijd volledig serviceverslag</div><div class="service-visit-report-lines">${sessions.length?sessions.map(row=>`<div>${svEsc(svDateText(row.date))} · <strong>${svEsc(row.minutes)} min</strong></div>`).join(''):'<div>—</div>'}<div><strong>Totaal serviceverslag: ${svEsc(totalMinutes)} min · ${svEsc(Math.max(1,Number(visit.records?.[0]?.item?.serviceReportDeviceCount)||visit.deviceCount||1))} toestel${Math.max(1,Number(visit.records?.[0]?.item?.serviceReportDeviceCount)||visit.deviceCount||1)===1?'':'len'}</strong></div></div></div>
       <div><div class="section-title">Werkzaamheden per toestel</div><div style="display:grid;gap:9px">${visit.records.map(row => recordSummary(row.kind,row.item)).join('')}</div></div>
@@ -1065,7 +1066,7 @@
     const draftBox=document.getElementById('serviceVisitDraftList'),headers=visitDraftHeaders();
     if(draftBox)draftBox.innerHTML=headers.length?`<div class="service-visit-drafts"><div class="service-draft-head"><strong>Serviceconcepten (${headers.length})</strong><span class="muted" style="font-size:11px">Meerdere locaties blijven samen in één concept en worden centraal gesynchroniseerd.</span></div><div class="service-draft-list">${headers.map(h=>{const items=visitDraftItems(h.id),locations=Array.isArray(h.locations)&&h.locations.length?h.locations.map(x=>x.label):[h.locationLabel].filter(Boolean),devices=[...new Set(items.map(i=>svDeviceShort(i.deviceId)))].join(', ')||'Nog geen toestel geselecteerd',target=h.appendToReportId?serviceReportById(h.appendToReportId):(h.appendToVisitId?serviceReportForVisit(h.appendToVisitId):null);return `<div class="service-draft-row"><div><div class="service-draft-row-title"><span class="service-draft-badge">CONCEPT</span>${svEsc(target?`Aanvulling ${reportDisplayLabel(target)}`:locations.length?`Serviceverslag · ${locations.length} locatie${locations.length===1?'':'s'}`:'Nieuw serviceverslag')}</div><div class="service-draft-row-meta">${svEsc(locations.join(', ')||'Nog geen locatie')} · ${svEsc(devices)} · laatst aangepast ${svEsc(new Date(h.updatedAt||Date.now()).toLocaleString('nl-BE'))}</div></div><div class="service-draft-actions"><button type="button" class="btn small service-draft-button" data-sv-draft-open="${svEsc(h.id)}">Verdergaan</button><button type="button" class="btn small danger" data-sv-draft-delete="${svEsc(h.id)}">Verwijderen</button></div></div>`;}).join('')}</div></div>`:'';
     const body=document.getElementById('serviceVisitBody');if(!body)return;const reports=serviceReports();
-    body.innerHTML=reports.length?reports.map(r=>{const acts=[r.maintenanceCount?`${r.maintenanceCount} onderhoud`:'',r.breakdownCount?`${r.breakdownCount} depannage`:'',r.otherWorkCount?`${r.otherWorkCount} andere werken`:''].filter(Boolean).join(' · '),locations=r.visits.map(v=>v.location).filter(Boolean);return `<tr><td><span class="service-visit-number">${svEsc(reportDisplayLabel(r))}</span><div class="muted" style="font-size:10px">v${svEsc(r.revision)}</div></td><td>${svEsc(svDateText(r.date))}${r.time?`<div class="muted" style="font-size:10px">${svEsc(r.time)}</div>`:''}</td><td><strong>${svEsc(r.locationCount)}</strong><div class="muted" style="font-size:10px">${svEsc(locations.join(' · ')||'—')}</div></td><td>${svEsc(r.deviceCount)}</td><td>${svEsc(acts||'—')}</td><td>${svEsc(r.technician||'—')}</td><td><span class="service-visit-status">Afgesloten</span></td><td><button type="button" class="btn small" data-service-visit-open="${svEsc(r.id)}">Details</button></td></tr>`;}).join(''):'<tr><td colspan="8"><div class="empty">Nog geen gezamenlijke serviceverslagen. Los onderhoud en losse depannages blijven gewoon in de historiek staan.</div></td></tr>';
+    body.innerHTML=reports.length?reports.map(r=>{const acts=[r.maintenanceCount?`${r.maintenanceCount} onderhoud`:'',r.breakdownCount?`${r.breakdownCount} depannage`:'',r.otherWorkCount?`${r.otherWorkCount} andere werken`:''].filter(Boolean).join(' · '),locations=r.visits.map(v=>v.location).filter(Boolean);return `<tr><td><span class="service-visit-number">${svEsc(reportDisplayLabel(r))}</span></td><td>${svEsc(svDateText(r.date))}${r.time?`<div class="muted" style="font-size:10px">${svEsc(r.time)}</div>`:''}</td><td><strong>${svEsc(r.locationCount)}</strong><div class="muted" style="font-size:10px">${svEsc(locations.join(' · ')||'—')}</div></td><td>${svEsc(r.deviceCount)}</td><td>${svEsc(acts||'—')}</td><td>${svEsc(r.technician||'—')}</td><td><span class="service-visit-status">Afgesloten</span></td><td><button type="button" class="btn small" data-service-visit-open="${svEsc(r.id)}">Details</button></td></tr>`;}).join(''):'<tr><td colspan="8"><div class="empty">Nog geen gezamenlijke serviceverslagen. Los onderhoud en losse depannages blijven gewoon in de historiek staan.</div></td></tr>';
   }
 
   // Beschikbaar voor latere renderlagen. De klassieke onderhoud/depannage-conceptlaag
@@ -1082,7 +1083,7 @@
   window.machineparkServiceVisitPdfModel = function(id) {
     const report=serviceReportById(id)||serviceReportForVisit(id);if(!report)return null;
     const parts=mergedReportParts(report),sessions=reportWorkSessions(report),totalMinutes=sessions.reduce((sum,row)=>sum+row.minutes,0),fields=[
-      {label:'Verslag',value:reportDisplayLabel(report)},{label:'Locaties',value:(report.visits||[]).map(v=>v.location||'—').join('\n')||'—'},{label:'Technieker',value:report.technician||'—'},{label:'Status / versie',value:`Afgesloten · v${report.revision}`},
+      {label:'Verslag',value:reportDisplayLabel(report)},{label:'Locaties',value:(report.visits||[]).map(v=>v.location||'—').join('\n')||'—'},{label:'Technieker',value:report.technician||'—'},{label:'Status',value:'Afgesloten'},
       {label:'Werkdagen / tijd',value:sessions.length?sessions.map(row=>`${svDateText(row.date)} · ${row.minutes} min`).join('\n')+`\nTotaal: ${totalMinutes} min · ${report.deviceCount} toestel${report.deviceCount===1?'':'len'}`:'—',full:true}
     ];
     for(const visit of report.visits||[]) {
@@ -1124,7 +1125,7 @@
       headerTitle:'Machinepark . Serviceverslag',
       subtitle:`${reportDisplayLabel(report)} · ${report.locationCount} locatie${report.locationCount===1?'':'s'}`,
       rightText:`${svDateText(report.date)}${report.time?` · ${report.time}`:''}`,
-      filenameTitle:`Serviceverslag_${shortDate(report.date).replace('/','-')}_${visibleCode(report.number,'SR')}`,
+      filenameTitle:reportFilenameLabel(report),
       fields,
       photos:reportPhotos(report).map(p=>p.src),
       photoTitle:'Foto’s bij serviceverslag',
@@ -1139,7 +1140,6 @@
           {label:'Datum / uur',value:`${svDateText(report.date)}${report.time?` · ${report.time}`:''}`},
           {label:'Technieker',value:report.technician||'—'},
           {label:'Status',value:'Afgesloten'},
-          {label:'Versie',value:`v${report.revision}`},
         ],
         sessions:sessions.map(row=>({date:svDateText(row.date),minutes:row.minutes})),
         totalMinutes,

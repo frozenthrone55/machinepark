@@ -27,16 +27,23 @@ test('onderdelen blijven per toestel en worden alleen voor klant samengevoegd', 
   assert.match(js, /devices:new Set/);
 });
 
-test('zichtbare serviceverslagnaam bevat volledige datum locatie en korte code', () => {
+test('serviceverslagen tonen datum en locatie zonder interne code of revisienummer', () => {
   assert.match(js, /function reportDisplayLabel/);
   assert.match(js, /shortDate\(report\.date\)/);
   assert.match(js, /\$\{m\[3\]\}\/\$\{m\[2\]\}\/\$\{m\[1\]\}/);
-  assert.match(js, /visibleCode\(report\.number,'SR'\)/);
   assert.match(js, /\+\$\{locations\.length-1\}/);
   assert.match(js, /reportDisplayLabel\(r\)/);
   assert.match(js, /reportDisplayLabel\(report\)/);
   assert.match(js, /function visitDisplayLabel/);
   assert.match(js, /visitDisplayLabel\(visit\)/);
+  assert.doesNotMatch(js, /function visibleCode/);
+  assert.doesNotMatch(js, /visibleCode\(report\.number/);
+  assert.doesNotMatch(js, /visibleCode\(visit\.number/);
+  assert.doesNotMatch(js, /v\$\{svEsc\(r\.revision\)\}/);
+  assert.doesNotMatch(js, /<small>Versie<\/small>/);
+  assert.doesNotMatch(js, /label:'Status \/ versie'/);
+  assert.doesNotMatch(js, /label:'Versie',value:\`v\$\{report\.revision\}\`/);
+  assert.match(js, /filenameTitle:reportFilenameLabel\(report\)/);
 });
 
 test('serviceverslagdetails tonen Bewerken en toevoegacties zitten alleen in bewerkmodus', () => {
@@ -223,4 +230,13 @@ test('servicebewerking bewaart bestaande Synology-foto’s zonder onnodige POST 
   assert.match(collect, /targetRecordId=String\(persistRecordId\|\|recordId\|\|''\)/);
   assert.match(js, /const photoRecordId=old\?\.sourceRecordId\|\|old\?\.id\|\|id/);
   assert.match(js, /collectPhotos\(panel,kind,id,old\?\.photos\|\|\[\],photoRecordId\)/);
+});
+
+test('interne service-identifiers en revisies blijven wel behouden voor systeemwerking', () => {
+  assert.match(js, /serviceReportNumber/);
+  assert.match(js, /serviceVisitNumber/);
+  assert.match(js, /serviceReportRevision/);
+  assert.match(js, /serviceVisitRevision/);
+  assert.match(js, /function reportFilenameLabel\(report\)/);
+  assert.doesNotMatch(js, /filenameTitle:.*serviceReportNumber/);
 });
