@@ -122,6 +122,17 @@ if MARKER not in index:
 </script>
 '''.replace('__BUILD_MARKER__', MARKER)
 
+    # Pagina-ondertitels onder de hoofdtitel zijn bewust verborgen.
+    # De metadata blijft intern beschikbaar voor compatibiliteit met oudere runtimecode.
+    subtitle_style = '''
+<style data-machinepark-build-fix="hide-page-subtitles-v1">
+#pageSubtitle{display:none!important}
+</style>
+'''
+    if "</head>" not in index:
+        raise SystemExit('Buildvalidatie mislukt: </head> ontbreekt voor ondertitelstijl')
+    index = index.replace("</head>", subtitle_style + "</head>", 1)
+
     body_pos = index.rfind('</body>')
     if body_pos < 0:
         raise SystemExit('Buildvalidatie mislukt: </body> ontbreekt voor navigatie-runtime')
@@ -144,6 +155,8 @@ required = [
     "document.addEventListener('touchend', handleNavigationEvent, { capture: true, passive: false })",
     'event.stopImmediatePropagation()',
     "if (typeof state !== 'undefined' && state) state.view = view",
+    'data-machinepark-build-fix="hide-page-subtitles-v1"',
+    "#pageSubtitle{display:none!important}",
 ]
 for needle in required:
     if needle not in index:

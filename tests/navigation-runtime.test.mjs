@@ -21,7 +21,7 @@ test('vroege bridge wisselt de DOM vóór de app-runtime', () => {
 });
 
 test('navigatie-runtime houdt alle hoofdtabbladen bruikbaar', () => {
-  for (const view of ['dashboard', 'devices', 'maintenance', 'breakdowns', 'parts', 'faults', 'manuals', 'settings']) {
+  for (const view of ['dashboard', 'devices', 'maintenance', 'breakdowns', 'parts', 'work', 'faults', 'manuals', 'settings']) {
     assert.ok(build.includes(`${view}: [`), `metadata ontbreekt voor ${view}`);
   }
   assert.ok(build.includes('window.switchView = activateView'));
@@ -92,4 +92,10 @@ test('sync, auth en offline-builds blijven onaangeroerd vóór navigatie-hardeni
   assert.ok(bootstrapPos > navigationPos, 'inline fallback moet na de volledige navigatie-runtime worden toegevoegd');
   assert.ok(extractionPos > bootstrapPos, 'inline fallback moet vóór asset-extractie worden toegevoegd');
   assert.ok(command.includes('node --check assets/machinepark-build.js'));
+});
+
+test('hoofdpagina-ondertitels zijn overal verborgen', () => {
+  assert.match(build, /hide-page-subtitles-v1/);
+  assert.match(build, /#pageSubtitle\{display:none!important\}/);
+  assert.match(build, /work: \['Werkzaamheden'/);
 });
