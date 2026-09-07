@@ -210,3 +210,17 @@ test('serviceconcept foto-editor verwerkt één gekozen bestand maar één keer 
   assert.match(collect, /syncPhotoEditorState\(editor,saved\)/);
   assert.match(collect, /uniquePhotoList\(\[\.\.\.kept,\.\.\.added\]\)/);
 });
+
+
+test('servicebewerking bewaart bestaande Synology-foto’s zonder onnodige POST en gebruikt bronrecord bij wijzigingen', () => {
+  assert.match(js, /machinepark-service-photo-edit-id-v1/);
+  const collectStart=js.indexOf('async function collectPhotos');
+  const collectEnd=js.indexOf('function collectHeader',collectStart);
+  const collect=js.slice(collectStart,collectEnd);
+  assert.match(collect, /const changed=remove\.size>0\|\|files\.length>0/);
+  assert.match(collect, /if\(!changed\)\{/);
+  assert.match(collect, /return current/);
+  assert.match(collect, /targetRecordId=String\(persistRecordId\|\|recordId\|\|''\)/);
+  assert.match(js, /const photoRecordId=old\?\.sourceRecordId\|\|old\?\.id\|\|id/);
+  assert.match(js, /collectPhotos\(panel,kind,id,old\?\.photos\|\|\[\],photoRecordId\)/);
+});
