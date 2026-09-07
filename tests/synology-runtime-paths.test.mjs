@@ -60,7 +60,7 @@ test('Synology service worker laat PHP API en no-store altijd rechtstreeks naar 
 
 test('Synology dashboard toont automatisch datum en uur van laatste gepubliceerde build', () => {
   assert.match(builder, /dashboardVersionStamp/);
-  assert.match(builder, /centralSyncStatus/);
+  assert.match(builder, /accountSummary/);
   assert.match(builder, /Laatste versie: laden/);
   assert.match(builder, /data-machinepark-synology-version="v3"/);
   assert.match(builder, /\.\/deploy-meta\.json\?ts=/);
