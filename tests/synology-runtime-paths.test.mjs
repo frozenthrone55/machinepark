@@ -57,3 +57,14 @@ test('Synology service worker laat PHP API en no-store altijd rechtstreeks naar 
   assert.match(builder, /e\.request\.cache==='no-store'/);
   assert.match(builder, /e\.respondWith\(fetch\(e\.request\)\)/);
 });
+
+test('Synology dashboard toont automatisch datum en uur van laatste gepubliceerde build', () => {
+  assert.match(builder, /dashboardVersionStamp/);
+  assert.match(builder, /Laatste versie: laden/);
+  assert.match(builder, /\.\/deploy-meta\.json\?ts=/);
+  assert.match(builder, /cache: 'no-store'/);
+  assert.match(builder, /timeZone: 'Europe\/Brussels'/);
+  assert.match(builder, /new Intl\.DateTimeFormat\('nl-BE'/);
+  assert.match(builder, /Laatste versie: ' \+ formatted/);
+  assert.match(builder, /visibilitychange/);
+});

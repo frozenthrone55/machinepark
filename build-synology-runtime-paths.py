@@ -117,6 +117,73 @@ if remaining_sw_roots:
 
 SW.write_text(sw, encoding="utf-8")
 
+# Toon bovenaan het Synology-dashboard wanneer de gepubliceerde runtime gebouwd is.
+# De bron is deploy-meta.json uit synology-deploy; daardoor verandert dit automatisch
+# bij elke geslaagde publicatie en blijft de tijd los van browser-/serviceworkercache.
+DASHBOARD_VERSION_MARKER = 'data-machinepark-synology-version="v1"'
+index = INDEX.read_text(encoding="utf-8")
+if DASHBOARD_VERSION_MARKER not in index:
+    dashboard_anchor = '<section class="view active" id="view-dashboard">'
+    dashboard_stamp = """<section class="view active" id="view-dashboard">
+      <div id="dashboardVersionStamp" class="dashboard-version-stamp" data-machinepark-synology-version="v1" role="status" aria-live="polite">Laatste versie: laden…</div>"""
+    if dashboard_anchor not in index:
+        raise SystemExit("Buildvalidatie mislukt: dashboardanker ontbreekt voor versiedatum")
+    index = index.replace(dashboard_anchor, dashboard_stamp, 1)
+
+    dashboard_style = """<style data-machinepark-synology-version="v1">
+.dashboard-version-stamp{display:flex;align-items:center;width:max-content;max-width:100%;margin:0 0 14px auto;padding:7px 11px;border:1px solid var(--line);border-radius:999px;background:#f8faf9;color:var(--muted);font-size:12px;font-weight:700;line-height:1.2}
+@media(max-width:700px){.dashboard-version-stamp{margin:0 0 12px 0;font-size:11px}}
+</style>
+"""
+    if "</head>" not in index:
+        raise SystemExit("Buildvalidatie mislukt: HTML-head ontbreekt voor versiedatum")
+    index = index.replace("</head>", dashboard_style + "</head>", 1)
+
+    dashboard_script = """<script data-machinepark-synology-version="v1">
+(() => {
+  async function machineparkLoadDashboardVersion() {
+    const node = document.getElementById('dashboardVersionStamp');
+    if (!node) return;
+    try {
+      const response = await fetch('./deploy-meta.json?ts=' + Date.now(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const meta = await response.json();
+      const date = new Date(meta && meta.built_at ? meta.built_at : '');
+      if (!Number.isFinite(date.getTime())) throw new Error('Ongeldige buildtijd');
+      const formatted = new Intl.DateTimeFormat('nl-BE', {
+        timeZone: 'Europe/Brussels',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(date).replace(',', '');
+      node.textContent = 'Laatste versie: ' + formatted;
+    } catch (_) {
+      node.textContent = 'Laatste versie: niet beschikbaar';
+    }
+  }
+  window.machineparkRefreshDashboardVersion = machineparkLoadDashboardVersion;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', machineparkLoadDashboardVersion, {once:true});
+  } else {
+    machineparkLoadDashboardVersion();
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) machineparkLoadDashboardVersion();
+  });
+})();
+</script>
+"""
+    if "</body>" not in index:
+        raise SystemExit("Buildvalidatie mislukt: HTML-body ontbreekt voor versiedatum")
+    index = index.replace("</body>", dashboard_script + "</body>", 1)
+    INDEX.write_text(index, encoding="utf-8")
+
 # Loginruntime en service worker zelf krijgen inhoudsversies zodat een oude
 # browser/service-worker-cache nooit de vorige logininterface kan blijven tonen.
 index = INDEX.read_text(encoding="utf-8")
