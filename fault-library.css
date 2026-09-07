@@ -1,0 +1,34 @@
+.fault-library-status{margin:-6px 0 12px;font-size:12px}
+.fault-table{min-width:980px}
+.fault-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:850;color:#744e19}
+.fault-name{font-weight:800}
+.fault-solution-preview{max-width:390px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#53615b}
+.fault-scope{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.fault-detail-grid{display:grid;gap:13px}
+.fault-detail-section{border:1px solid var(--line);background:#fafcfb;border-radius:12px;padding:12px}
+.fault-detail-section h4{margin:0 0 7px;font-size:13px}
+.fault-detail-section p{margin:0;white-space:pre-wrap;line-height:1.55}
+.fault-detail-list{margin:0;padding-left:20px;display:grid;gap:6px;line-height:1.45}
+.fault-editor-help{font-size:11px;color:var(--muted);line-height:1.45;margin-top:4px}
+.fault-breakdown-picker{border:1px solid #d5e2dd;border-radius:13px;padding:12px;background:#f7faf9;position:relative}
+.fault-breakdown-picker-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
+.fault-breakdown-picker-head strong{font-size:13px}
+.fault-picker-search{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff}
+.fault-picker-results{display:none;margin-top:7px;border:1px solid var(--line);border-radius:10px;background:#fff;max-height:250px;overflow:auto;box-shadow:0 10px 30px rgba(20,45,38,.12)}
+.fault-picker-results.show{display:block}
+.fault-picker-result{width:100%;border:0;border-bottom:1px solid #edf1ef;background:#fff;text-align:left;padding:9px 10px;cursor:pointer;display:grid;gap:2px}
+.fault-picker-result:last-child{border-bottom:0}
+.fault-picker-result:hover{background:#f3f7f5}
+.fault-picker-result strong{font-size:12px}
+.fault-picker-result small{font-size:10px;color:var(--muted)}
+.fault-picker-selected{margin-top:8px;font-size:11px;color:#34584d;font-weight:750}
+.fault-inline-tools{grid-column:1/-1;border:1px dashed #c8d7d1;border-radius:10px;padding:9px;background:#f8faf9;margin-bottom:4px}
+.fault-inline-tools button{margin-bottom:7px}
+.fault-inline-panel{display:none}
+.fault-inline-panel.show{display:block}
+.fault-inline-panel .fault-picker-results{position:relative}
+@media(max-width:700px){
+ .fault-toolbar .toolbar-left,.fault-toolbar .toolbar-right{width:100%}
+ .fault-toolbar .filter,.fault-toolbar .btn{flex:1;min-width:0}
+ .fault-detail-grid{gap:9px}
+}

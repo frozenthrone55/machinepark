@@ -7,5 +7,13 @@
   "background_color": "#f4f6f5",
   "theme_color": "#173f35",
   "lang": "nl-BE",
-  "description": "Centraal machinepark voor toestellen, onderhoud, depannages en onderdelen. Login via Clerk."
+  "description": "Centraal machinepark voor toestellen, onderhoud, depannages en onderdelen. Login via Clerk.",
+  "icons": [
+    {
+      "src": "/machinepark-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
