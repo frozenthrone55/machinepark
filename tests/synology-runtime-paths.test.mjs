@@ -60,11 +60,23 @@ test('Synology service worker laat PHP API en no-store altijd rechtstreeks naar 
 
 test('Synology dashboard toont automatisch datum en uur van laatste gepubliceerde build', () => {
   assert.match(builder, /dashboardVersionStamp/);
+  assert.match(builder, /centralSyncStatus/);
   assert.match(builder, /Laatste versie: laden/);
+  assert.match(builder, /data-machinepark-synology-version="v2"/);
   assert.match(builder, /\.\/deploy-meta\.json\?ts=/);
   assert.match(builder, /cache: 'no-store'/);
   assert.match(builder, /timeZone: 'Europe\/Brussels'/);
   assert.match(builder, /new Intl\.DateTimeFormat\('nl-BE'/);
   assert.match(builder, /Laatste versie: ' \+ formatted/);
   assert.match(builder, /visibilitychange/);
+});
+
+test('versiedatum staat zichtbaar bij Dashboardtitel en synchronisatiestatus', () => {
+  const versionPos = builder.indexOf('id="dashboardVersionStamp"');
+  const syncPos = builder.indexOf('id="centralSyncStatus"');
+  assert.ok(versionPos >= 0 && syncPos >= 0);
+  assert.match(builder, /sync_anchor/);
+  assert.doesNotMatch(builder, /dashboard_anchor = '<section class="view active" id="view-dashboard">/);
+  assert.match(builder, /font-weight:800/);
+  assert.match(builder, /background:#eef6f2/);
 });

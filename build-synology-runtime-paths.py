@@ -120,19 +120,19 @@ SW.write_text(sw, encoding="utf-8")
 # Toon bovenaan het Synology-dashboard wanneer de gepubliceerde runtime gebouwd is.
 # De bron is deploy-meta.json uit synology-deploy; daardoor verandert dit automatisch
 # bij elke geslaagde publicatie en blijft de tijd los van browser-/serviceworkercache.
-DASHBOARD_VERSION_MARKER = 'data-machinepark-synology-version="v1"'
+DASHBOARD_VERSION_MARKER = 'data-machinepark-synology-version="v2"'
 index = INDEX.read_text(encoding="utf-8")
 if DASHBOARD_VERSION_MARKER not in index:
-    dashboard_anchor = '<section class="view active" id="view-dashboard">'
-    dashboard_stamp = """<section class="view active" id="view-dashboard">
-      <div id="dashboardVersionStamp" class="dashboard-version-stamp" data-machinepark-synology-version="v1" role="status" aria-live="polite">Laatste versie: laden…</div>"""
-    if dashboard_anchor not in index:
-        raise SystemExit("Buildvalidatie mislukt: dashboardanker ontbreekt voor versiedatum")
-    index = index.replace(dashboard_anchor, dashboard_stamp, 1)
+    sync_anchor = '<div id="centralSyncStatus" class="sync-status" role="status" aria-live="polite">☁ Verbinden met centrale gegevens…</div>'
+    dashboard_stamp = sync_anchor + '<div id="dashboardVersionStamp" class="dashboard-version-stamp" data-machinepark-synology-version="v2" role="status" aria-live="polite">Laatste versie: laden…</div>'
+    if sync_anchor not in index:
+        raise SystemExit("Buildvalidatie mislukt: synchronisatiestatus ontbreekt voor versiedatum")
+    index = index.replace(sync_anchor, dashboard_stamp, 1)
 
-    dashboard_style = """<style data-machinepark-synology-version="v1">
-.dashboard-version-stamp{display:flex;align-items:center;width:max-content;max-width:100%;margin:0 0 14px auto;padding:7px 11px;border:1px solid var(--line);border-radius:999px;background:#f8faf9;color:var(--muted);font-size:12px;font-weight:700;line-height:1.2}
-@media(max-width:700px){.dashboard-version-stamp{margin:0 0 12px 0;font-size:11px}}
+    dashboard_style = """<style data-machinepark-synology-version="v2">
+.dashboard-version-stamp{display:flex;align-items:center;width:max-content;max-width:100%;margin-top:7px;padding:7px 10px;border:1px solid #c7d9d2;border-radius:9px;background:#eef6f2;color:#164f3e;font-size:12px;font-weight:800;line-height:1.2;box-shadow:0 1px 0 rgba(16,78,58,.05)}
+.dashboard-version-stamp::before{content:'↻';display:inline-block;margin-right:6px;font-size:12px}
+@media(max-width:700px){.dashboard-version-stamp{font-size:11px;margin-top:6px}}
 </style>
 """
     if "</head>" not in index:
