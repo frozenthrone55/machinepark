@@ -355,3 +355,25 @@ test('open service metadata is bekend bij vaste navigatieruntime', () => {
   const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
   assert.match(dashboard, /'service-overview': \['Open service'/);
 });
+
+
+test('werkzaamheden tabblad toont service maar dashboard drilldown niet', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /currentView==="work"&&workView/);
+  assert.match(dashboard, /workView\.appendChild\(panel\)/);
+  assert.match(dashboard, /panel\.style\.display=dashboardWork\?"none":""/);
+  assert.match(dashboard, /overviewFilter\.value="all"/);
+  assert.match(dashboard, /machineparkDashboardWorkDrilldown/);
+});
+
+test('dashboard onderhoud en depannage markeren service als verborgen context', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /machineparkDashboardWorkDrilldown=target==="maintenance"\|\|target==="breakdowns"/);
+  assert.match(dashboard, /machineparkSyncServiceOverviewPlacement/);
+});
+
+test('normaal werkzaamheden tabblad wist dashboardcontext en herplaatst service', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /machineparkDashboardWorkDrilldown=false/);
+  assert.match(dashboard, /setTimeout\(function\(\)\{if\(typeof window\.machineparkSyncServiceOverviewPlacement/);
+});

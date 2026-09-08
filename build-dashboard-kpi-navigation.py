@@ -245,8 +245,17 @@ if MARKER not in index:
   function syncServiceOverview(){
     var panel=document.getElementById("serviceVisitPanel");
     if(!panel){ensureOpenServiceKpi();updateOpenServiceKpi();return;}
-    var view=ensureServiceOverviewView();
-    if(panel.parentNode!==view)view.appendChild(panel);
+    var serviceView=ensureServiceOverviewView(),workView=document.getElementById("view-work");
+    var currentView=String(state&&state.view||""),dashboardWork=Boolean(window.machineparkDashboardWorkDrilldown);
+    if(currentView==="service-overview"){
+      if(panel.parentNode!==serviceView)serviceView.appendChild(panel);
+      panel.style.display="";
+    }else if(currentView==="work"&&workView){
+      if(panel.parentNode!==workView)workView.appendChild(panel);
+      panel.style.display=dashboardWork?"none":"";
+    }else{
+      panel.style.display="";
+    }
 
     var head=panel.querySelector(".service-visit-panel-head");
     if(head&&!document.getElementById("serviceOverviewStatusFilter")){
@@ -260,6 +269,8 @@ if MARKER not in index:
       if(add&&add.parentNode===head)head.insertBefore(select,add);
       else head.appendChild(select);
     }
+    var overviewFilter=document.getElementById("serviceOverviewStatusFilter");
+    if(currentView==="work"&&!dashboardWork&&overviewFilter)overviewFilter.value="all";
 
     var m=document.getElementById("workAddMaintenance"),b=document.getElementById("workAddBreakdown");
     if(m&&m.textContent.indexOf("Los onderhoud")>=0)m.textContent="+ Onderhoud registreren";
@@ -309,10 +320,12 @@ if MARKER not in index:
       state.view="service-overview";
     }
 
+    syncServiceOverview();
     restoreServiceOverviewActive();
     serviceOverviewApplyFilter();
   }
   window.machineparkOpenServiceOverview=openServiceOverview;
+  window.machineparkSyncServiceOverviewPlacement=syncServiceOverview;
 
   var baseServiceRender=window.renderMachineparkServiceVisits;
   if(typeof baseServiceRender==="function"){
@@ -329,8 +342,10 @@ if MARKER not in index:
     if(next==="devices"){var device=document.getElementById("deviceStatusFilter");if(device)device.value="";}
     if(next==="parts"){var stock=document.getElementById("partStockFilter");if(stock)stock.value="";}
     if(next==="work"||next==="maintenance"||next==="breakdowns"){
+      window.machineparkDashboardWorkDrilldown=false;
       var kind=document.getElementById("workKindFilter"),maintenanceType=document.getElementById("workMaintenanceTypeFilter"),breakdownStatus=document.getElementById("workBreakdownStatusFilter"),breakdownPriority=document.getElementById("workBreakdownPriorityFilter");
       if(kind)kind.value="";if(maintenanceType)maintenanceType.value="";if(breakdownStatus)breakdownStatus.value="";if(breakdownPriority)breakdownPriority.value="";
+      setTimeout(function(){if(typeof window.machineparkSyncServiceOverviewPlacement==="function")window.machineparkSyncServiceOverviewPlacement();},0);
     }
     if(next==="actions"){
       window.machineparkDashboardTodoOpenOnly=false;
@@ -347,6 +362,7 @@ if MARKER not in index:
   function goDashboardKpi(card){
     var target=card && card.dataset ? card.dataset.dashboardKpi : "";
     if(!target)return;
+    window.machineparkDashboardWorkDrilldown=target==="maintenance"||target==="breakdowns";
     if(target==="service"){
       if(typeof window.machineparkOpenServiceOverview==="function")window.machineparkOpenServiceOverview("open");
       return;
@@ -381,6 +397,7 @@ if MARKER not in index:
       setTimeout(function(){
         if(typeof window.machineparkRenderCombinedWork==="function")window.machineparkRenderCombinedWork();
         else if(typeof window.renderWorkActivities==="function")window.renderWorkActivities();
+        if(typeof window.machineparkSyncServiceOverviewPlacement==="function")window.machineparkSyncServiceOverviewPlacement();
       },0);
     }
   }
@@ -422,6 +439,8 @@ required = [
     'restoreServiceOverviewActive',
     'machineparkDashboardNavigationTarget',
     'machineparkResetDashboardDrilldownFilters',
+    'machineparkDashboardWorkDrilldown',
+    'machineparkSyncServiceOverviewPlacement',
     'navigate("service-overview")',
     'route="work"',
     'workKindFilter',
