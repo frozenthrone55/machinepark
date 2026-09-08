@@ -2,7 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 INDEX = ROOT / "index.html"
-MARKER = 'data-machinepark-dashboard-kpi-nav="v1"'
+MARKER = 'data-machinepark-dashboard-kpi-nav="v2"'
 
 index = INDEX.read_text(encoding="utf-8")
 
@@ -50,8 +50,76 @@ if MARKER not in index:
             raise SystemExit("Buildvalidatie mislukt: ToDo KPI-kaart niet gevonden")
         index = index.replace(todo_old, todo_new, 1)
 
+
+    # De drilldown moet exact dezelfde selectie tonen als de KPI-teller.
+    device_filter_old = '<select id="deviceStatusFilter" class="filter"><option value="">Alle statussen</option>'
+    device_filter_new = '<select id="deviceStatusFilter" class="filter"><option value="">Alle statussen</option><option value="service">In servicebeheer</option>'
+    if device_filter_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: toestelstatusfilter niet gevonden")
+    index = index.replace(device_filter_old, device_filter_new, 1)
+
+    device_patterns = [
+        ("(!f||d.status===f)&&deviceMatchesQuery(d)", "(!f||(f==='service'?d.status!=='Buiten dienst':d.status===f))&&deviceMatchesQuery(d)"),
+        ("(!f || d.status === f) && deviceMatchesQuery(d)", "(!f || (f === 'service' ? d.status !== 'Buiten dienst' : d.status === f)) && deviceMatchesQuery(d)"),
+    ]
+    device_replacements = 0
+    for old, new in device_patterns:
+        if old in index:
+            device_replacements += index.count(old)
+            index = index.replace(old, new)
+    if device_replacements < 1:
+        raise SystemExit("Buildvalidatie mislukt: renderDevices-filter niet gevonden")
+
+    kind_old = '<select id="workKindFilter" class="filter"><option value="">Alle werkzaamheden</option>'
+    kind_new = '<select id="workKindFilter" class="filter"><option value="">Alle werkzaamheden</option><option value="maintenance-attention">Onderhoud aandacht</option>'
+    if kind_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: werkzaamhedenfilter niet gevonden")
+    index = index.replace(kind_old, kind_new, 1)
+
+    breakdown_filter_old = '<select id="workBreakdownStatusFilter" class="filter"><option value="">Alle depannagestatussen</option>'
+    breakdown_filter_new = '<select id="workBreakdownStatusFilter" class="filter"><option value="">Alle depannagestatussen</option><option value="open-attention">Open of in behandeling</option>'
+    if breakdown_filter_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: depannagestatusfilter niet gevonden")
+    index = index.replace(breakdown_filter_old, breakdown_filter_new, 1)
+
+    combined_anchor = "  function renderCombined(){const body=document.getElementById('workHistoryBody');if(!body)return;const kind=document.getElementById('workKindFilter')?.value||'',mt=document.getElementById('workMaintenanceTypeFilter')?.value||'',bs=document.getElementById('workBreakdownStatusFilter')?.value||'',bp=document.getElementById('workBreakdownPriorityFilter')?.value||'',canM=!window.machineparkAccessReady||window.machineparkHasPermission?.('view.maintenance'),canB=canView(),rows=[];"
+    combined_new = combined_anchor + "if(kind==='maintenance-attention'&&typeof window.machineparkDashboardRenderMaintenanceAttention==='function'){window.machineparkDashboardRenderMaintenanceAttention(body);renderDrafts();return;}"
+    if combined_anchor not in index:
+        raise SystemExit("Buildvalidatie mislukt: gecombineerde werkzaamheden-renderer niet gevonden")
+    index = index.replace(combined_anchor, combined_new, 1)
+
+    breakdown_condition_old = "isOtherWork(item)||bs&&item.status!==bs||bp&&item.priority!==bp"
+    breakdown_condition_new = "isOtherWork(item)||bs&&((bs==='open-attention'&&item.status==='Opgelost')||(bs!=='open-attention'&&item.status!==bs))||bp&&item.priority!==bp"
+    if breakdown_condition_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: depannagefilter in gecombineerde werkzaamheden niet gevonden")
+    index = index.replace(breakdown_condition_old, breakdown_condition_new, 1)
+
+    kpi_open_old = "const open=state.breakdowns.filter(b=>b.status!=='Opgelost').length;"
+    kpi_open_new = "const open=state.breakdowns.filter(b=>b.status!=='Opgelost'&&b.isDraft!==true&&b.serviceKind!=='other').length;"
+    if kpi_open_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: KPI open depannages teller niet gevonden")
+    index = index.replace(kpi_open_old, kpi_open_new, 1)
+
+    todo_go_old = "const go=()=>{actionScope='mine';if(typeof switchView==='function')switchView('actions');};"
+    todo_go_new = "const go=()=>{window.machineparkDashboardTodoOpenOnly=true;actionScope='all';if(typeof switchView==='function')switchView('actions');};"
+    if todo_go_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: ToDo KPI handler niet gevonden")
+    index = index.replace(todo_go_old, todo_go_new, 1)
+
+    todo_render_old = "const oc=document.getElementById('actionOpenCount'),dc=document.getElementById('actionDoneCount'),show=document.getElementById('actionShowAllDone');"
+    todo_render_new = "const oc=document.getElementById('actionOpenCount'),dc=document.getElementById('actionDoneCount'),show=document.getElementById('actionShowAllDone'),doneSection=document.querySelector('#view-actions .action-section-done');if(doneSection)doneSection.style.display=window.machineparkDashboardTodoOpenOnly?'none':'';"
+    if todo_render_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: ToDo renderer anker niet gevonden")
+    index = index.replace(todo_render_old, todo_render_new, 1)
+
+    todo_scope_old = "const scope=e.target.closest('[data-action-scope]');if(scope){actionScope=scope.dataset.actionScope||'all';renderActions();return;}"
+    todo_scope_new = "const scope=e.target.closest('[data-action-scope]');if(scope){window.machineparkDashboardTodoOpenOnly=false;actionScope=scope.dataset.actionScope||'all';renderActions();return;}"
+    if todo_scope_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: ToDo scope-handler niet gevonden")
+    index = index.replace(todo_scope_old, todo_scope_new, 1)
+
     style = """
-<style data-machinepark-dashboard-kpi-nav="v1">
+<style data-machinepark-dashboard-kpi-nav="v2">
 #view-dashboard .dashboard-kpi-link{cursor:pointer;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease}
 #view-dashboard .dashboard-kpi-link:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(25,57,48,.10);border-color:#bfd1ca}
 #view-dashboard .dashboard-kpi-link:focus-visible{outline:3px solid rgba(44,106,88,.20);outline-offset:2px;border-color:#7ea598}
@@ -65,6 +133,39 @@ if MARKER not in index:
     script = """
 <script data-machinepark-dashboard-kpi-nav="v1">
 (function(){
+
+  window.machineparkDashboardRenderMaintenanceAttention=function(body){
+    if(!body)return;
+    var attention=[];
+    (state.devices||[]).filter(function(device){return device.status!=="Buiten dienst";}).forEach(function(device){
+      if(device.nextHalf&&daysUntil(device.nextHalf)<=30)attention.push({device:device,type:"Halfjaarlijks",date:device.nextHalf});
+      if(device.nextAnnual&&daysUntil(device.nextAnnual)<=30)attention.push({device:device,type:"Jaarlijks",date:device.nextAnnual});
+    });
+    attention.sort(function(a,b){return String(a.date||"").localeCompare(String(b.date||""));});
+    body.innerHTML="";
+    if(!attention.length){
+      var emptyRow=document.createElement("tr"),emptyCell=document.createElement("td"),empty=document.createElement("div");
+      emptyCell.colSpan=9;empty.className="empty";empty.textContent="Geen onderhoud dat aandacht nodig heeft.";
+      emptyCell.appendChild(empty);emptyRow.appendChild(emptyCell);body.appendChild(emptyRow);return;
+    }
+    attention.forEach(function(row){
+      var tr=document.createElement("tr");tr.dataset.workKind="maintenance-attention";
+      var date=document.createElement("td");date.className="nowrap";var dateStrong=document.createElement("strong");dateStrong.textContent=dateFmt(row.date);date.appendChild(dateStrong);
+      var kind=document.createElement("td");kind.innerHTML='<span class="badge blue">Onderhoud</span>';
+      var deviceCell=document.createElement("td"),deviceStrong=document.createElement("strong"),location=document.createElement("span");
+      deviceStrong.textContent=row.device.assetCode||row.device.model||"Toestel";location.className="muted";location.textContent=deviceLocationAt(row.device,row.date)||"";
+      deviceCell.appendChild(deviceStrong);deviceCell.appendChild(document.createElement("br"));deviceCell.appendChild(location);
+      var type=document.createElement("td"),typeSpan=document.createElement("span");typeSpan.className="work-activity-type maintenance";typeSpan.textContent=row.type;type.appendChild(typeSpan);
+      var status=document.createElement("td");status.innerHTML=dueBadge(row.date);
+      var tech=document.createElement("td");tech.textContent="—";
+      var parts=document.createElement("td");parts.textContent="—";
+      var note=document.createElement("td");note.textContent="Vervallen of binnen 30 dagen";
+      var action=document.createElement("td"),button=document.createElement("button");button.type="button";button.className="btn small";button.dataset.deviceDetails=row.device.id;button.textContent="Toestel";action.appendChild(button);
+      [date,kind,deviceCell,type,status,tech,parts,note,action].forEach(function(cell){tr.appendChild(cell);});
+      body.appendChild(tr);
+    });
+  };
+
   function goDashboardKpi(card){
     var target=card && card.dataset ? card.dataset.dashboardKpi : "";
     if(!target)return;
@@ -75,7 +176,7 @@ if MARKER not in index:
       if(stock)stock.value="low";
     }else if(target==="devices"){
       var device=document.getElementById("deviceStatusFilter");
-      if(device)device.value="";
+      if(device)device.value="service";
     }else if(target==="maintenance" || target==="breakdowns"){
       // Onderhoud en depannages zijn in de huidige app samengevoegd onder
       // Werkzaamheden. De oude view-maintenance/view-breakdowns zijn leeg.
@@ -84,9 +185,9 @@ if MARKER not in index:
       var maintenanceType=document.getElementById("workMaintenanceTypeFilter");
       var breakdownStatus=document.getElementById("workBreakdownStatusFilter");
       var breakdownPriority=document.getElementById("workBreakdownPriorityFilter");
-      if(kind)kind.value=target==="maintenance" ? "maintenance" : "breakdowns";
+      if(kind)kind.value=target==="maintenance" ? "maintenance-attention" : "breakdowns";
       if(maintenanceType)maintenanceType.value="";
-      if(breakdownStatus)breakdownStatus.value="";
+      if(breakdownStatus)breakdownStatus.value=target==="breakdowns" ? "open-attention" : "";
       if(breakdownPriority)breakdownPriority.value="";
     }
 
@@ -126,6 +227,11 @@ required = [
     'data-dashboard-kpi="parts"',
     'action-kpi dashboard-kpi-link',
     'stock.value="low"',
+    'device.value="service"',
+    'maintenance-attention',
+    'open-attention',
+    'machineparkDashboardRenderMaintenanceAttention',
+    'machineparkDashboardTodoOpenOnly',
     'route="work"',
     'workKindFilter',
     'machineparkInlineNavigate',

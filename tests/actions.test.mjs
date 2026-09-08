@@ -254,3 +254,17 @@ test('dashboard onderhoud en depannages gebruiken Werkzaamheden in plaats van le
   assert.match(dashboard, /machineparkRenderCombinedWork/);
   assert.match(dashboard, /data-dashboard-kpi="maintenance">Alles bekijken/);
 });
+
+
+test('dashboard KPI drilldown toont exact dezelfde selectie als de teller', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /value="service">In servicebeheer/);
+  assert.match(dashboard, /maintenance-attention/);
+  assert.match(dashboard, /open-attention/);
+  assert.match(dashboard, /machineparkDashboardRenderMaintenanceAttention/);
+  assert.match(dashboard, /daysUntil\(device\.nextHalf\)<=30/);
+  assert.match(dashboard, /bs==='open-attention'/);
+  assert.match(dashboard, /serviceKind!=='other'/);
+  assert.match(dashboard, /machineparkDashboardTodoOpenOnly/);
+  assert.match(dashboard, /actionScope='all'/);
+});
