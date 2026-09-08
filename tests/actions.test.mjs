@@ -303,3 +303,14 @@ test('dashboard KPI volgorde is twee rijen van drie', () => {
   assert.match(dashboard, /max-width:1050px/);
   assert.match(dashboard, /max-width:680px/);
 });
+
+
+test('open service blijft actief na synchronisatie en render', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /restoreServiceOverviewActive/);
+  assert.match(dashboard, /state\.view!=="service-overview"/);
+  assert.match(dashboard, /navigate\("service-overview"\)/);
+  assert.match(dashboard, /restoreServiceOverviewActive\(\);\n    serviceOverviewApplyFilter/);
+  assert.match(dashboard, /updateOpenServiceKpi\(\);restoreServiceOverviewActive\(\)/);
+  assert.match(dashboard, /service-overview.*Open service/);
+});

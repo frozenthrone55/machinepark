@@ -267,32 +267,48 @@ if MARKER not in index:
 
     serviceOverviewApplyFilter();
     updateOpenServiceKpi();
+    restoreServiceOverviewActive();
 
     if(!panel.__machineparkServiceOverviewObserver){
       var scheduled=false;
       panel.__machineparkServiceOverviewObserver=new MutationObserver(function(){
         if(scheduled)return;
         scheduled=true;
-        requestAnimationFrame(function(){scheduled=false;serviceOverviewApplyFilter();updateOpenServiceKpi();});
+        requestAnimationFrame(function(){scheduled=false;serviceOverviewApplyFilter();updateOpenServiceKpi();restoreServiceOverviewActive();});
       });
       panel.__machineparkServiceOverviewObserver.observe(panel,{childList:true,subtree:true,characterData:true});
     }
   }
 
-  function openServiceOverview(filter){
-    syncServiceOverview();
+  function restoreServiceOverviewActive(){
+    if(!state||state.view!=="service-overview")return;
     var view=ensureServiceOverviewView();
-    var select=document.getElementById("serviceOverviewStatusFilter");
-    if(select)select.value=filter||"open";
-    state.view="service-overview";
     document.querySelectorAll(".view").forEach(function(node){node.classList.remove("active");});
     view.classList.add("active");
     document.querySelectorAll(".nav button").forEach(function(button){button.classList.remove("active");});
+    var select=document.getElementById("serviceOverviewStatusFilter");
     var title=document.getElementById("pageTitle"),subtitle=document.getElementById("pageSubtitle"),search=document.getElementById("globalSearch");
     if(title)title.textContent=(select&&select.value==="open")?"Open service":"Service";
     if(subtitle)subtitle.textContent="Serviceconcepten en gezamenlijke serviceverslagen in een apart overzicht.";
     if(search){search.value="";search.placeholder="Serviceoverzicht";}
     if(typeof closeGlobalSearch==="function")closeGlobalSearch();
+  }
+
+  function openServiceOverview(filter){
+    syncServiceOverview();
+    ensureServiceOverviewView();
+    var select=document.getElementById("serviceOverviewStatusFilter");
+    if(select)select.value=filter||"open";
+
+    var navigate=window.machineparkNavigate||window.switchView;
+    if(typeof navigate==="function"){
+      try{navigate("service-overview");}
+      catch(error){console.warn("[Machinepark] Service-navigatie via runtime mislukt",error);state.view="service-overview";}
+    }else{
+      state.view="service-overview";
+    }
+
+    restoreServiceOverviewActive();
     serviceOverviewApplyFilter();
   }
   window.machineparkOpenServiceOverview=openServiceOverview;
@@ -381,6 +397,8 @@ required = [
     'kpiOpenServiceCard',
     'serviceOverviewStatusFilter',
     'machineparkOpenServiceOverview',
+    'restoreServiceOverviewActive',
+    'navigate("service-overview")',
     'route="work"',
     'workKindFilter',
     'machineparkInlineNavigate',
@@ -398,6 +416,13 @@ for forbidden in [
 ]:
     if forbidden in index:
         raise SystemExit("Buildvalidatie mislukt: verwijderd dashboardblok nog aanwezig (" + forbidden + ")")
+
+
+# Maak service-overview ook bekend bij de gegenereerde navigatieruntime.
+nav_meta_old = "    settings: ['Beheer', 'Back-up, import en instellingen.'],\\n    };"
+nav_meta_new = "    settings: ['Beheer', 'Back-up, import en instellingen.'],\\n      'service-overview': ['Open service', 'Serviceconcepten en gezamenlijke serviceverslagen in een apart overzicht.'],\\n    };"
+if nav_meta_old in index and "'service-overview': ['Open service'" not in index:
+    index = index.replace(nav_meta_old, nav_meta_new, 1)
 
 INDEX.write_text(index, encoding="utf-8")
 print("[Machinepark] dashboard vereenvoudigd; vijf KPI-kaarten openen hun modules")
