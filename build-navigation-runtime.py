@@ -25,6 +25,7 @@ if MARKER not in index:
       breakdowns: ['Depannages', 'Volg storingen van melding tot oplossing op.'],
       parts: ['Onderdelen', 'Voorraad en onderdelen.'],
       work: ['Werkzaamheden', 'Serviceverslagen, onderhoud, depannages en andere werken.'],
+      actions: ['Acties', 'Snelle acties en opvolging.'],
       faults: ['Storingen', 'Zoek storingscodes, storingen en oplossingen per merk of model.'],
       manuals: ['Handleidingen', 'Technische PDF-handleidingen per merk, model of toestel.'],
       settings: ['Beheer', 'Back-up, import en instellingen.'],
@@ -81,7 +82,9 @@ if MARKER not in index:
       if (typeof renderAll === 'function') renderAll();
     });
 
-    if (nextView === 'faults') {
+    if (nextView === 'actions') {
+      safeCall('acties renderen', window.machineparkRenderActions);
+    } else if (nextView === 'faults') {
       safeCall('storingen renderen', window.machineparkRenderFaultLibrary);
     } else if (nextView === 'manuals') {
       safeCall('handleidingen renderen', window.machineparkRenderManualLibrary);
@@ -146,8 +149,10 @@ required = [
     "document.getElementById(`view-${nextView}`)",
     "document.querySelectorAll('.nav [data-view]')",
     "work: ['Werkzaamheden'",
+    "actions: ['Acties'",
     "faults: ['Storingen'",
     "manuals: ['Handleidingen'",
+    'window.machineparkRenderActions',
     'window.machineparkRenderFaultLibrary',
     'window.machineparkRenderManualLibrary',
     "if (typeof renderAll === 'function') renderAll()",

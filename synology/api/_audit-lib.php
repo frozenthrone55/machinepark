@@ -87,6 +87,7 @@ function mp_audit_entity_label(string $store, array $item): string {
     if ($store === 'parts') return trim((string)($item['artNr'] ?? $item['description'] ?? 'Onderdeel'));
     if ($store === 'maintenance') return trim((string)($item['title'] ?? $item['type'] ?? 'Onderhoud'));
     if ($store === 'breakdowns') return trim((string)($item['issue'] ?? $item['title'] ?? 'Depannage'));
+    if ($store === 'actions') return trim((string)($item['title'] ?? 'Actie'));
     return ucfirst($store);
 }
 
@@ -96,6 +97,7 @@ function mp_audit_entity_type(string $store): string {
         'parts' => 'Onderdelen',
         'maintenance' => 'Onderhoud',
         'breakdowns' => 'Depannages',
+        'actions' => 'Acties',
     ][$store] ?? ucfirst($store);
 }
 
@@ -110,7 +112,7 @@ function mp_audit_index_by_id(array $items): array {
 
 function mp_audit_snapshot_changes(array $before, array $after): array {
     $changes = [];
-    foreach (['devices','parts','maintenance','breakdowns'] as $store) {
+    foreach (['devices','parts','maintenance','breakdowns','actions'] as $store) {
         $a = mp_audit_index_by_id(isset($before[$store]) && is_array($before[$store]) ? $before[$store] : []);
         $b = mp_audit_index_by_id(isset($after[$store]) && is_array($after[$store]) ? $after[$store] : []);
 

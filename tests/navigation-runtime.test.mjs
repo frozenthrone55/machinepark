@@ -21,7 +21,7 @@ test('vroege bridge wisselt de DOM vóór de app-runtime', () => {
 });
 
 test('navigatie-runtime houdt alle hoofdtabbladen bruikbaar', () => {
-  for (const view of ['dashboard', 'devices', 'maintenance', 'breakdowns', 'parts', 'work', 'faults', 'manuals', 'settings']) {
+  for (const view of ['dashboard', 'devices', 'maintenance', 'breakdowns', 'parts', 'work', 'actions', 'faults', 'manuals', 'settings']) {
     assert.ok(build.includes(`${view}: [`), `metadata ontbreekt voor ${view}`);
   }
   assert.ok(build.includes('window.switchView = activateView'));
@@ -98,4 +98,10 @@ test('hoofdpagina-ondertitels zijn overal verborgen', () => {
   assert.match(build, /hide-page-subtitles-v1/);
   assert.match(build, /#pageSubtitle\{display:none!important\}/);
   assert.match(build, /work: \['Werkzaamheden'/);
+});
+
+test('Acties heeft veilige paginatitel en eigen renderer in navigatie-runtime', () => {
+  assert.match(build, /actions: \['Acties'/);
+  assert.match(build, /nextView === 'actions'/);
+  assert.match(build, /machineparkRenderActions/);
 });

@@ -402,6 +402,12 @@ if ($method === 'PUT') {
         mp_json(['error'=>'Lokale database kon niet worden gelezen.'], 500);
     }
 
+    // Oudere clients kennen de Acties-store nog niet. Laat zo'n upload nooit
+    // bestaande acties verwijderen.
+    if (!isset($data['actions']) || !is_array($data['actions'])) {
+        $data['actions'] = isset($before['actions']) && is_array($before['actions']) ? $before['actions'] : [];
+    }
+
     mp_validate_write_permissions($before, $data, $authUser);
     $changes = mp_audit_snapshot_changes($before, $data);
 

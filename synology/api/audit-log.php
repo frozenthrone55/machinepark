@@ -65,7 +65,7 @@ function audit_apply_undo(array $snapshot, array $change): array {
     if (!$undo) throw new RuntimeException('Deze logboekregel bevat geen hersteldata.');
     $store = (string)($undo['storeName'] ?? '');
     $id = (string)($undo['entityId'] ?? '');
-    if (!in_array($store, ['devices','parts','maintenance','breakdowns'], true) || $id === '') {
+    if (!in_array($store, ['devices','parts','maintenance','breakdowns','actions'], true) || $id === '') {
         throw new RuntimeException('Deze logboekregel bevat ongeldige hersteldata.');
     }
 
