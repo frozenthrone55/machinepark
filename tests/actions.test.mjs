@@ -11,7 +11,6 @@ const userApi = readFileSync(new URL('../synology/api/action-users.php', import.
 const auditLib = readFileSync(new URL('../synology/api/_audit-lib.php', import.meta.url), 'utf8');
 const auditLog = readFileSync(new URL('../synology/api/audit-log.php', import.meta.url), 'utf8');
 const roleLib = readFileSync(new URL('../synology/api/_role-lib.php', import.meta.url), 'utf8');
-const roleBuilder = readFileSync(new URL('../build-role-management.py', import.meta.url), 'utf8');
 
 test('Acties is een eigen offline datastore met DB-migratie', () => {
   assert.match(builder, /DB_VERSION=2/);
@@ -76,5 +75,5 @@ test('Acties heeft een expliciet Synology-weergaverecht en blijft zichtbaar voor
   assert.match(roleLib, /Acties bekijken/);
   assert.match(roleLib, /view\.manuals','view\.actions','view\.parts/);
   assert.match(roleLib, /view\.dashboard','view\.actions','view\.parts/);
-  assert.match(roleBuilder, /'actions'/);
+  assert.match(builder, /breakdowns','actions','faults/);
 });

@@ -31,6 +31,12 @@ if MARKER not in index:
         "state voor Acties",
     )
 
+    # Handleidingen heeft de basis-schermvolgorde eerder uitgebreid. Voeg Acties
+    # pas hier toe, zodat oudere builders hun verwachte anker blijven herkennen.
+    allowed_old = "return ['dashboard','devices','maintenance','breakdowns','faults','manuals','parts','settings'].find((view) => hasPermission(viewPermission(view))) || 'dashboard';"
+    allowed_new = "return ['dashboard','devices','maintenance','breakdowns','actions','faults','manuals','parts','settings'].find((view) => hasPermission(viewPermission(view))) || 'dashboard';"
+    replace_once(allowed_old, allowed_new, "toegestane schermvolgorde voor Acties")
+
     nav_anchor = """      <button type="button" data-view="maintenance" onclick="switchView('maintenance')"><span class="icon">🔧</span><span class="label">Onderhoud</span></button>"""
     nav_action = nav_anchor + """
       <button type="button" data-view="actions" onclick="switchView('actions')" class="action-nav-button"><span class="icon">✓</span><span class="label">Acties</span><span class="action-nav-count" id="actionNavCount" hidden>0</span></button>"""
@@ -451,6 +457,7 @@ required = [
     "kpiActions",
     "action-device-summary",
     "machinepark-action-users-v1",
+    "'breakdowns','actions','faults'",
 ]
 for needle in required:
     if needle not in built:
