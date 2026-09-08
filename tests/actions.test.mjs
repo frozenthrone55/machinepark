@@ -242,3 +242,15 @@ test('dashboard KPI navigatie bouwt na ToDo-labels', () => {
   assert.ok(cmd.indexOf('python3 build-dashboard-kpi-navigation.py') > cmd.indexOf('python3 build-todo-labels.py'));
   assert.ok(cmd.indexOf('python3 build-dashboard-kpi-navigation.py') < cmd.indexOf('node --check service-visits.js'));
 });
+
+
+test('dashboard onderhoud en depannages gebruiken Werkzaamheden in plaats van lege legacy views', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /route="work"/);
+  assert.match(dashboard, /workKindFilter/);
+  assert.match(dashboard, /target==="maintenance" \? "maintenance" : "breakdowns"/);
+  assert.match(dashboard, /machineparkInlineNavigate/);
+  assert.match(dashboard, /machineparkEarlyNavigate/);
+  assert.match(dashboard, /machineparkRenderCombinedWork/);
+  assert.match(dashboard, /data-dashboard-kpi="maintenance">Alles bekijken/);
+});

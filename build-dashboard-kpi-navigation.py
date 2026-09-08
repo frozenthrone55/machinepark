@@ -12,7 +12,7 @@ if MARKER not in index:
         <div class="panel"><div class="panel-head"><h3>Aandachtspunten</h3><span class="muted" style="font-size:12px">live overzicht</span></div><div id="dashboardAlerts" class="panel-body"></div></div>
       </div>
       <div class="panel" style="margin-top:18px"><div class="panel-head"><h3>Operationele prioriteiten</h3><span class="muted" style="font-size:12px">vandaag</span></div><div id="dashboardProfessional" class="panel-body"></div></div>"""
-    dashboard_new = """      <div class="panel dashboard-upcoming-panel" style="margin-top:18px"><div class="panel-head"><h3>Komende onderhoudsmomenten</h3><button class="btn small" data-go="maintenance">Alles bekijken</button></div><div id="dashboardUpcoming" class="panel-body"></div></div>
+    dashboard_new = """      <div class="panel dashboard-upcoming-panel" style="margin-top:18px"><div class="panel-head"><h3>Komende onderhoudsmomenten</h3><button class="btn small" data-dashboard-kpi="maintenance">Alles bekijken</button></div><div id="dashboardUpcoming" class="panel-body"></div></div>
       <div id="dashboardAlerts" hidden></div>"""
     if dashboard_old not in index:
         raise SystemExit("Buildvalidatie mislukt: dashboardpanelen voor aandacht/prioriteiten niet gevonden")
@@ -68,22 +68,37 @@ if MARKER not in index:
   function goDashboardKpi(card){
     var target=card && card.dataset ? card.dataset.dashboardKpi : "";
     if(!target)return;
+    var route=target;
+
     if(target==="parts"){
       var stock=document.getElementById("partStockFilter");
       if(stock)stock.value="low";
     }else if(target==="devices"){
       var device=document.getElementById("deviceStatusFilter");
       if(device)device.value="";
-    }else if(target==="maintenance"){
-      var maintenance=document.getElementById("maintenanceTypeFilter");
-      if(maintenance)maintenance.value="";
-    }else if(target==="breakdowns"){
-      var status=document.getElementById("breakdownStatusFilter");
-      var priority=document.getElementById("breakdownPriorityFilter");
-      if(status)status.value="";
-      if(priority)priority.value="";
+    }else if(target==="maintenance" || target==="breakdowns"){
+      // Onderhoud en depannages zijn in de huidige app samengevoegd onder
+      // Werkzaamheden. De oude view-maintenance/view-breakdowns zijn leeg.
+      route="work";
+      var kind=document.getElementById("workKindFilter");
+      var maintenanceType=document.getElementById("workMaintenanceTypeFilter");
+      var breakdownStatus=document.getElementById("workBreakdownStatusFilter");
+      var breakdownPriority=document.getElementById("workBreakdownPriorityFilter");
+      if(kind)kind.value=target==="maintenance" ? "maintenance" : "breakdowns";
+      if(maintenanceType)maintenanceType.value="";
+      if(breakdownStatus)breakdownStatus.value="";
+      if(breakdownPriority)breakdownPriority.value="";
     }
-    if(typeof window.switchView==="function")window.switchView(target);
+
+    var navigate=window.machineparkInlineNavigate || window.machineparkEarlyNavigate || window.machineparkNavigate || window.switchView;
+    if(typeof navigate==="function")navigate(route);
+
+    if(route==="work"){
+      setTimeout(function(){
+        if(typeof window.machineparkRenderCombinedWork==="function")window.machineparkRenderCombinedWork();
+        else if(typeof window.renderWorkActivities==="function")window.renderWorkActivities();
+      },0);
+    }
   }
   document.addEventListener("click",function(event){
     var card=event.target && event.target.closest ? event.target.closest("[data-dashboard-kpi]") : null;
@@ -111,6 +126,9 @@ required = [
     'data-dashboard-kpi="parts"',
     'action-kpi dashboard-kpi-link',
     'stock.value="low"',
+    'route="work"',
+    'workKindFilter',
+    'machineparkInlineNavigate',
     'goDashboardKpi',
     'dashboard-upcoming-panel',
 ]
