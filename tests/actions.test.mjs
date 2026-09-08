@@ -165,3 +165,21 @@ test('service-actie afrondvinkje bouwt na de servicekoppeling', () => {
   assert.ok(cmd.includes('python3 build-action-service-completion.py'));
   assert.ok(cmd.indexOf('python3 build-action-service-completion.py') > cmd.indexOf('python3 build-action-service-linking.py'));
 });
+
+
+test('machine-acties staan in de chronologische tijdlijn en niet in een apart vak', () => {
+  const timeline = readFileSync(new URL('../build-action-machine-timeline.py', import.meta.url), 'utf8');
+  assert.match(timeline, /type:'action'/);
+  assert.match(timeline, /event-label action/);
+  assert.match(timeline, /data-action-open/);
+  assert.match(timeline, /events\.sort/);
+  assert.match(timeline, /function deviceActionsHtml\(deviceId\).*in index/);
+  assert.match(timeline, /decorateContextModal\('device',deviceId\)/);
+});
+
+test('machine-actietijdlijn bouwt na de acties en servicekoppeling', () => {
+  const cmd = pkg.scripts.build;
+  assert.ok(cmd.includes('python3 build-action-machine-timeline.py'));
+  assert.ok(cmd.indexOf('python3 build-action-machine-timeline.py') > cmd.indexOf('python3 build-actions.py'));
+  assert.ok(cmd.indexOf('python3 build-action-machine-timeline.py') > cmd.indexOf('python3 build-action-service-completion.py'));
+});
