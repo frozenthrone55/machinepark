@@ -202,3 +202,22 @@ test('service-delete cleanup draait na service- en tijdlijnbouw', () => {
   assert.ok(cmd.indexOf('python3 build-action-service-delete-cleanup.py') > cmd.indexOf('python3 build-action-service-linking.py'));
   assert.ok(cmd.indexOf('python3 build-action-service-delete-cleanup.py') > cmd.indexOf('python3 build-action-machine-timeline.py'));
 });
+
+
+test('zichtbare Acties-module heet ToDo', () => {
+  const labels = readFileSync(new URL('../build-todo-labels.py', import.meta.url), 'utf8');
+  assert.match(labels, /<span class="label">ToDo<\/span>/);
+  assert.match(labels, /Nieuwe ToDo snel toevoegen/);
+  assert.match(labels, /Open ToDo’s/);
+  assert.match(labels, /Gekoppelde ToDo’s/);
+  assert.match(labels, /Bestaande ToDo koppelen/);
+  assert.match(labels, /ToDo afronden/);
+  assert.match(labels, /state\.actions/);
+});
+
+test('ToDo-labels draaien als laatste actie-naamlaag', () => {
+  const cmd = pkg.scripts.build;
+  assert.ok(cmd.includes('python3 build-todo-labels.py'));
+  assert.ok(cmd.indexOf('python3 build-todo-labels.py') > cmd.indexOf('python3 build-action-service-delete-cleanup.py'));
+  assert.ok(cmd.indexOf('python3 build-todo-labels.py') < cmd.indexOf('node --check service-visits.js'));
+});
