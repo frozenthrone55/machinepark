@@ -183,3 +183,22 @@ test('machine-actietijdlijn bouwt na de acties en servicekoppeling', () => {
   assert.ok(cmd.indexOf('python3 build-action-machine-timeline.py') > cmd.indexOf('python3 build-actions.py'));
   assert.ok(cmd.indexOf('python3 build-action-machine-timeline.py') > cmd.indexOf('python3 build-action-service-completion.py'));
 });
+
+
+test('service verwijderen ruimt actiekoppeling atomair op', () => {
+  const cleanup = readFileSync(new URL('../build-action-service-delete-cleanup.py', import.meta.url), 'utf8');
+  assert.match(cleanup, /serviceReportLinkedActions\(reportId\)/);
+  assert.match(cleanup, /maintenance','breakdowns','parts','actions/);
+  assert.match(cleanup, /serviceReportIds/);
+  assert.match(cleanup, /serviceLinks/);
+  assert.match(cleanup, /sourceKind:'',sourceId:'',sourceLabel:''/);
+  assert.match(cleanup, /Serviceverslag verwijderd/);
+  assert.match(cleanup, /actionUnlinked/);
+});
+
+test('service-delete cleanup draait na service- en tijdlijnbouw', () => {
+  const cmd = pkg.scripts.build;
+  assert.ok(cmd.includes('python3 build-action-service-delete-cleanup.py'));
+  assert.ok(cmd.indexOf('python3 build-action-service-delete-cleanup.py') > cmd.indexOf('python3 build-action-service-linking.py'));
+  assert.ok(cmd.indexOf('python3 build-action-service-delete-cleanup.py') > cmd.indexOf('python3 build-action-machine-timeline.py'));
+});
