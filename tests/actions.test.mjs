@@ -268,3 +268,24 @@ test('dashboard KPI drilldown toont exact dezelfde selectie als de teller', () =
   assert.match(dashboard, /machineparkDashboardTodoOpenOnly/);
   assert.match(dashboard, /actionScope='all'/);
 });
+
+
+test('open service heeft eigen dashboardvenster en staat niet meer in Werkzaamheden', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /view-service-overview/);
+  assert.match(dashboard, /kpiOpenServiceCard/);
+  assert.match(dashboard, /serviceOverviewStatusFilter/);
+  assert.match(dashboard, /Open service/);
+  assert.match(dashboard, /Alle serviceverslagen/);
+  assert.match(dashboard, /Afgesloten/);
+  assert.match(dashboard, /panel\.parentNode!==view/);
+  assert.match(dashboard, /view\.appendChild\(panel\)/);
+  assert.match(dashboard, /machineparkOpenServiceOverview/);
+});
+
+test('open service KPI telt open verslagen en serviceconcepten', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /status==="Open"\|\|status==="In behandeling"/);
+  assert.match(dashboard, /data-sv-draft-open/);
+  assert.match(dashboard, /kpiOpenService/);
+});

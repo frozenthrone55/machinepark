@@ -131,7 +131,7 @@ if MARKER not in index:
     index = index.replace("</head>", style + "</head>", 1)
 
     script = """
-<script data-machinepark-dashboard-kpi-nav="v1">
+<script data-machinepark-dashboard-kpi-nav="v2">
 (function(){
 
   window.machineparkDashboardRenderMaintenanceAttention=function(body){
@@ -166,9 +166,145 @@ if MARKER not in index:
     });
   };
 
+
+  function ensureServiceOverviewView(){
+    var view=document.getElementById("view-service-overview");
+    if(view)return view;
+    view=document.createElement("section");
+    view.id="view-service-overview";
+    view.className="view";
+    var work=document.getElementById("view-work"),parts=document.getElementById("view-parts");
+    var parent=(work||parts)&&((work||parts).parentNode);
+    if(parent)parent.insertBefore(view,parts||((work&&work.nextSibling)||null));
+    else (document.querySelector("main")||document.body).appendChild(view);
+    return view;
+  }
+
+  function serviceOverviewRows(){
+    return Array.prototype.slice.call(document.querySelectorAll("#serviceVisitBody tr")).filter(function(row){
+      return !!row.querySelector(".service-visit-status");
+    });
+  }
+
+  function serviceOverviewApplyFilter(){
+    var select=document.getElementById("serviceOverviewStatusFilter");
+    var filter=select?select.value:"open";
+    serviceOverviewRows().forEach(function(row){
+      var status=(row.querySelector(".service-visit-status")||{}).textContent||"";
+      status=status.trim();
+      var open=status==="Open"||status==="In behandeling";
+      row.style.display=filter==="all"?"":filter==="closed"?(open?"none":""):(open?"":"none");
+    });
+    var drafts=document.getElementById("serviceVisitDraftList");
+    if(drafts)drafts.style.display=filter==="closed"?"none":"";
+    var title=document.getElementById("pageTitle");
+    if(state&&state.view==="service-overview"&&title)title.textContent=filter==="open"?"Open service":"Service";
+  }
+
+  function ensureOpenServiceKpi(){
+    var box=document.querySelector("#view-dashboard .kpis");
+    if(!box)return null;
+    var card=document.getElementById("kpiOpenServiceCard");
+    if(!card){
+      card=document.createElement("div");
+      card.id="kpiOpenServiceCard";
+      card.className="kpi dashboard-kpi-link";
+      card.dataset.dashboardKpi="service";
+      card.setAttribute("role","button");
+      card.setAttribute("tabindex","0");
+      card.setAttribute("aria-label","Open service");
+      card.innerHTML='<span class="dot" style="background:#397a68"></span><div class="label">Open service</div><div class="value" id="kpiOpenService">0</div><div class="hint" id="kpiOpenServiceHint">0 verslagen · 0 concepten</div>';
+      box.appendChild(card);
+    }
+    return card;
+  }
+
+  function updateOpenServiceKpi(){
+    ensureOpenServiceKpi();
+    var openReports=serviceOverviewRows().filter(function(row){
+      var status=(row.querySelector(".service-visit-status")||{}).textContent||"";
+      status=status.trim();
+      return status==="Open"||status==="In behandeling";
+    }).length;
+    var concepts=document.querySelectorAll("#serviceVisitDraftList [data-sv-draft-open]").length;
+    var value=document.getElementById("kpiOpenService");
+    var hint=document.getElementById("kpiOpenServiceHint");
+    if(value)value.textContent=String(openReports+concepts);
+    if(hint)hint.textContent=String(openReports)+" verslag"+(openReports===1?"":"en")+" · "+String(concepts)+" concept"+(concepts===1?"":"en");
+  }
+
+  function syncServiceOverview(){
+    var panel=document.getElementById("serviceVisitPanel");
+    if(!panel){ensureOpenServiceKpi();updateOpenServiceKpi();return;}
+    var view=ensureServiceOverviewView();
+    if(panel.parentNode!==view)view.appendChild(panel);
+
+    var head=panel.querySelector(".service-visit-panel-head");
+    if(head&&!document.getElementById("serviceOverviewStatusFilter")){
+      var select=document.createElement("select");
+      select.id="serviceOverviewStatusFilter";
+      select.className="filter";
+      select.innerHTML='<option value="open">Open service</option><option value="all">Alle serviceverslagen</option><option value="closed">Afgesloten</option>';
+      select.value="open";
+      select.addEventListener("change",serviceOverviewApplyFilter);
+      var add=document.getElementById("serviceVisitAdd");
+      if(add&&add.parentNode===head)head.insertBefore(select,add);
+      else head.appendChild(select);
+    }
+
+    var m=document.getElementById("workAddMaintenance"),b=document.getElementById("workAddBreakdown");
+    if(m&&m.textContent.indexOf("Los onderhoud")>=0)m.textContent="+ Onderhoud registreren";
+    if(b&&b.textContent.indexOf("Losse depannage")>=0)b.textContent="+ Depannage toevoegen";
+
+    serviceOverviewApplyFilter();
+    updateOpenServiceKpi();
+
+    if(!panel.__machineparkServiceOverviewObserver){
+      var scheduled=false;
+      panel.__machineparkServiceOverviewObserver=new MutationObserver(function(){
+        if(scheduled)return;
+        scheduled=true;
+        requestAnimationFrame(function(){scheduled=false;serviceOverviewApplyFilter();updateOpenServiceKpi();});
+      });
+      panel.__machineparkServiceOverviewObserver.observe(panel,{childList:true,subtree:true,characterData:true});
+    }
+  }
+
+  function openServiceOverview(filter){
+    syncServiceOverview();
+    var view=ensureServiceOverviewView();
+    var select=document.getElementById("serviceOverviewStatusFilter");
+    if(select)select.value=filter||"open";
+    state.view="service-overview";
+    document.querySelectorAll(".view").forEach(function(node){node.classList.remove("active");});
+    view.classList.add("active");
+    document.querySelectorAll(".nav button").forEach(function(button){button.classList.remove("active");});
+    var title=document.getElementById("pageTitle"),subtitle=document.getElementById("pageSubtitle"),search=document.getElementById("globalSearch");
+    if(title)title.textContent=(select&&select.value==="open")?"Open service":"Service";
+    if(subtitle)subtitle.textContent="Serviceconcepten en gezamenlijke serviceverslagen in een apart overzicht.";
+    if(search){search.value="";search.placeholder="Serviceoverzicht";}
+    if(typeof closeGlobalSearch==="function")closeGlobalSearch();
+    serviceOverviewApplyFilter();
+  }
+  window.machineparkOpenServiceOverview=openServiceOverview;
+
+  var baseServiceRender=window.renderMachineparkServiceVisits;
+  if(typeof baseServiceRender==="function"){
+    window.renderMachineparkServiceVisits=function(){
+      var result=baseServiceRender.apply(this,arguments);
+      setTimeout(syncServiceOverview,0);
+      return result;
+    };
+  }
+  setTimeout(syncServiceOverview,0);
+
   function goDashboardKpi(card){
     var target=card && card.dataset ? card.dataset.dashboardKpi : "";
     if(!target)return;
+    if(target==="service"){
+      if(typeof window.machineparkOpenServiceOverview==="function")window.machineparkOpenServiceOverview("open");
+      return;
+    }
     var route=target;
 
     if(target==="parts"){
@@ -232,6 +368,10 @@ required = [
     'open-attention',
     'machineparkDashboardRenderMaintenanceAttention',
     'machineparkDashboardTodoOpenOnly',
+    'view-service-overview',
+    'kpiOpenServiceCard',
+    'serviceOverviewStatusFilter',
+    'machineparkOpenServiceOverview',
     'route="work"',
     'workKindFilter',
     'machineparkInlineNavigate',
