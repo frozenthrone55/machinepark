@@ -830,7 +830,7 @@
   function decorateDraftModal() {
     const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),submit=form?.querySelector('button[type="submit"]'),cancel=document.getElementById('cancelModal');if(!form||!foot||!submit)return;
     submit.textContent=activeVisitDraft.editMode?'Wijzigingen opslaan':(activeVisitDraft.appendToReportId?'Aanvulling afsluiten':'Serviceverslag afsluiten');
-    const status=document.createElement('span');status.className='service-visit-draft-status';status.textContent=activeVisitDraft.persisted?'Concept geladen · wijzigingen worden automatisch opgeslagen.':'Automatisch opslaan start zodra je iets wijzigt.';
+    const status=document.createElement('span');status.className='service-visit-draft-status';status.textContent=activeVisitDraft.editMode?'Wijzigingen worden tussentijds veilig bewaard; “Wijzigingen opslaan” maakt ze meteen definitief.':(activeVisitDraft.persisted?'Concept geladen · wijzigingen worden automatisch opgeslagen.':'Automatisch opslaan start zodra je iets wijzigt.');
     const button=document.createElement('button');button.type='button';button.className='btn service-draft-button';button.textContent='Concept bewaren';button.onclick=async()=>{button.disabled=true;try{activeVisitDraft.touched=true;await queueDraftSave({manual:true,force:true});const current=activeVisitDraft;activeVisitDraft=null;clearTimeout(visitAutosaveTimer);baseCloseModal();if(current)await refreshVisitState();}catch(e){alert(e?.message||'Concept bewaren mislukt.');}finally{if(document.body.contains(button))button.disabled=false;}};
     foot.insertBefore(status,submit);foot.insertBefore(button,submit);if(cancel)cancel.textContent='Sluiten';
     form.addEventListener('input',scheduleDraft);form.addEventListener('change',scheduleDraft);form.addEventListener('click',e=>{if(e.target.closest('.sv-add-part,.sv-add-oneoff,.remove-line,.usage-suggestion,[data-sv-location],[data-kind],[data-fault-pick],[data-add-work-session],[data-remove-work-session]'))scheduleDraft();});
@@ -891,9 +891,27 @@
   }
 
   async function finalizeActiveVisit() {
-    const current=activeVisitDraft;if(!current||current.finalizing)return;current.finalizing=true;clearTimeout(visitAutosaveTimer);setDraftStatus('Serviceverslag afsluiten…','busy');
+    const current=activeVisitDraft;if(!current||current.finalizing)return;current.finalizing=true;clearTimeout(visitAutosaveTimer);
+    setDraftStatus(current.editMode?'Wijzigingen definitief opslaan…':'Serviceverslag afsluiten…','busy');
     try{
-      current.touched=true;const saved=await queueDraftSave({force:true});if(!saved||activeVisitDraft!==current)return;
+      let saved;
+      if(current.editMode){
+        // machinepark-service-edit-direct-save-v1
+        // Een bestaand serviceverslag moet met één klik definitief worden bewaard.
+        // Wacht een eventueel lopende autosave af, lees daarna rechtstreeks het
+        // actuele formulier en ga meteen naar de definitieve transactie. We maken
+        // hier dus niet eerst opnieuw een verplichte concept-save tussenin.
+        await visitSaveChain.catch(()=>{});
+        if(activeVisitDraft!==current)return;
+        const header=collectHeader(),items=await collectItems();
+        if(activeVisitDraft!==current)return;
+        current.header=header;current.items=items;current.touched=false;
+        saved={header,items};
+      }else{
+        current.touched=true;
+        saved=await queueDraftSave({force:true});
+        if(!saved||activeVisitDraft!==current)return;
+      }
       const selected=saved.items,locations=saved.header.locations||[];
       if(!locations.length)throw new Error('Voeg minstens één locatie toe.');
       if(!selected.length)throw new Error('Kies minstens één onderhoud, depannage of Andere werken.');
@@ -905,7 +923,9 @@
       const missingOtherType=selected.find(i=>i.draftServiceKind==='otherworks'&&!String(i.workTypeName||'').trim());if(missingOtherType)throw new Error(`Kies een soort werkzaamheden voor ${svDeviceShort(missingOtherType.deviceId)}.`);
       const report=saved.header.appendToReportId?serviceReportById(saved.header.appendToReportId):null;
       const result=await finalizeDraftTransaction(saved.header,saved.items,selected,report);
-      activeVisitDraft=null;baseCloseModal();await refresh();toast(`Serviceverslag ${reportDisplayLabel(serviceReportById(result.id) || {number:result.number,date:saved.header.date,visits:(result.visits||[]).map(v=>({location:v.location}))})} opgeslagen · ${result.visits.length} locatie${result.visits.length===1?'':'s'} · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceReportDetails(result.id),0);
+      activeVisitDraft=null;baseCloseModal();await refresh();
+      if(current.editMode)await syncVisitDraft();
+      toast(`Serviceverslag ${reportDisplayLabel(serviceReportById(result.id) || {number:result.number,date:saved.header.date,visits:(result.visits||[]).map(v=>({location:v.location}))})} ${current.editMode?'gewijzigd en opgeslagen':'opgeslagen'} · ${result.visits.length} locatie${result.visits.length===1?'':'s'} · ${result.finals.length} registratie${result.finals.length===1?'':'s'}`);setTimeout(()=>showServiceReportDetails(result.id),0);
     }catch(e){current.finalizing=false;setDraftStatus(e?.message||'Afsluiten mislukt','error');throw e;}
   }
 

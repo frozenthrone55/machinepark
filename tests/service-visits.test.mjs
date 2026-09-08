@@ -267,3 +267,23 @@ test('Werkzaamheden gebruikt in landscape de volledige hoofdinhoud-breedte', () 
   assert.match(js, /max-width:none/);
   assert.match(js, /box-sizing:border-box/);
 });
+
+test('bestaand serviceverslag wordt met één klik definitief opgeslagen', () => {
+  const start = js.indexOf('async function finalizeActiveVisit()');
+  const end = js.indexOf('function headerStoreForUser()', start);
+  const block = js.slice(start, end);
+  assert.match(block, /machinepark-service-edit-direct-save-v1/);
+  assert.match(block, /if\(current\.editMode\)/);
+  assert.match(block, /await visitSaveChain\.catch\(\(\)=>\{\}\)/);
+  assert.match(block, /const header=collectHeader\(\),items=await collectItems\(\)/);
+  assert.match(block, /saved=\{header,items\}/);
+  assert.match(block, /else\{[\s\S]*queueDraftSave\(\{force:true\}\)/);
+  assert.match(block, /finalizeDraftTransaction\(saved\.header,saved\.items,selected,report\)/);
+  const editBranch = block.slice(block.indexOf('if(current.editMode)'), block.indexOf('}else{'));
+  assert.doesNotMatch(editBranch, /queueDraftSave/);
+});
+
+test('bewerkknop legt uit dat Wijzigingen opslaan meteen definitief bewaart', () => {
+  assert.match(js, /Wijzigingen worden tussentijds veilig bewaard; “Wijzigingen opslaan” maakt ze meteen definitief\./);
+  assert.match(js, /current\.editMode\?'gewijzigd en opgeslagen':'opgeslagen'/);
+});
