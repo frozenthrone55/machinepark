@@ -148,3 +148,20 @@ test('service-visits krijgt cache-busting na actiekoppeling-build', () => {
   assert.match(linking, /service_src_count/);
   assert.match(linking, /INDEX\.write_text\(index/);
 });
+
+
+test('service-actie afrondvinkje rondt gekoppelde actie direct af', () => {
+  const completion = readFileSync(new URL('../build-action-service-completion.py', import.meta.url), 'utf8');
+  assert.match(completion, /completeLinkedActionFromService/);
+  assert.match(completion, /service-action-complete-check/);
+  assert.match(completion, /data-service-action-complete/);
+  assert.match(completion, /completedDate:todayISO\(\)/);
+  assert.match(completion, /Actie afgerond/);
+  assert.match(completion, /linked\.has\(String\(action\.id/);
+});
+
+test('service-actie afrondvinkje bouwt na de servicekoppeling', () => {
+  const cmd = pkg.scripts.build;
+  assert.ok(cmd.includes('python3 build-action-service-completion.py'));
+  assert.ok(cmd.indexOf('python3 build-action-service-completion.py') > cmd.indexOf('python3 build-action-service-linking.py'));
+});
