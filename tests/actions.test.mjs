@@ -289,3 +289,17 @@ test('open service KPI telt open verslagen en serviceconcepten', () => {
   assert.match(dashboard, /data-sv-draft-open/);
   assert.match(dashboard, /kpiOpenService/);
 });
+
+
+test('dashboard KPI volgorde is twee rijen van drie', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(dashboard, /\[data-dashboard-kpi="devices"\]\{order:1\}/);
+  assert.match(dashboard, /#kpiActionsCard\{order:2\}/);
+  assert.match(dashboard, /\[data-dashboard-kpi="parts"\]\{order:3\}/);
+  assert.match(dashboard, /#kpiOpenServiceCard\{order:4\}/);
+  assert.match(dashboard, /\[data-dashboard-kpi="breakdowns"\]\{order:5\}/);
+  assert.match(dashboard, /\[data-dashboard-kpi="maintenance"\]\{order:6\}/);
+  assert.match(dashboard, /max-width:1050px/);
+  assert.match(dashboard, /max-width:680px/);
+});

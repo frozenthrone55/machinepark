@@ -120,10 +120,19 @@ if MARKER not in index:
 
     style = """
 <style data-machinepark-dashboard-kpi-nav="v2">
+#view-dashboard .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
 #view-dashboard .dashboard-kpi-link{cursor:pointer;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease}
 #view-dashboard .dashboard-kpi-link:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(25,57,48,.10);border-color:#bfd1ca}
 #view-dashboard .dashboard-kpi-link:focus-visible{outline:3px solid rgba(44,106,88,.20);outline-offset:2px;border-color:#7ea598}
+#view-dashboard [data-dashboard-kpi="devices"]{order:1}
+#view-dashboard #kpiActionsCard{order:2}
+#view-dashboard [data-dashboard-kpi="parts"]{order:3}
+#view-dashboard #kpiOpenServiceCard{order:4}
+#view-dashboard [data-dashboard-kpi="breakdowns"]{order:5}
+#view-dashboard [data-dashboard-kpi="maintenance"]{order:6}
 #view-dashboard .dashboard-upcoming-panel{width:100%}
+@media (max-width:1050px){#view-dashboard .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:680px){#view-dashboard .kpis{grid-template-columns:1fr}}
 </style>
 """
     if "</head>" not in index:
