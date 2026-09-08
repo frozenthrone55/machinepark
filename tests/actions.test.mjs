@@ -139,3 +139,12 @@ test('serviceconcept bewaart en ruimt actiekoppelingen correct op', () => {
   assert.match(linking, /machineparkClearServiceDraftActionLinks/);
   assert.match(linking, /service-draft-action-picker-backdrop/);
 });
+
+
+test('service-visits krijgt cache-busting na actiekoppeling-build', () => {
+  const linking = readFileSync(new URL('../build-action-service-linking.py', import.meta.url), 'utf8');
+  assert.match(linking, /sha256\(service\.encode/);
+  assert.match(linking, /service-visits\\\.js\\\?v=/);
+  assert.match(linking, /service_src_count/);
+  assert.match(linking, /INDEX\.write_text\(index/);
+});

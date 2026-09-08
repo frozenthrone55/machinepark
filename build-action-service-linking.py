@@ -1,3 +1,5 @@
+from hashlib import sha256
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -376,6 +378,18 @@ if "machineparkClearServiceDraftActionLinks(header.draftReportId)" not in servic
     if delete_draft_old not in service:
         raise SystemExit("Buildvalidatie mislukt: verwijderen-serviceconceptanker voor acties ontbreekt")
     service = service.replace(delete_draft_old, delete_draft_new, 1)
+
+
+# Cache-busting voor service-visits.js moet NA alle servicepatches gebeuren.
+# Anders kan de PWA/browser de oude servicecode blijven gebruiken terwijl het
+# bestand op synology-deploy al vernieuwd is.
+service_version = sha256(service.encode("utf-8")).hexdigest()[:12]
+service_src_pattern = r'<script src="\./service-visits\.js\?v=[^"]+" data-machinepark-service-visits="v1"></script>'
+service_src_new = f'<script src="./service-visits.js?v={service_version}" data-machinepark-service-visits="v1"></script>'
+index, service_src_count = re.subn(service_src_pattern, service_src_new, index, count=1)
+if service_src_count != 1:
+    raise SystemExit(f"Buildvalidatie mislukt: service-visits cache-busting anker gevonden {service_src_count}x")
+INDEX.write_text(index, encoding="utf-8")
 
 SERVICE.write_text(service, encoding="utf-8")
 
