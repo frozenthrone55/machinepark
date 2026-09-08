@@ -11,6 +11,7 @@ function mp_role_catalog(): array {
         ['group'=>'Weergave','key'=>'view.breakdowns','label'=>'Depannages bekijken'],
         ['group'=>'Weergave','key'=>'view.faults','label'=>'Storingen bekijken'],
         ['group'=>'Weergave','key'=>'view.manuals','label'=>'Handleidingen bekijken'],
+        ['group'=>'Weergave','key'=>'view.actions','label'=>'Acties bekijken'],
         ['group'=>'Weergave','key'=>'view.parts','label'=>'Onderdelen bekijken'],
         ['group'=>'Weergave','key'=>'view.settings','label'=>'Beheer bekijken'],
         ['group'=>'Toestellen','key'=>'devices.add','label'=>'Toestellen toevoegen'],
@@ -60,7 +61,7 @@ function mp_role_defaults(): array {
     return ['version'=>1,'roles'=>[
         ['id'=>'beheerder','label'=>'Beheerder','builtIn'=>true,'permissions'=>mp_role_permission_set('all')],
         ['id'=>'gebruiker','label'=>'Gebruiker','builtIn'=>true,'permissions'=>mp_role_permission_set([
-            'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.manuals','view.parts',
+            'view.dashboard','view.devices','view.maintenance','view.breakdowns','view.faults','view.manuals','view.actions','view.parts',
             'devices.add','devices.edit','devices.delete',
             'maintenance.add','maintenance.edit','maintenance.delete',
             'breakdowns.add','breakdowns.edit','breakdowns.delete',
@@ -72,7 +73,7 @@ function mp_role_defaults(): array {
             'breakdowns.add','breakdowns.edit','breakdowns.delete','print'
         ])],
         ['id'=>'magazijnier','label'=>'Magazijnier','builtIn'=>true,'permissions'=>mp_role_permission_set([
-            'view.dashboard','view.parts','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print'
+            'view.dashboard','view.actions','view.parts','parts.add','parts.edit','parts.stock','parts.delete','parts.export','print'
         ])],
     ]];
 }

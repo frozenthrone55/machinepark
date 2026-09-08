@@ -99,7 +99,7 @@ if MARKER not in index:
 
   function viewPermission(view) { return `view.${view}`; }
   function firstAllowedView() {
-    return ['dashboard','devices','maintenance','breakdowns','parts','settings'].find((view) => hasPermission(viewPermission(view))) || 'dashboard';
+    return ['dashboard','devices','work','maintenance','breakdowns','actions','faults','manuals','parts','settings'].find((view) => hasPermission(viewPermission(view))) || 'dashboard';
   }
 
   const originalSwitchViewForRoles = switchView;

@@ -10,6 +10,8 @@ const dataApi = readFileSync(new URL('../synology/api/machinepark-data.php', imp
 const userApi = readFileSync(new URL('../synology/api/action-users.php', import.meta.url), 'utf8');
 const auditLib = readFileSync(new URL('../synology/api/_audit-lib.php', import.meta.url), 'utf8');
 const auditLog = readFileSync(new URL('../synology/api/audit-log.php', import.meta.url), 'utf8');
+const roleLib = readFileSync(new URL('../synology/api/_role-lib.php', import.meta.url), 'utf8');
+const roleBuilder = readFileSync(new URL('../build-role-management.py', import.meta.url), 'utf8');
 
 test('Acties is een eigen offline datastore met DB-migratie', () => {
   assert.match(builder, /DB_VERSION=2/);
@@ -67,4 +69,12 @@ test('Actiegebruikers-API deelt alleen minimale gebruikersinfo met aangemelde ge
   assert.match(userApi, /mp_auth_public_user/);
   assert.match(userApi, /roleLabel/);
   assert.doesNotMatch(userApi, /passwordHash/);
+});
+
+test('Acties heeft een expliciet Synology-weergaverecht en blijft zichtbaar voor bestaande ingebouwde rollen', () => {
+  assert.match(roleLib, /view\.actions/);
+  assert.match(roleLib, /Acties bekijken/);
+  assert.match(roleLib, /view\.manuals','view\.actions','view\.parts/);
+  assert.match(roleLib, /view\.dashboard','view\.actions','view\.parts/);
+  assert.match(roleBuilder, /'actions'/);
 });
