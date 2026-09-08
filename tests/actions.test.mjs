@@ -341,3 +341,17 @@ test('dashboard KPI markeert navigatiecontext vóór filterroute', () => {
   assert.match(dashboard, /machineparkDashboardNavigationTarget="service-overview"/);
   assert.match(dashboard, /machineparkDashboardNavigationTarget=route/);
 });
+
+
+test('open service gebruikt bestaande onderhoud of depannagerechten', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /view === 'service-overview'/);
+  assert.match(dashboard, /hasPermission\('view\.maintenance'\)/);
+  assert.match(dashboard, /return 'view\.breakdowns'/);
+  assert.doesNotMatch(dashboard, /return 'view\.service-overview'/);
+});
+
+test('open service metadata is bekend bij vaste navigatieruntime', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /'service-overview': \['Open service'/);
+});

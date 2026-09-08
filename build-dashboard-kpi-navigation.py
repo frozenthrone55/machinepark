@@ -442,6 +442,27 @@ for forbidden in [
         raise SystemExit("Buildvalidatie mislukt: verwijderd dashboardblok nog aanwezig (" + forbidden + ")")
 
 
+# service-overview gebruikt bestaande service-rechten. Zonder deze mapping
+# behandelt role-management de view als 'view.service-overview' (bestaat niet)
+# en springt de app terug naar Dashboard.
+role_permission_old = "  function viewPermission(view) { return `view.${view}`; }"
+role_permission_new = """  function viewPermission(view) {
+    if (view === 'service-overview') {
+      if (hasPermission('view.maintenance')) return 'view.maintenance';
+      return 'view.breakdowns';
+    }
+    return `view.${view}`;
+  }"""
+if role_permission_old not in index:
+    raise SystemExit("Buildvalidatie mislukt: role-management viewPermission niet gevonden voor Open service")
+index = index.replace(role_permission_old, role_permission_new, 1)
+
+# Voeg ook correcte metadata toe aan de vaste navigatieruntime.
+nav_service_meta_old = "      settings: ['Beheer', 'Back-up, import en instellingen.'],\n    };"
+nav_service_meta_new = "      settings: ['Beheer', 'Back-up, import en instellingen.'],\n      'service-overview': ['Open service', 'Serviceconcepten en gezamenlijke serviceverslagen in een apart overzicht.'],\n    };"
+if nav_service_meta_old in index and "'service-overview': ['Open service'" not in index:
+    index = index.replace(nav_service_meta_old, nav_service_meta_new, 1)
+
 # Dashboardfilters blijven alleen actief wanneer de view vanuit een KPI wordt geopend.
 nav_activate_old = """  function activateView(view) {
     let nextView = String(view || '').trim();
