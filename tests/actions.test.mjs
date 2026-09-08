@@ -314,3 +314,30 @@ test('open service blijft actief na synchronisatie en render', () => {
   assert.match(dashboard, /updateOpenServiceKpi\(\);restoreServiceOverviewActive\(\)/);
   assert.match(dashboard, /service-overview.*Open service/);
 });
+
+
+test('dashboardfilters gelden alleen bij dashboardnavigatie', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /machineparkDashboardNavigationTarget/);
+  assert.match(dashboard, /machineparkResetDashboardDrilldownFilters/);
+  assert.match(dashboard, /const fromDashboardKpi = dashboardTarget === nextView/);
+  assert.match(dashboard, /machineparkResetDashboardDrilldownFilters\(nextView\)/);
+});
+
+test('gewone tabbladen herstellen volledige overzichten', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /if\(device\)device\.value=""/);
+  assert.match(dashboard, /if\(stock\)stock\.value=""/);
+  assert.match(dashboard, /if\(kind\)kind\.value=""/);
+  assert.match(dashboard, /if\(breakdownStatus\)breakdownStatus\.value=""/);
+  assert.match(dashboard, /machineparkDashboardTodoOpenOnly=false/);
+  assert.match(dashboard, /doneSection\.style\.display=""/);
+  assert.match(dashboard, /serviceFilter\.value="all"/);
+});
+
+test('dashboard KPI markeert navigatiecontext vóór filterroute', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /machineparkDashboardNavigationTarget='actions'/);
+  assert.match(dashboard, /machineparkDashboardNavigationTarget="service-overview"/);
+  assert.match(dashboard, /machineparkDashboardNavigationTarget=route/);
+});
