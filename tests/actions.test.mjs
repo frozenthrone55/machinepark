@@ -120,3 +120,22 @@ test('serviceoverzicht opnieuw na actierefresh', () => {
   assert.match(linking, /renderAll/);
   assert.match(linking, /servicestatus refresh/);
 });
+
+
+test('nieuw serviceconcept kan bestaande actie koppelen vóór afsluiten', () => {
+  const linking = readFileSync(new URL('../build-action-service-linking.py', import.meta.url), 'utf8');
+  assert.match(linking, /Actie koppelen/);
+  assert.match(linking, /machineparkOpenServiceDraftActionPicker/);
+  assert.match(linking, /linkedActionIds/);
+  assert.match(linking, /draftReportId/);
+  assert.match(linking, /header\.draftReportId\|\|uid\('sr'\)/);
+  assert.match(linking, /machineparkFinalizeServiceDraftActions/);
+});
+
+test('serviceconcept bewaart en ruimt actiekoppelingen correct op', () => {
+  const linking = readFileSync(new URL('../build-action-service-linking.py', import.meta.url), 'utf8');
+  assert.match(linking, /Koppeling bewaren/);
+  assert.match(linking, /Gekoppeld aan serviceconcept/);
+  assert.match(linking, /machineparkClearServiceDraftActionLinks/);
+  assert.match(linking, /service-draft-action-picker-backdrop/);
+});
