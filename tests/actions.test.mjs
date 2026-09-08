@@ -377,3 +377,27 @@ test('normaal werkzaamheden tabblad wist dashboardcontext en herplaatst service'
   assert.match(dashboard, /machineparkDashboardWorkDrilldown=false/);
   assert.match(dashboard, /setTimeout\(function\(\)\{if\(typeof window\.machineparkSyncServiceOverviewPlacement/);
 });
+
+
+test('dashboard zoeken toont ToDo resultaten', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /const actionMatches=canSearchActions/);
+  assert.match(dashboard, /global-search-head">ToDo/);
+  assert.match(dashboard, /data-global-action/);
+  assert.match(dashboard, /a\.title,a\.notes,a\.location,a\.assigneeName/);
+  assert.match(dashboard, /a\.completedByName,a\.completionNote,a\.sourceLabel/);
+  assert.match(dashboard, /linkedDeviceSearchText\(a\.deviceId/);
+});
+
+test('dashboard ToDo zoekresultaat opent rechtstreeks details', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /machineparkOpenActionDetails=openActionDetails/);
+  assert.match(dashboard, /closest\("\[data-global-action\]"\)/);
+  assert.match(dashboard, /machineparkOpenActionDetails\(actionResult\.dataset\.globalAction\)/);
+  assert.match(dashboard, /closeGlobalSearch/);
+});
+
+test('dashboard ToDo zoeken respecteert view actions recht', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /machineparkHasPermission\('view\.actions'\)/);
+});

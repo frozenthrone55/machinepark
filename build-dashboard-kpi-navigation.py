@@ -402,6 +402,12 @@ if MARKER not in index:
     }
   }
   document.addEventListener("click",function(event){
+    var actionResult=event.target && event.target.closest ? event.target.closest("[data-global-action]") : null;
+    if(actionResult){
+      if(typeof closeGlobalSearch==="function")closeGlobalSearch();
+      if(typeof window.machineparkOpenActionDetails==="function")window.machineparkOpenActionDetails(actionResult.dataset.globalAction);
+      return;
+    }
     var card=event.target && event.target.closest ? event.target.closest("[data-dashboard-kpi]") : null;
     if(card)goDashboardKpi(card);
   });
@@ -441,6 +447,8 @@ required = [
     'machineparkResetDashboardDrilldownFilters',
     'machineparkDashboardWorkDrilldown',
     'machineparkSyncServiceOverviewPlacement',
+    'data-global-action',
+    'machineparkOpenActionDetails',
     'navigate("service-overview")',
     'route="work"',
     'workKindFilter',
@@ -460,6 +468,37 @@ for forbidden in [
     if forbidden in index:
         raise SystemExit("Buildvalidatie mislukt: verwijderd dashboardblok nog aanwezig (" + forbidden + ")")
 
+
+# Dashboardzoeker krijgt ToDo-resultaten. De zoekfunctie blijft algemeen:
+# open, in behandeling én uitgevoerde ToDo's kunnen gevonden worden.
+todo_search_matches_old = " const partMatches=state.parts.filter(partMatchesQuery).slice(0,7);\n let html='';"
+todo_search_matches_new = """ const partMatches=state.parts.filter(partMatchesQuery).slice(0,7);
+ const canSearchActions=!window.machineparkAccessReady||typeof window.machineparkHasPermission!=='function'||window.machineparkHasPermission('view.actions');
+ const actionMatches=canSearchActions?(state.actions||[]).filter(a=>{
+   const status=a.status==='done'?'Uitgevoerd':a.status==='in_progress'?'In behandeling':'Nog te doen';
+   return searchIncludes(['ToDo',a.title,a.notes,a.location,a.assigneeName,a.assigneeEmail,a.priority,status,a.dueDate,a.completedDate,a.completedByName,a.completionNote,a.sourceLabel,linkedDeviceSearchText(a.deviceId,a.completedAt||a.updatedAt||a.createdAt||'')].join(' '));
+ }).sort((a,b)=>String(b.updatedAt||b.completedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.completedAt||a.createdAt||''))).slice(0,7):[];
+ let html='';"""
+if todo_search_matches_old not in index:
+    raise SystemExit("Buildvalidatie mislukt: dashboardzoeker partMatches-anker niet gevonden")
+index = index.replace(todo_search_matches_old, todo_search_matches_new, 1)
+
+todo_search_html_old = """ if(deviceMatches.length){html+='<div class="global-search-head">Toestellen & locaties</div>'+deviceMatches.map(d=>`<button type="button" class="global-search-result" data-global-device="${d.id}"><strong>☕ ${esc(d.assetCode||d.model||'Toestel')}</strong><small>${esc(deviceLocationAt(d)||'Geen locatie')} · ${esc([d.brand,d.model].filter(Boolean).join(' ')||'Geen toesteltype')}</small></button>`).join('')}
+ if(maintenanceMatches.length){"""
+todo_search_html_new = """ if(deviceMatches.length){html+='<div class="global-search-head">Toestellen & locaties</div>'+deviceMatches.map(d=>`<button type="button" class="global-search-result" data-global-device="${d.id}"><strong>☕ ${esc(d.assetCode||d.model||'Toestel')}</strong><small>${esc(deviceLocationAt(d)||'Geen locatie')} · ${esc([d.brand,d.model].filter(Boolean).join(' ')||'Geen toesteltype')}</small></button>`).join('')}
+ if(actionMatches.length){html+='<div class="global-search-head">ToDo</div>'+actionMatches.map(a=>{const status=a.status==='done'?'Uitgevoerd':a.status==='in_progress'?'In behandeling':'Nog te doen',device=a.deviceId?deviceName(a.deviceId,a.completedAt||a.updatedAt||a.createdAt||''):'',meta=[status,a.assigneeName?('Aan: '+a.assigneeName):'',a.dueDate?('Tegen '+dateFmt(a.dueDate)):'',a.location||device].filter(Boolean).join(' · ');return `<button type="button" class="global-search-result" data-global-action="${esc(a.id)}"><strong>✓ ${esc(a.title||'ToDo')}</strong><small>${esc(meta||'ToDo')}</small></button>`;}).join('')}
+ if(maintenanceMatches.length){"""
+if todo_search_html_old not in index:
+    raise SystemExit("Buildvalidatie mislukt: dashboardzoeker toestel/onderhoud-anker niet gevonden")
+index = index.replace(todo_search_html_old, todo_search_html_new, 1)
+
+# Export the existing action details function so the dashboard search can open it directly.
+todo_open_old = "  function openActionDetails(id) {"
+todo_open_new = "  window.machineparkOpenActionDetails=openActionDetails;\n  function openActionDetails(id) {"
+if todo_open_new not in index:
+    if todo_open_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: openActionDetails niet gevonden voor dashboardzoeker")
+    index = index.replace(todo_open_old, todo_open_new, 1)
 
 # service-overview gebruikt bestaande service-rechten. Zonder deze mapping
 # behandelt role-management de view als 'view.service-overview' (bestaat niet)
