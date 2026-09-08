@@ -221,3 +221,24 @@ test('ToDo-labels draaien als laatste actie-naamlaag', () => {
   assert.ok(cmd.indexOf('python3 build-todo-labels.py') > cmd.indexOf('python3 build-action-service-delete-cleanup.py'));
   assert.ok(cmd.indexOf('python3 build-todo-labels.py') < cmd.indexOf('node --check service-visits.js'));
 });
+
+
+test('dashboard KPI kaarten openen modules en oude blokken verdwijnen', () => {
+  const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
+  assert.match(dashboard, /data-dashboard-kpi="devices"/);
+  assert.match(dashboard, /data-dashboard-kpi="maintenance"/);
+  assert.match(dashboard, /data-dashboard-kpi="breakdowns"/);
+  assert.match(dashboard, /data-dashboard-kpi="parts"/);
+  assert.match(dashboard, /kpiActionsCard/);
+  assert.match(dashboard, /partStockFilter/);
+  assert.match(dashboard, /stock\.value="low"/);
+  assert.match(dashboard, /goDashboardKpi/);
+  assert.match(dashboard, /dashboardAlerts.*hidden/);
+});
+
+test('dashboard KPI navigatie bouwt na ToDo-labels', () => {
+  const cmd = pkg.scripts.build;
+  assert.ok(cmd.includes('python3 build-dashboard-kpi-navigation.py'));
+  assert.ok(cmd.indexOf('python3 build-dashboard-kpi-navigation.py') > cmd.indexOf('python3 build-todo-labels.py'));
+  assert.ok(cmd.indexOf('python3 build-dashboard-kpi-navigation.py') < cmd.indexOf('node --check service-visits.js'));
+});
