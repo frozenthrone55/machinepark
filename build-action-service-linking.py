@@ -177,6 +177,17 @@ if MARKER not in index:
         if needle not in index:
             raise SystemExit(f"Buildvalidatie mislukt: actie/servicefunctie ontbreekt ({needle})")
 
+
+# De servicelijst wordt al geladen vóór de hoofdapp. Zorg dat elke algemene
+# refresh (dus ook na actie koppelen/status wijzigen) de serviceverslagen
+# opnieuw tekent zodra de runtime beschikbaar is.
+render_all_old = "function renderAll(){renderDashboard();renderProfessionalDashboard();renderDevices();renderMaintenance();renderBreakdowns();renderParts();enhanceSortableTables();reapplyGenericTableSorts();applyOperationalPermissions()}"
+render_all_new = "function renderAll(){renderDashboard();renderProfessionalDashboard();renderDevices();renderMaintenance();renderBreakdowns();renderParts();enhanceSortableTables();reapplyGenericTableSorts();applyOperationalPermissions();if(typeof window.renderMachineparkServiceVisits==='function')window.renderMachineparkServiceVisits()}"
+if render_all_new not in index:
+    if render_all_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: renderAll-anker ontbreekt voor servicestatus refresh")
+    index = index.replace(render_all_old, render_all_new, 1)
+
 INDEX.write_text(index, encoding="utf-8")
 
 # Serviceverslagen krijgen hun zichtbare status van gekoppelde acties:

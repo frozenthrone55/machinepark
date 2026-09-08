@@ -112,3 +112,11 @@ test('serviceverslagstatus volgt gekoppelde actiestatus', () => {
   assert.match(linking, /return 'Afgesloten'/);
   assert.match(linking, /service-visit-status/);
 });
+
+
+test('serviceoverzicht opnieuw na actierefresh', () => {
+  const linking = readFileSync(new URL('../build-action-service-linking.py', import.meta.url), 'utf8');
+  assert.match(linking, /renderMachineparkServiceVisits/);
+  assert.match(linking, /renderAll/);
+  assert.match(linking, /servicestatus refresh/);
+});
