@@ -101,7 +101,7 @@ if MARKER not in index:
     index = index.replace(kpi_open_old, kpi_open_new, 1)
 
     todo_go_old = "const go=()=>{actionScope='mine';if(typeof switchView==='function')switchView('actions');};"
-    todo_go_new = "const go=()=>{window.machineparkDashboardTodoOpenOnly=true;actionScope='all';if(typeof switchView==='function')switchView('actions');};"
+    todo_go_new = "const go=()=>{window.machineparkDashboardTodoOpenOnly=true;window.machineparkDashboardNavigationTarget='actions';actionScope='all';if(typeof switchView==='function')switchView('actions');};"
     if todo_go_old not in index:
         raise SystemExit("Buildvalidatie mislukt: ToDo KPI handler niet gevonden")
     index = index.replace(todo_go_old, todo_go_new, 1)
@@ -300,6 +300,7 @@ if MARKER not in index:
     var select=document.getElementById("serviceOverviewStatusFilter");
     if(select)select.value=filter||"open";
 
+    window.machineparkDashboardNavigationTarget="service-overview";
     var navigate=window.machineparkNavigate||window.switchView;
     if(typeof navigate==="function"){
       try{navigate("service-overview");}
@@ -322,6 +323,26 @@ if MARKER not in index:
     };
   }
   setTimeout(syncServiceOverview,0);
+
+  window.machineparkResetDashboardDrilldownFilters=function(view){
+    var next=String(view||"").trim();
+    if(next==="devices"){var device=document.getElementById("deviceStatusFilter");if(device)device.value="";}
+    if(next==="parts"){var stock=document.getElementById("partStockFilter");if(stock)stock.value="";}
+    if(next==="work"||next==="maintenance"||next==="breakdowns"){
+      var kind=document.getElementById("workKindFilter"),maintenanceType=document.getElementById("workMaintenanceTypeFilter"),breakdownStatus=document.getElementById("workBreakdownStatusFilter"),breakdownPriority=document.getElementById("workBreakdownPriorityFilter");
+      if(kind)kind.value="";if(maintenanceType)maintenanceType.value="";if(breakdownStatus)breakdownStatus.value="";if(breakdownPriority)breakdownPriority.value="";
+    }
+    if(next==="actions"){
+      window.machineparkDashboardTodoOpenOnly=false;
+      var doneSection=document.querySelector("#view-actions .action-section-done");
+      if(doneSection)doneSection.style.display="";
+    }
+    if(next==="service-overview"){
+      var serviceFilter=document.getElementById("serviceOverviewStatusFilter");
+      if(serviceFilter)serviceFilter.value="all";
+      if(typeof serviceOverviewApplyFilter==="function")serviceOverviewApplyFilter();
+    }
+  };
 
   function goDashboardKpi(card){
     var target=card && card.dataset ? card.dataset.dashboardKpi : "";
@@ -352,6 +373,7 @@ if MARKER not in index:
       if(breakdownPriority)breakdownPriority.value="";
     }
 
+    window.machineparkDashboardNavigationTarget=route;
     var navigate=window.machineparkInlineNavigate || window.machineparkEarlyNavigate || window.machineparkNavigate || window.switchView;
     if(typeof navigate==="function")navigate(route);
 
@@ -398,6 +420,8 @@ required = [
     'serviceOverviewStatusFilter',
     'machineparkOpenServiceOverview',
     'restoreServiceOverviewActive',
+    'machineparkDashboardNavigationTarget',
+    'machineparkResetDashboardDrilldownFilters',
     'navigate("service-overview")',
     'route="work"',
     'workKindFilter',
@@ -417,6 +441,24 @@ for forbidden in [
     if forbidden in index:
         raise SystemExit("Buildvalidatie mislukt: verwijderd dashboardblok nog aanwezig (" + forbidden + ")")
 
+
+# Dashboardfilters blijven alleen actief wanneer de view vanuit een KPI wordt geopend.
+nav_activate_old = """  function activateView(view) {
+    let nextView = String(view || '').trim();
+    if (nextView === 'settings' && !window.machineparkIsAdmin) nextView = 'dashboard';"""
+nav_activate_new = """  function activateView(view) {
+    let nextView = String(view || '').trim();
+    const dashboardTarget = String(window.machineparkDashboardNavigationTarget || '').trim();
+    const fromDashboardKpi = dashboardTarget === nextView;
+    if (fromDashboardKpi) {
+      window.machineparkDashboardNavigationTarget = '';
+    } else if (typeof window.machineparkResetDashboardDrilldownFilters === 'function') {
+      window.machineparkResetDashboardDrilldownFilters(nextView);
+    }
+    if (nextView === 'settings' && !window.machineparkIsAdmin) nextView = 'dashboard';"""
+if nav_activate_old not in index:
+    raise SystemExit("Buildvalidatie mislukt: hoofd-navigatieruntime niet gevonden voor dashboardfilter-reset")
+index = index.replace(nav_activate_old, nav_activate_new, 1)
 
 # Maak service-overview ook bekend bij de gegenereerde navigatieruntime.
 nav_meta_old = "    settings: ['Beheer', 'Back-up, import en instellingen.'],\\n    };"
