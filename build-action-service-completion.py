@@ -56,8 +56,8 @@ if MARKER not in index:
         raise SystemExit("Buildvalidatie mislukt: actiepicker-anker ontbreekt voor afrondvinkje")
     index = index.replace(picker_old, picker_new, 1)
 
-    linked_old = r"""<div class="action-card-actions"><button type="button" class="btn small" data-service-action-open="\${esc(a.id)}">Bekijken</button><button type="button" class="btn small" data-service-action-unlink="\${esc(a.id)}">Ontkoppelen</button></div>"""
-    linked_new = r"""<div class="action-card-actions"><button type="button" class="service-action-complete-check" title="Actie afronden" data-service-action-complete="\${esc(a.id)}" \${a.status==='done'?'disabled':''}>✓</button><button type="button" class="btn small" data-service-action-open="\${esc(a.id)}">Bekijken</button><button type="button" class="btn small" data-service-action-unlink="\${esc(a.id)}">Ontkoppelen</button></div>"""
+    linked_old = r"""<div class="action-card-actions"><button type="button" class="btn small" data-service-action-open="${esc(a.id)}">Bekijken</button><button type="button" class="btn small" data-service-action-unlink="${esc(a.id)}">Ontkoppelen</button></div>"""
+    linked_new = r"""<div class="action-card-actions"><button type="button" class="service-action-complete-check" title="Actie afronden" data-service-action-complete="${esc(a.id)}" ${a.status==='done'?'disabled':''}>✓</button><button type="button" class="btn small" data-service-action-open="${esc(a.id)}">Bekijken</button><button type="button" class="btn small" data-service-action-unlink="${esc(a.id)}">Ontkoppelen</button></div>"""
     if linked_old not in index:
         raise SystemExit("Buildvalidatie mislukt: gekoppelde-actierij ontbreekt voor afrondvinkje")
     index = index.replace(linked_old, linked_new, 1)
