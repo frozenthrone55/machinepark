@@ -384,7 +384,7 @@ if "machineparkClearServiceDraftActionLinks(header.draftReportId)" not in servic
 # Anders kan de PWA/browser de oude servicecode blijven gebruiken terwijl het
 # bestand op synology-deploy al vernieuwd is.
 service_version = sha256(service.encode("utf-8")).hexdigest()[:12]
-service_src_pattern = r'(\./service-visits\.js\?v=)[^"\'\s>]+'
+service_src_pattern = r'(service-visits\.js\?v=)[^"\'\s>]+'
 index, service_src_count = re.subn(service_src_pattern, lambda match: match.group(1) + service_version, index, count=1)
 if service_src_count != 1:
     raise SystemExit(f"Buildvalidatie mislukt: service-visits cache-busting anker gevonden {service_src_count}x")
