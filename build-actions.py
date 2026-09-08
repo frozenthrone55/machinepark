@@ -349,6 +349,22 @@ if MARKER not in index:
     await put('actions',updated);await refresh();toast('Actie opnieuw geopend');
   }
 
+  async function deleteAction(id) {
+    const item=(state.actions||[]).find(a=>a.id===id);if(!item)return;
+    const linked=actionDeviceLabel(item);
+    const message=`Actie “${item.title||'Actie'}” definitief verwijderen?${linked?`\n\nDe koppeling met ${linked} verdwijnt eveneens.`:''}\n\nDeze verwijdering wordt centraal gesynchroniseerd.`;
+    if(!confirm(message))return;
+    try{
+      await del('actions',item.id);
+      closeModal();
+      await refresh();
+      toast('Actie verwijderd');
+    }catch(error){
+      console.error('Actie verwijderen',error);
+      alert(error?.message||'Actie verwijderen mislukt.');
+    }
+  }
+
   function actionHistoryHtml(item) {
     const rows=[...(Array.isArray(item.history)?item.history:[])].sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
     return rows.length?`<div class="action-history">${rows.map(h=>`<div class="action-history-row"><strong>${esc(h.label||h.type||'Wijziging')}</strong><small>${esc(h.byName||'Gebruiker')} · ${h.at?esc(new Date(h.at).toLocaleString('nl-BE')):''}${h.detail?' · '+esc(h.detail):''}</small></div>`).join('')}</div>`:'<div class="muted">Nog geen historiek.</div>';
@@ -357,7 +373,7 @@ if MARKER not in index:
     const item=(state.actions||[]).find(a=>a.id===id);if(!item)return;const device=actionDeviceLabel(item);
     const body=`<div class="action-form-grid"><div class="field full"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="action-badge ${item.priority==='urgent'?'urgent':''}">${esc(actionPriorityLabel(item.priority))}</span>${item.status==='done'?'<span class="action-badge done">✓ Uitgevoerd</span>':''}</div><h3 style="margin:9px 0 3px">${esc(item.title)}</h3>${item.notes?`<div class="muted" style="white-space:pre-wrap">${esc(item.notes)}</div>`:''}</div><div class="field"><label>Toegewezen aan</label><strong>${esc(item.assigneeName||'—')}</strong></div><div class="field"><label>Tegen wanneer</label><strong>${actionDate(item.dueDate)}</strong></div><div class="field"><label>Locatie</label><strong>${esc(item.location||'—')}</strong></div><div class="field"><label>Toestel</label><strong>${esc(device||'—')}</strong></div>${item.sourceLabel?`<div class="field full"><label>Bron</label><strong>${esc(item.sourceLabel)}</strong></div>`:''}${item.status==='done'?`<div class="field"><label>Uitgevoerd door</label><strong>${esc(item.completedByName||'—')}</strong></div><div class="field"><label>Uitgevoerd op</label><strong>${actionDate(item.completedDate)}</strong></div><div class="field full"><label>Opmerking uitvoering</label><div>${esc(item.completionNote||'—')}</div></div>`:''}<div class="field full"><label>Historiek</label>${actionHistoryHtml(item)}</div></div>`;
     showModal('Actie',body,'Sluiten',async()=>closeModal());
-    setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';const edit=document.createElement('button');edit.type='button';edit.className='btn';edit.textContent='Bewerken';edit.onclick=()=>{closeModal();void openActionEditor(item.id);};foot.insertBefore(edit,submit);if(item.status==='done'){const reopen=document.createElement('button');reopen.type='button';reopen.className='btn';reopen.textContent='Heropenen';reopen.onclick=()=>{closeModal();void reopenAction(item.id);};foot.insertBefore(reopen,submit);}else{const complete=document.createElement('button');complete.type='button';complete.className='btn primary';complete.textContent='✓ Afronden';complete.onclick=()=>{closeModal();void openCompleteAction(item.id);};submit.classList.remove('primary');foot.appendChild(complete);}},0);
+    setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.textContent='Verwijderen';remove.onclick=()=>void deleteAction(item.id);foot.insertBefore(remove,foot.firstChild);const edit=document.createElement('button');edit.type='button';edit.className='btn';edit.textContent='Bewerken';edit.onclick=()=>{closeModal();void openActionEditor(item.id);};foot.insertBefore(edit,submit);if(item.status==='done'){const reopen=document.createElement('button');reopen.type='button';reopen.className='btn';reopen.textContent='Heropenen';reopen.onclick=()=>{closeModal();void reopenAction(item.id);};foot.insertBefore(reopen,submit);}else{const complete=document.createElement('button');complete.type='button';complete.className='btn primary';complete.textContent='✓ Afronden';complete.onclick=()=>{closeModal();void openCompleteAction(item.id);};submit.classList.remove('primary');foot.appendChild(complete);}},0);
   }
 
   function contextFor(kind,id) {
@@ -457,6 +473,8 @@ required = [
     "kpiActions",
     "action-device-summary",
     "machinepark-action-users-v1",
+    "deleteAction",
+    "Actie verwijderd",
     "'breakdowns','actions','faults'",
 ]
 for needle in required:

@@ -77,3 +77,12 @@ test('Acties heeft een expliciet Synology-weergaverecht en blijft zichtbaar voor
   assert.match(roleLib, /view\.dashboard','view\.actions','view\.parts/);
   assert.match(builder, /breakdowns','actions','faults/);
 });
+
+test('een actie kan veilig verwijderd worden vanuit het detailscherm', () => {
+  assert.match(builder, /async function deleteAction\(id\)/);
+  assert.match(builder, /await del\('actions',item\.id\)/);
+  assert.match(builder, /Actie .* definitief verwijderen/);
+  assert.match(builder, /className='btn danger'/);
+  assert.match(builder, /remove\.textContent='Verwijderen'/);
+  assert.match(builder, /toast\('Actie verwijderd'\)/);
+});
