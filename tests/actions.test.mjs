@@ -86,3 +86,29 @@ test('een actie kan veilig verwijderd worden vanuit het detailscherm', () => {
   assert.match(builder, /remove\.textContent='Verwijderen'/);
   assert.match(builder, /toast\('Actie verwijderd'\)/);
 });
+
+test('Acties ondersteunt status In behandeling binnen Nog te doen', () => {
+  const linking = readFileSync(new URL('../build-action-service-linking.py', import.meta.url), 'utf8');
+  assert.match(linking, /In behandeling/);
+  assert.match(linking, /setActionWorkStatus/);
+  assert.match(linking, /status==='in_progress'/);
+  assert.match(linking, /Nog te doen/);
+});
+
+test('bestaande open of in behandeling zijnde actie kan aan service gekoppeld worden', () => {
+  const linking = readFileSync(new URL('../build-action-service-linking.py', import.meta.url), 'utf8');
+  assert.match(linking, /linkExistingActionToService/);
+  assert.match(linking, /Bestaande actie koppelen/);
+  assert.match(linking, /a\.status!==['"]done['"]/);
+  assert.match(linking, /serviceReportIds/);
+  assert.match(linking, /Ontkoppelen/);
+});
+
+test('serviceverslagstatus volgt gekoppelde actiestatus', () => {
+  const linking = readFileSync(new URL('../build-action-service-linking.py', import.meta.url), 'utf8');
+  assert.match(linking, /machineparkServiceReportStatus/);
+  assert.match(linking, /In behandeling/);
+  assert.match(linking, /return 'Open'/);
+  assert.match(linking, /return 'Afgesloten'/);
+  assert.match(linking, /service-visit-status/);
+});
