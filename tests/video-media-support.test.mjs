@@ -108,3 +108,14 @@ test('elke videothumbnail toont opnieuw een duidelijk play-driehoekje',()=>{
   assert.match(builder,/video\.parentElement\.insertBefore\(host,video\)/);
   assert.match(builder,/host\.appendChild\(icon\)/);
 });
+
+
+test('sluitkruis van videoviewer blijft op gsm zichtbaar binnen safe area',()=>{
+  assert.match(builder,/@media\(max-width:900px\),\(pointer:coarse\)/);
+  assert.match(builder,/\.machinepark-video-lightbox-close\{[\s\S]*position:fixed/);
+  assert.match(builder,/safe-area-inset-top/);
+  assert.match(builder,/safe-area-inset-right/);
+  assert.match(builder,/width:44px;height:44px/);
+  assert.match(builder,/z-index:100002/);
+  assert.doesNotMatch(builder,/\.machinepark-video-lightbox-close\{right:0;top:-44px\}/);
+});

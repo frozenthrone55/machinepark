@@ -46,7 +46,18 @@ video.machinepark-media-video[data-machinepark-video-thumb="1"]{cursor:zoom-in}
 .machinepark-video-lightbox-shell{position:relative;display:flex;align-items:center;justify-content:center;max-width:96vw;max-height:94vh}
 .machinepark-video-lightbox-player{display:block;width:auto!important;height:auto!important;max-width:94vw!important;max-height:88vh!important;object-fit:contain!important;background:#000;border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.5)}
 .machinepark-video-lightbox-close{position:absolute;right:-12px;top:-12px;width:38px;height:38px;border:0;border-radius:50%;background:#fff;color:#1c2924;font-size:22px;line-height:1;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.3)}
-@media(max-width:700px){.machinepark-video-lightbox{padding:10px}.machinepark-video-lightbox-player{max-width:96vw!important;max-height:90vh!important}.machinepark-video-lightbox-close{right:0;top:-44px}}
+@media(max-width:900px),(pointer:coarse){
+  .machinepark-video-lightbox{padding:10px}
+  .machinepark-video-lightbox-player{max-width:96vw!important;max-height:90vh!important}
+  .machinepark-video-lightbox-close{
+    position:fixed;
+    right:calc(10px + env(safe-area-inset-right,0px));
+    top:calc(10px + env(safe-area-inset-top,0px));
+    width:44px;height:44px;
+    z-index:100002;
+    font-size:25px;
+  }
+}
 @media print{video.machinepark-media-video,.machinepark-video-lightbox{display:none!important}}
 </style>
 <script data-machinepark-build-fix="video-media-support-v1">
@@ -375,7 +386,7 @@ if "src.startsWith('data:video/')" not in built:
     raise SystemExit("Buildvalidatie mislukt: raw video wordt niet door de service-mediafilter behouden")
 if "const photos = (model.photos || []).filter(src=>!window.machineparkIsVideoMedia?.(src));" not in built:
     raise SystemExit("Buildvalidatie mislukt: generieke PDF filtert video niet uit")
-for needle in ["machinepark-video-lightbox-player","machineparkOpenVideoMedia","data-machinepark-video-thumb","machinepark-video-play-icon","machinepark-video-thumb-host","max-width:94vw","max-height:88vh","object-fit:contain"]:
+for needle in ["machinepark-video-lightbox-player","machineparkOpenVideoMedia","data-machinepark-video-thumb","machinepark-video-play-icon","machinepark-video-thumb-host","max-width:94vw","max-height:88vh","object-fit:contain","safe-area-inset-top","safe-area-inset-right","position:fixed"]:
     if needle not in built:
         raise SystemExit(f"Buildvalidatie mislukt: grote videoweergave ontbreekt ({needle})")
 print("[Machinepark] foto + video media actief · thumbnails fotoformaat, video groot in originele verhouding")
