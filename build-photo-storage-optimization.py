@@ -208,12 +208,23 @@ if MARKER not in index:
     }
   };
 
+  window.machineparkListServicePhotos = async function(storeName, entityId) {
+    if (!storeName || !entityId) return [];
+    try {
+      const body = await apiPost(SERVICE_PHOTO_URL, { action:'list', storeName, entityId }, 'Verslagfoto’s ophalen mislukt');
+      return (Array.isArray(body.photos) ? body.photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 10);
+    } catch (error) {
+      console.warn('Verslagfoto’s konden niet van Synology worden opgehaald', storeName, entityId, error);
+      return [];
+    }
+  };
+
   window.machineparkPersistServicePhotos = async function(storeName, entityId, photos) {
     const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 10);
     const rawIndexes = list.map((src, index) => isRawPhoto(src) ? index : -1).filter((index) => index >= 0);
     photoSaveBusy += 1;
     try {
-      const body = await apiPost(SERVICE_PHOTO_URL, { storeName, entityId, photos: list }, 'Verslagfoto’s opslaan mislukt');
+      const body = await apiPost(SERVICE_PHOTO_URL, { storeName, entityId, photos: list, completeList:true }, 'Verslagfoto’s opslaan mislukt');
       const refs = Array.isArray(body.photos) ? body.photos.slice(0, 10) : list;
       rawIndexes.forEach((index) => {
         const ref = refs[index];

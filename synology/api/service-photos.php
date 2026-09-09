@@ -53,6 +53,24 @@ $dir = MP_PHOTO_ROOT . '/service/' . $store . '/' . $entityId;
 $prefix = MP_SERVICE_PHOTO_PREFIX . $store . '/' . $entityId . '/';
 mp_photo_ensure_dir($dir);
 
+if ($action === 'list') {
+    $refs = [];
+    $files = (array)glob($dir . '/*.bin');
+    usort($files, static function ($a, $b) {
+        $ma = @filemtime($a) ?: 0;
+        $mb = @filemtime($b) ?: 0;
+        return $ma === $mb ? strcmp((string)$a, (string)$b) : ($ma <=> $mb);
+    });
+    foreach ($files as $file) {
+        if (!is_file($file)) continue;
+        $token = basename($file, '.bin');
+        if (mp_photo_safe_token($token) === '') continue;
+        $refs[] = mp_photo_ref('service-photos.php', $prefix . $token, false);
+        if (count($refs) >= 10) break;
+    }
+    mp_photo_json(['ok'=>true,'photos'=>$refs,'mode'=>'synology-local-list']);
+}
+
 if ($action === 'thumbnail') {
     $key = service_photo_key_from_ref($body['photoRef'] ?? '');
     if ($key === '' || strpos($key,$prefix) !== 0) mp_photo_json(['error'=>'De fotoreferentie hoort niet bij dit dossier.'],400);
@@ -66,6 +84,7 @@ if (!mp_photo_can($user, [$permissionPrefix.'.edit',$permissionPrefix.'.add'])) 
     mp_photo_json(['error'=>'Deze rol mag verslagfoto’s niet wijzigen.'],403);
 }
 
+$completeList = !empty($body['completeList']);
 $photos = isset($body['photos']) && is_array($body['photos']) ? array_values($body['photos']) : [];
 $thumbnails = isset($body['thumbnails']) && is_array($body['thumbnails']) ? array_values($body['thumbnails']) : [];
 if (count($photos)>10) mp_photo_json(['error'=>'Een onderhouds- of depannageverslag kan maximaal 10 foto’s bevatten.'],400);
@@ -123,5 +142,5 @@ foreach($photos as $index=>$photoValue){
     $refs[]=mp_photo_ref('service-photos.php',$key,false);
     if($thumbnail!=='')mp_photo_write_thumb($base,mp_photo_parse_data_image($thumbnail,180000));
 }
-mp_photo_cleanup_bases($dir,$keepTokens);
-mp_photo_json(['ok'=>true,'photos'=>$refs,'mode'=>'synology-local']);
+if ($completeList) mp_photo_cleanup_bases($dir,$keepTokens);
+mp_photo_json(['ok'=>true,'photos'=>$refs,'mode'=>'synology-local','completeList'=>$completeList]);

@@ -402,7 +402,7 @@
     const photoLabel=kind === 'maintenance' ? 'onderhoud' : (kind === 'otherworks' ? 'Andere werken' : 'depannage');
     return `<div class="service-visit-parts"><div class="service-visit-parts-head"><strong>Gebruikte onderdelen</strong><button type="button" class="btn small sv-add-part">+ Onderdeelregel</button></div><div class="muted" style="font-size:11px;margin:-3px 0 7px">Onderdelen blijven gekoppeld aan dit toestel en deze ${recordLabel}.</div><div class="usage-list sv-usage-list">${used}</div></div>
       <div class="service-visit-oneoff"><div class="service-visit-parts-head"><strong>Eenmalige onderdelen / leverancier</strong><button type="button" class="btn small sv-add-oneoff">+ Eenmalig onderdeel</button></div><div class="service-visit-oneoff-list">${one}</div></div>
-      <div class="field full sv-photo-editor" data-existing-photos='${svEsc(JSON.stringify(item.photos || []))}'><label>Foto’s bij ${photoLabel}</label>${photoDraftHtml(item.photos || [])}<input class="sv-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 10 foto’s per toestelregistratie.</div></div>`;
+      <div class="field full sv-photo-editor" data-service-photo-recovery="1" data-existing-photos='${svEsc(JSON.stringify(item.photos || []))}'><label>Foto’s bij ${photoLabel}</label>${photoDraftHtml(item.photos || [])}<input class="sv-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 10 foto’s per toestelregistratie.</div></div>`;
   }
 
   function svOtherWorkTypeNames(extra='') {
@@ -694,7 +694,35 @@
     }
     return out;
   }
+  function scheduleVisibleServicePhotoRecovery(root=document) {
+    setTimeout(async()=>{
+      for(const editor of root.querySelectorAll?.('.sv-photo-editor[data-service-photo-recovery="1"]')||[]){
+        const panel=editor.closest('.service-visit-kind-panel');
+        const deviceCard=editor.closest('.service-visit-device');
+        const kind=panel?.dataset?.serviceVisitKind||panel?.dataset?.kind||'';
+        const recordId=String(panel?.dataset?.recordId||panel?.dataset?.serviceVisitRecordId||editor.closest('[data-record-id]')?.dataset?.recordId||'');
+        if(!panel||!recordId||!['maintenance','breakdowns','otherworks'].includes(kind))continue;
+        const current=existingPhotoList(panel);
+        const recovered=await recoverPhysicalServicePhotos(panel,kind,recordId,current);
+        if(recovered.length>current.length)editor.dataset.existingPhotos=JSON.stringify(recovered);
+      }
+    },250);
+  }
+
   function existingPhotoList(panel){const editor=panel?.querySelector('.sv-photo-editor');if(!editor)return[];try{return uniquePhotoList(JSON.parse(editor.dataset.existingPhotos||'[]'));}catch(_){return[];}}
+
+  async function recoverPhysicalServicePhotos(panel,kind,recordId,currentPhotos=[]) {
+    const current=uniquePhotoList(currentPhotos);
+    if(typeof window.machineparkListServicePhotos!=='function'||!recordId)return current;
+    const store=kind==='maintenance'?'maintenance':'breakdowns';
+    const physical=uniquePhotoList(await window.machineparkListServicePhotos(store,String(recordId)));
+    const merged=uniquePhotoList([...current,...physical]);
+    if(merged.length>current.length){
+      const editor=panel?.querySelector('.sv-photo-editor');
+      if(editor)syncPhotoEditorState(editor,merged);
+    }
+    return merged;
+  }
 
   function syncPhotoEditorState(editor,photos) {
     if(!editor)return;
@@ -718,7 +746,8 @@
     const editor=panel?.querySelector('.sv-photo-editor');
     if(!editor)return uniquePhotoList(old||[]);
     const fromEditor=existingPhotoList(panel);
-    const current=uniquePhotoList(fromEditor.length?fromEditor:(old||[]));
+    let current=uniquePhotoList(fromEditor.length?fromEditor:(old||[]));
+    current=await recoverPhysicalServicePhotos(panel,kind,String(persistRecordId||recordId||''),current);
     const remove=new Set([...editor.querySelectorAll('.sv-remove-photo:checked')].map(x=>Number(x.value)).filter(Number.isFinite));
     const kept=current.filter((_,i)=>!remove.has(i));
     const fileMap=new Map();

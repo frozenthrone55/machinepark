@@ -309,3 +309,24 @@ test('shared data safety knipt servicefotos niet terug naar 5', () => {
   assert.doesNotMatch(safety, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*5\)/);
   assert.match(safety, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*10\)/);
 });
+
+
+test('service foto API kan fysieke foto refs herstellen', () => {
+  const api = readFileSync(new URL('../synology/api/service-photos.php', import.meta.url), 'utf8');
+  assert.match(api, /\$action === 'list'/);
+  assert.match(api, /glob\(\$dir \. '\/\*\.bin'\)/);
+  assert.match(api, /count\(\$refs\) >= 10/);
+  assert.match(api, /\$completeList = !empty\(\$body\['completeList'\]\)/);
+  assert.match(api, /if \(\$completeList\) mp_photo_cleanup_bases/);
+});
+
+test('service concept herstelt fysieke Synology fotos tot 10', () => {
+  const svc = readFileSync(new URL('../service-visits.js', import.meta.url), 'utf8');
+  const opt = readFileSync(new URL('../build-photo-storage-optimization.py', import.meta.url), 'utf8');
+  assert.match(opt, /machineparkListServicePhotos/);
+  assert.match(opt, /action:'list'/);
+  assert.match(opt, /completeList:true/);
+  assert.match(svc, /recoverPhysicalServicePhotos/);
+  assert.match(svc, /machineparkListServicePhotos/);
+  assert.match(svc, /uniquePhotoList\(\[\.\.\.current,\.\.\.physical\]\)/);
+});
