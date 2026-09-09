@@ -16,7 +16,7 @@ def replace_once(old, new, label):
 
 if MARKER not in index:
     helper = r'''function deviceTimelinePhotosHtml(photos,label='Verslagfoto'){
- const list=(Array.isArray(photos)?photos:[]).filter(src=>typeof src==='string'&&src.trim()).slice(0,5);
+ const list=(Array.isArray(photos)?photos:[]).filter(src=>typeof src==='string'&&src.trim()).slice(0,10);
  if(!list.length)return '';
  return `<div class="timeline-service-photos">${list.map((src,index)=>{const preview=typeof window.machineparkThumbnailRef==='function'?window.machineparkThumbnailRef(src):src;return `<img class="timeline-service-photo" src="${esc(preview)}" data-full-src="${esc(src)}" data-photo-lightbox loading="lazy" decoding="async" alt="${esc(label)} ${index+1}" title="Klik om te vergroten">`}).join('')}</div>`
 }
