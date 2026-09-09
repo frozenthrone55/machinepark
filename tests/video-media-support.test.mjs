@@ -98,3 +98,13 @@ test('videospeler sluit op achtergrond knop of Escape',()=>{
   assert.match(builder,/event\.key==='Escape'/);
   assert.match(builder,/player\.pause\(\)/);
 });
+
+
+test('elke videothumbnail toont opnieuw een duidelijk play-driehoekje',()=>{
+  assert.match(builder,/machinepark-video-play-icon/);
+  assert.match(builder,/machinepark-video-thumb-host/);
+  assert.match(builder,/border-left:13px solid #fff/);
+  assert.match(builder,/pointer-events:none/);
+  assert.match(builder,/video\.parentElement\.insertBefore\(host,video\)/);
+  assert.match(builder,/host\.appendChild\(icon\)/);
+});

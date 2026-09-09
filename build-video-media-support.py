@@ -27,6 +27,20 @@ if MARKER not in index:
 .service-visit-photo-grid video{width:100%;height:130px;object-fit:cover;border-radius:7px;background:#111}
 .timeline-service-photo.machinepark-media-video{width:64px;height:64px;object-fit:cover}
 video.machinepark-media-video[data-machinepark-video-thumb="1"]{cursor:zoom-in}
+.machinepark-video-thumb-host{position:relative;display:block;min-width:0;overflow:hidden;border-radius:inherit}
+.photo-preview>.machinepark-video-thumb-host{width:100%;height:100%}
+.service-photo-item>.machinepark-video-thumb-host{width:100%;height:96px;border-radius:8px}
+.service-photo-details>.machinepark-video-thumb-host{width:100%;height:150px;border-radius:12px}
+.action-photo-item>.machinepark-video-thumb-host{width:100%;height:96px;border-radius:8px}
+.action-photo-details>.machinepark-video-thumb-host{width:100%;height:105px;border-radius:10px}
+.device-photo-image-wrap>.machinepark-video-thumb-host,.device-detail-photo>.machinepark-video-thumb-host{width:100%;height:100%}
+.service-visit-photo-grid figure>.machinepark-video-thumb-host{width:100%;height:130px;border-radius:7px}
+.timeline-service-photos>.machinepark-video-thumb-host{width:64px;height:64px;border-radius:11px;flex:0 0 64px}
+.machinepark-video-thumb-host>video.machinepark-media-video{width:100%!important;height:100%!important;object-fit:cover!important}
+.machinepark-video-play-icon{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.62);box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;display:grid;place-items:center;z-index:2}
+.machinepark-video-play-icon::before{content:"";display:block;margin-left:3px;width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-left:13px solid #fff}
+.timeline-service-photos .machinepark-video-play-icon{width:28px;height:28px}
+.timeline-service-photos .machinepark-video-play-icon::before{border-top-width:6px;border-bottom-width:6px;border-left-width:9px}
 .machinepark-video-lightbox{position:fixed;inset:0;z-index:100000;background:rgba(8,16,13,.9);display:none;align-items:center;justify-content:center;padding:22px}
 .machinepark-video-lightbox.show{display:flex}
 .machinepark-video-lightbox-shell{position:relative;display:flex;align-items:center;justify-content:center;max-width:96vw;max-height:94vh}
@@ -118,6 +132,21 @@ video.machinepark-media-video[data-machinepark-video-thumb="1"]{cursor:zoom-in}
     video.setAttribute('role','button');
     video.setAttribute('aria-label','Video groter afspelen');
     video.title='Klik om video groter af te spelen';
+    if(video.isConnected&&video.parentElement&&!video.parentElement.classList.contains('machinepark-video-thumb-host')){
+      const host=document.createElement('span');
+      host.className='machinepark-video-thumb-host';
+      video.parentElement.insertBefore(host,video);
+      host.appendChild(video);
+      const icon=document.createElement('span');
+      icon.className='machinepark-video-play-icon';
+      icon.setAttribute('aria-hidden','true');
+      host.appendChild(icon);
+    }else if(video.parentElement?.classList.contains('machinepark-video-thumb-host')&&!video.parentElement.querySelector('.machinepark-video-play-icon')){
+      const icon=document.createElement('span');
+      icon.className='machinepark-video-play-icon';
+      icon.setAttribute('aria-hidden','true');
+      video.parentElement.appendChild(icon);
+    }
     return video;
   }
   window.machineparkMarkVideoThumbnail=markVideoThumbnail;
@@ -146,7 +175,8 @@ video.machinepark-media-video[data-machinepark-video-thumb="1"]{cursor:zoom-in}
   }
   const observer=new MutationObserver(records=>records.forEach(r=>r.addedNodes.forEach(node=>{if(node.nodeType===1){enhance(node);if(node.matches?.('video[data-machinepark-video-pending="1"]'))markVideoThumbnail(node);node.querySelectorAll?.('video[data-machinepark-video-pending="1"]').forEach(v=>markVideoThumbnail(v));}})));
   document.addEventListener('click',event=>{
-    const thumb=event.target.closest?.('video[data-machinepark-video-thumb="1"]');
+    const direct=event.target.closest?.('video[data-machinepark-video-thumb="1"]');
+    const thumb=direct||event.target.closest?.('.machinepark-video-thumb-host')?.querySelector('video[data-machinepark-video-thumb="1"]');
     if(!thumb)return;
     event.preventDefault();event.stopPropagation();
     window.machineparkOpenVideoMedia(thumb.dataset.fullSrc||thumb.currentSrc||thumb.src);
@@ -345,7 +375,7 @@ if "src.startsWith('data:video/')" not in built:
     raise SystemExit("Buildvalidatie mislukt: raw video wordt niet door de service-mediafilter behouden")
 if "const photos = (model.photos || []).filter(src=>!window.machineparkIsVideoMedia?.(src));" not in built:
     raise SystemExit("Buildvalidatie mislukt: generieke PDF filtert video niet uit")
-for needle in ["machinepark-video-lightbox-player","machineparkOpenVideoMedia","data-machinepark-video-thumb","max-width:94vw","max-height:88vh","object-fit:contain"]:
+for needle in ["machinepark-video-lightbox-player","machineparkOpenVideoMedia","data-machinepark-video-thumb","machinepark-video-play-icon","machinepark-video-thumb-host","max-width:94vw","max-height:88vh","object-fit:contain"]:
     if needle not in built:
         raise SystemExit(f"Buildvalidatie mislukt: grote videoweergave ontbreekt ({needle})")
 print("[Machinepark] foto + video media actief · thumbnails fotoformaat, video groot in originele verhouding")
