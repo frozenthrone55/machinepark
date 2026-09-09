@@ -27,7 +27,17 @@ if MARKER not in index:
 
     sort_anchor = " events.sort((a,b)=>(b.moment||'').localeCompare(a.moment||''));"
     action_events = """
- (state.actions||[]).filter(a=>a.deviceId===d.id).forEach(a=>{
+ const actionBelongsToDevice=a=>{
+   if(String(a?.deviceId||'')===String(d.id||''))return true;
+   const linkedServiceIds=new Set((typeof actionServiceIds==='function'?actionServiceIds(a):Array.isArray(a?.serviceReportIds)?a.serviceReportIds:[]).map(String).filter(Boolean));
+   if(!linkedServiceIds.size)return false;
+   return [...(state.maintenance||[]),...(state.breakdowns||[])].some(item=>{
+     if(item?.isDraft===true||String(item?.deviceId||'')!==String(d.id||''))return false;
+     const reportId=String(item?.serviceReportId||item?.serviceVisitId||'');
+     return reportId&&linkedServiceIds.has(reportId);
+   });
+ };
+ (state.actions||[]).filter(actionBelongsToDevice).forEach(a=>{
    const done=a.status==='done',moment=normalizeMoment(done?(a.completedAt||a.completedDate||a.updatedAt):(a.createdAt||a.updatedAt),'00:00');
    const status=done?'Uitgevoerd':a.status==='in_progress'?'In behandeling':'Nog te doen';
    const meta=[];
@@ -68,6 +78,10 @@ required = [
     "type:'action'",
     "event-label action",
     "data-action-open=",
+    "actionBelongsToDevice",
+    "serviceReportIds",
+    "serviceReportId||item?.serviceVisitId",
+    "item?.isDraft===true",
     "decorateContextModal('device',deviceId)",
 ]
 for needle in required:
@@ -79,4 +93,4 @@ if "holder.innerHTML=deviceActionsHtml" in index:
     raise SystemExit("Buildvalidatie mislukt: apart actieblok wordt nog in machinedetails geplaatst")
 
 INDEX.write_text(index, encoding="utf-8")
-print("[Machinepark] machine-acties geïntegreerd in chronologische tijdlijn; apart actieblok verwijderd")
+print("[Machinepark] machine-acties geïntegreerd in chronologische tijdlijn, inclusief servicegekoppelde ToDo's op alle betrokken machines")
