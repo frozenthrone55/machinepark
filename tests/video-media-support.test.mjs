@@ -52,3 +52,15 @@ test('service video uploadroute wordt op de echte servicefunctie geankerd',()=>{
   assert.match(builder,/service-video uploadroute staat in toestelmediafunctie/);
   assert.match(builder,/service-video uploadroute ontbreekt/);
 });
+
+
+test('serviceconcepten behouden raw video en zichtbare labels noemen foto en video',()=>{
+  assert.match(builder,/src\.startsWith\('data:video\/'\)/);
+  assert.match(builder,/Foto’s \/ video’s/);
+  assert.match(builder,/foto’s en video’s samen/);
+});
+
+test('PDF-fotolijsten slaan video volledig over',()=>{
+  assert.match(builder,/model\.photos \|\| \[\]\)\.filter\(src=>!window\.machineparkIsVideoMedia/);
+  assert.match(builder,/serviceModel\(context\)/);
+});

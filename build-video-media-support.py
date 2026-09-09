@@ -116,6 +116,12 @@ index = index.replace(
 )
 
 # Thumbnail refs should never point a video at an <img>.
+# Loose service media filtering must also retain raw videos while offline/before persistence.
+index = index.replace(
+    "return src.startsWith('data:image/') || src.includes(SERVICE_PHOTO_ENDPOINT);",
+    "return src.startsWith('data:image/') || src.startsWith('data:video/') || src.includes(SERVICE_PHOTO_ENDPOINT);"
+)
+
 index = index.replace(
     "const value = String(src || '').trim();\n    const normalized = value",
     "const value = String(src || '').trim();\n    if(window.machineparkIsVideoMedia?.(value)) return value;\n    const normalized = value"
@@ -166,6 +172,31 @@ index = index.replace(
     "const chosen=photos[overviewIndex(device,photos)]||'';if(chosen&&!window.machineparkIsVideoMedia?.(chosen))return chosen;return photos.find(src=>!window.machineparkIsVideoMedia?.(src))||'';"
 )
 
+# Visible copy consistently describes the combined photo/video list.
+for old,new in [
+    ("Foto onderdeel", "Foto of video onderdeel"),
+    ("om foto toe te voegen", "om foto of video toe te voegen"),
+    ("Foto’s toestel", "Foto’s / video’s toestel"),
+    ("+ Foto’s toevoegen", "+ Foto’s / video’s toevoegen"),
+    ("Foto’s bij verslag", "Foto’s / video’s bij verslag"),
+    ("Geen foto’s bij dit verslag.", "Geen foto’s of video’s bij dit verslag."),
+    ("Nog geen foto’s toegevoegd.", "Nog geen foto’s of video’s toegevoegd."),
+    ("Maximaal ${DEVICE_PHOTO_LIMIT} foto’s. Kies één foto als overzichtsfoto voor de toestellenlijst.", "Maximaal ${DEVICE_PHOTO_LIMIT} foto’s en video’s samen. Alleen een foto kan als overzichtsfoto dienen."),
+    (" van maximaal ${DEVICE_PHOTO_LIMIT} foto’s", " van maximaal ${DEVICE_PHOTO_LIMIT} media-items"),
+    ("Maximaal ${REPORT_PHOTO_LIMIT} foto’s per verslag. Foto’s worden automatisch verkleind en apart opgeslagen.", "Maximaal ${REPORT_PHOTO_LIMIT} foto’s en video’s samen per verslag. Foto’s worden verkleind; video’s worden apart opgeslagen."),
+    ("Maximaal '+ACTION_PHOTO_LIMIT+' foto’s per ToDo.", "Maximaal '+ACTION_PHOTO_LIMIT+' foto’s en video’s samen per ToDo."),
+    ("Foto’s bij ToDo", "Foto’s / video’s bij ToDo"),
+    ("📷 '+actionPhotoList(item.photos).length", "📎 '+actionPhotoList(item.photos).length"),
+]:
+    index = index.replace(old,new)
+
+for old,new in [
+    ("Foto’s bij ${photoLabel}", "Foto’s / video’s bij ${photoLabel}"),
+    ("Maximaal 10 foto’s per toestelregistratie.", "Maximaal 10 foto’s en video’s samen per toestelregistratie."),
+    ("Conceptfoto ", "Conceptmedia "),
+]:
+    service = service.replace(old,new)
+
 # PDF/print image-only surfaces ignore video rather than rendering broken image boxes.
 service = service.replace(
     "photos:(item.photos||[]).filter(src=>typeof src==='string'&&src.trim()),",
@@ -178,6 +209,17 @@ service = service.replace(
 service = service.replace(
     "const item=row.item||{},photos=(item.photos||[]).filter(src=>typeof src==='string'&&src.trim());",
     "const item=row.item||{},photos=(item.photos||[]).filter(src=>typeof src==='string'&&src.trim()&&!window.machineparkIsVideoMedia?.(src));"
+)
+
+# Loose maintenance/depannage PDF and the generic photo renderer should omit videos
+# entirely rather than drawing an empty "foto kon niet worden geladen" box.
+index = index.replace(
+    ".filter(src => typeof src === 'string' && src.trim());\n  }\n\n  function serviceModel(context)",
+    ".filter(src => typeof src === 'string' && src.trim() && !window.machineparkIsVideoMedia?.(src));\n  }\n\n  function serviceModel(context)"
+)
+index = index.replace(
+    "const photos = model.photos || [];\n    if (!photos.length) return startY;",
+    "const photos = (model.photos || []).filter(src=>!window.machineparkIsVideoMedia?.(src));\n    if (!photos.length) return startY;"
 )
 
 # Refresh service asset hash after modifying service-visits.js.
@@ -210,4 +252,10 @@ if "SERVICE_PHOTO_URL,{storeName,entityId}" in device_block:
     raise SystemExit("Buildvalidatie mislukt: service-video uploadroute staat in toestelmediafunctie")
 if "SERVICE_PHOTO_URL,{storeName,entityId}" not in service_block:
     raise SystemExit("Buildvalidatie mislukt: service-video uploadroute ontbreekt")
+if "Foto’s / video’s" not in built:
+    raise SystemExit("Buildvalidatie mislukt: media-interface gebruikt nog foto-only labels")
+if "src.startsWith('data:video/')" not in built:
+    raise SystemExit("Buildvalidatie mislukt: raw video wordt niet door de service-mediafilter behouden")
+if "const photos = (model.photos || []).filter(src=>!window.machineparkIsVideoMedia?.(src));" not in built:
+    raise SystemExit("Buildvalidatie mislukt: generieke PDF filtert video niet uit")
 print("[Machinepark] foto + video media actief · maximaal 10 items per bestaande fotolijst")
