@@ -60,7 +60,7 @@ test('kritieke UI bouwstenen zijn aanwezig', () => {
     'machineparkPersistServicePhotos',
     'machineparkServiceBlobWritesEnabled',
     "host.startsWith('deploy-preview-')",
-    'const DEVICE_PHOTO_LIMIT = 5;',
+    'const DEVICE_PHOTO_LIMIT = 10;',
   ]) assert.ok(builtSource.includes(needle), `Ontbreekt in gebouwde app: ${needle}`);
 });
 
