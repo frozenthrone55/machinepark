@@ -48,7 +48,8 @@ mp_photo_ensure_dir($dir);
 if ($action === 'thumbnail') {
     $refKey = part_photo_key_from_ref($body['photoRef'] ?? '');
     if ($refKey !== $key) mp_photo_json(['error'=>'De fotoreferentie hoort niet bij dit onderdeel.'],400);
-    if (!mp_photo_exists($base)) mp_photo_json(['error'=>'De originele onderdeelfoto bestaat niet meer.'],404);
+    if (!mp_photo_exists($base)) mp_photo_json(['error'=>'De originele onderdeelmedia bestaat niet meer.'],404);
+    if (mp_photo_is_video_base($base)) mp_photo_json(['error'=>'Een video gebruikt geen afbeeldings-thumbnail.'],400);
     mp_photo_write_thumb($base, mp_photo_parse_data_image($body['thumbnail'] ?? '',180000));
     mp_photo_json(['ok'=>true,'thumbnail'=>mp_photo_ref('part-photos.php',$key,true)]);
 }
@@ -68,15 +69,15 @@ if ($existingKey !== '') {
     if ($existingKey !== $key) mp_photo_json(['error'=>'De fotoreferentie hoort niet bij dit onderdeel.'],400);
     if (!mp_photo_exists($base)) mp_photo_json(['error'=>'De bestaande onderdeelfoto ontbreekt op de NAS.'],404);
     if ($thumbnail !== '') mp_photo_write_thumb($base, mp_photo_parse_data_image($thumbnail,180000));
-    mp_photo_json(['ok'=>true,'photo'=>mp_photo_ref('part-photos.php',$key,false),'mode'=>'synology-local']);
+    mp_photo_json(['ok'=>true,'photo'=>mp_photo_ref_for_base('part-photos.php',$key,$base,false),'mode'=>'synology-local']);
 }
 
 if (mp_photo_is_legacy_ref($photo,'part-photos.php')) {
     mp_photo_json(['ok'=>true,'photo'=>$photo,'legacy'=>true,'mode'=>'synology-local']);
 }
 
-try { $parsed = mp_photo_parse_data_image($photo,1500000); }
+try { $parsed = mp_photo_parse_data_media($photo,1500000,20000000); }
 catch (Throwable $e) { mp_photo_json(['error'=>$e->getMessage()], strpos($e->getMessage(),'te groot')!==false?413:400); }
 mp_photo_write_blob($base,$parsed);
 if ($thumbnail !== '') mp_photo_write_thumb($base, mp_photo_parse_data_image($thumbnail,180000));
-mp_photo_json(['ok'=>true,'photo'=>mp_photo_ref('part-photos.php',$key,false),'mode'=>'synology-local']);
+mp_photo_json(['ok'=>true,'photo'=>mp_photo_ref_for_base('part-photos.php',$key,$base,false),'mode'=>'synology-local']);

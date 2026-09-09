@@ -220,7 +220,8 @@
   }
 
   function isRawPhoto(value) {
-    return String(value || '').startsWith('data:image/');
+    const text=String(value || '');
+    return text.startsWith('data:image/') || text.startsWith('data:video/');
   }
 
   // machinepark-synology-fresh-central-get-v1

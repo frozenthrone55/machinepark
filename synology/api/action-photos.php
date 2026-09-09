@@ -48,7 +48,7 @@ mp_photo_ensure_dir($dir);
 
 $photos = isset($body['photos']) && is_array($body['photos']) ? array_values($body['photos']) : [];
 $completeList = !empty($body['completeList']);
-if (count($photos)>10) mp_photo_json(['error'=>'Een ToDo kan maximaal 10 foto’s bevatten.'],400);
+if (count($photos)>10) mp_photo_json(['error'=>'Een ToDo kan maximaal 10 foto’s en video’s samen bevatten.'],400);
 
 $refs=[];$keepTokens=[];$seenHashes=[];$totalBytes=0;
 foreach($photos as $photoValue){
@@ -66,25 +66,25 @@ foreach($photos as $photoValue){
         }
         $token=basename($base);
         $keepTokens[]=$token;
-        $refs[]=mp_photo_ref('action-photos.php',$existingKey,false);
+        $refs[]=mp_photo_ref_for_base('action-photos.php',$existingKey,$base,false);
         continue;
     }
 
-    try{$parsed=mp_photo_parse_data_image($photo,1200000);}
+    try{$parsed=mp_photo_parse_data_media($photo,1200000,20000000);}
     catch(Throwable $e){mp_photo_json(['error'=>$e->getMessage()],strpos($e->getMessage(),'te groot')!==false?413:400);}
 
     $hash=hash('sha256',$parsed['bytes']);
     if(isset($seenHashes[$hash]))continue;
     $seenHashes[$hash]=true;
     $totalBytes+=strlen($parsed['bytes']);
-    if($totalBytes>8000000)mp_photo_json(['error'=>'De geselecteerde ToDo-foto’s zijn samen te groot.'],413);
+    if($totalBytes>24000000)mp_photo_json(['error'=>'De geselecteerde ToDo-media zijn samen te groot.'],413);
 
     $token=bin2hex(random_bytes(16));
     $base=$dir.'/'.$token;
     mp_photo_write_blob($base,$parsed);
     $keepTokens[]=$token;
     $key=$prefix.$token;
-    $refs[]=mp_photo_ref('action-photos.php',$key,false);
+    $refs[]=mp_photo_ref_for_base('action-photos.php',$key,$base,false);
 }
 if($completeList)mp_photo_cleanup_bases($dir,$keepTokens);
 mp_photo_json(['ok'=>true,'photos'=>array_slice($refs,0,10),'mode'=>'synology-local-action-photos']);

@@ -68,7 +68,7 @@ if ($action === 'list') {
         if (substr((string)$file, -10) === '.thumb.bin') continue;
         $token = basename($file, '.bin');
         if (mp_photo_safe_token($token) === '') continue;
-        $refs[] = mp_photo_ref('service-photos.php', $prefix . $token, false);
+        $refs[] = mp_photo_ref_for_base('service-photos.php', $prefix . $token, substr($file, 0, -4), false);
         if (count($refs) >= 10) break;
     }
     mp_photo_json(['ok'=>true,'photos'=>$refs,'mode'=>'synology-local-list']);
@@ -78,7 +78,8 @@ if ($action === 'thumbnail') {
     $key = service_photo_key_from_ref($body['photoRef'] ?? '');
     if ($key === '' || strpos($key,$prefix) !== 0) mp_photo_json(['error'=>'De fotoreferentie hoort niet bij dit dossier.'],400);
     list($_dir,$base) = service_photo_location($key);
-    if (!mp_photo_exists($base)) mp_photo_json(['error'=>'De originele verslagfoto bestaat niet meer.'],404);
+    if (!mp_photo_exists($base)) mp_photo_json(['error'=>'De originele verslagmedia bestaat niet meer.'],404);
+    if (mp_photo_is_video_base($base)) mp_photo_json(['error'=>'Een video gebruikt geen afbeeldings-thumbnail.'],400);
     mp_photo_write_thumb($base,mp_photo_parse_data_image($body['thumbnail'] ?? '',180000));
     mp_photo_json(['ok'=>true,'thumbnail'=>mp_photo_ref('service-photos.php',$key,true)]);
 }
@@ -90,7 +91,7 @@ if (!mp_photo_can($user, [$permissionPrefix.'.edit',$permissionPrefix.'.add'])) 
 $completeList = !empty($body['completeList']);
 $photos = isset($body['photos']) && is_array($body['photos']) ? array_values($body['photos']) : [];
 $thumbnails = isset($body['thumbnails']) && is_array($body['thumbnails']) ? array_values($body['thumbnails']) : [];
-if (count($photos)>10) mp_photo_json(['error'=>'Een onderhouds- of depannageverslag kan maximaal 10 foto’s bevatten.'],400);
+if (count($photos)>10) mp_photo_json(['error'=>'Een onderhouds- of depannageverslag kan maximaal 10 foto’s en video’s samen bevatten.'],400);
 
 $refs=[];$keepTokens=[];$totalBytes=0;$seenHashes=[];$seenLegacy=[];
 foreach($photos as $index=>$photoValue){
@@ -116,7 +117,7 @@ foreach($photos as $index=>$photoValue){
 
         $token=basename($base);
         $keepTokens[]=$token;
-        $refs[]=mp_photo_ref('service-photos.php',$existingKey,false);
+        $refs[]=mp_photo_ref_for_base('service-photos.php',$existingKey,$base,false);
         if($thumbnail!=='')mp_photo_write_thumb($base,mp_photo_parse_data_image($thumbnail,180000));
         continue;
     }
@@ -128,7 +129,7 @@ foreach($photos as $index=>$photoValue){
         continue;
     }
 
-    try{$parsed=mp_photo_parse_data_image($photo,1200000);}
+    try{$parsed=mp_photo_parse_data_media($photo,1200000,20000000);}
     catch(Throwable $e){mp_photo_json(['error'=>$e->getMessage()],strpos($e->getMessage(),'te groot')!==false?413:400);}
 
     $hash=hash('sha256',$parsed['bytes']);
@@ -136,13 +137,13 @@ foreach($photos as $index=>$photoValue){
     $seenHashes[$hash]=true;
 
     $totalBytes+=strlen($parsed['bytes']);
-    if($totalBytes>8000000)mp_photo_json(['error'=>'De geselecteerde verslagfoto’s zijn samen te groot.'],413);
+    if($totalBytes>24000000)mp_photo_json(['error'=>'De geselecteerde verslagmedia zijn samen te groot.'],413);
     $token=bin2hex(random_bytes(16));
     $base=$dir.'/'.$token;
     mp_photo_write_blob($base,$parsed);
     $keepTokens[]=$token;
     $key=$prefix.$token;
-    $refs[]=mp_photo_ref('service-photos.php',$key,false);
+    $refs[]=mp_photo_ref_for_base('service-photos.php',$key,$base,false);
     if($thumbnail!=='')mp_photo_write_thumb($base,mp_photo_parse_data_image($thumbnail,180000));
 }
 if ($completeList) mp_photo_cleanup_bases($dir,$keepTokens);

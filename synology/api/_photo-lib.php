@@ -29,18 +29,31 @@ function mp_photo_ensure_dir(string $dir): void {
     if (!is_writable($dir)) throw new RuntimeException('Fotomap is niet schrijfbaar.');
 }
 
-function mp_photo_parse_data_image($value, int $maxBytes): array {
+function mp_photo_parse_data_media($value, int $maxImageBytes, int $maxVideoBytes = 20000000): array {
     $raw = (string)$value;
-    if (!preg_match('#^data:(image/[A-Za-z0-9.+-]+);base64,([A-Za-z0-9+/=\r\n]+)$#', $raw, $match)) {
-        throw new RuntimeException('De afbeelding bevat ongeldige gegevens.');
+    if (!preg_match('#^data:((?:image|video)/[A-Za-z0-9.+-]+);base64,([A-Za-z0-9+/=\r\n]+)$#', $raw, $match)) {
+        throw new RuntimeException('Het mediabestand bevat ongeldige gegevens.');
     }
     $bytes = base64_decode(preg_replace('/\s+/', '', $match[2]), true);
-    if ($bytes === false || strlen($bytes) === 0) throw new RuntimeException('De afbeelding bevat ongeldige gegevens.');
-    if (strlen($bytes) > $maxBytes) throw new RuntimeException('De afbeelding is te groot.');
+    if ($bytes === false || strlen($bytes) === 0) throw new RuntimeException('Het mediabestand bevat ongeldige gegevens.');
     $type = strtolower((string)$match[1]);
-    $allowed = ['image/jpeg','image/png','image/webp','image/gif'];
-    if (!in_array($type, $allowed, true)) throw new RuntimeException('Dit afbeeldingsformaat wordt niet ondersteund.');
-    return ['bytes'=>$bytes,'contentType'=>$type];
+    $images = ['image/jpeg','image/png','image/webp','image/gif'];
+    $videos = ['video/mp4','video/webm','video/quicktime','video/x-m4v'];
+    if (in_array($type, $images, true)) {
+        if (strlen($bytes) > $maxImageBytes) throw new RuntimeException('De afbeelding is te groot.');
+        return ['bytes'=>$bytes,'contentType'=>$type,'kind'=>'image'];
+    }
+    if (in_array($type, $videos, true)) {
+        if (strlen($bytes) > $maxVideoBytes) throw new RuntimeException('De video is te groot (maximaal 20 MB).');
+        return ['bytes'=>$bytes,'contentType'=>$type,'kind'=>'video'];
+    }
+    throw new RuntimeException('Dit foto- of videoformaat wordt niet ondersteund.');
+}
+
+function mp_photo_parse_data_image($value, int $maxBytes): array {
+    $parsed = mp_photo_parse_data_media($value, $maxBytes, 0);
+    if (($parsed['kind'] ?? '') !== 'image') throw new RuntimeException('De thumbnail moet een afbeelding zijn.');
+    return $parsed;
 }
 
 function mp_photo_write_blob(string $basePath, array $parsed): void {
@@ -89,7 +102,11 @@ function mp_photo_content_type(string $metaPath): string {
     $raw = @file_get_contents($metaPath);
     $data = $raw !== false ? json_decode($raw, true) : null;
     $type = is_array($data) ? (string)($data['contentType'] ?? '') : '';
-    return strpos($type, 'image/') === 0 ? $type : 'image/jpeg';
+    return (strpos($type, 'image/') === 0 || strpos($type, 'video/') === 0) ? $type : 'image/jpeg';
+}
+
+function mp_photo_is_video_base(string $basePath): bool {
+    return strpos(mp_photo_content_type($basePath . '.meta.json'), 'video/') === 0;
 }
 
 function mp_photo_serve(string $basePath, bool $thumb, bool $headOnly): void {
@@ -121,9 +138,15 @@ function mp_photo_serve(string $basePath, bool $thumb, bool $headOnly): void {
     exit;
 }
 
-function mp_photo_ref(string $endpoint, string $key, bool $thumb = false): string {
+function mp_photo_ref(string $endpoint, string $key, bool $thumb = false, string $mediaKind = ''): string {
     // Canonieke ref werkt zowel op /machinepark als /machinepark/.
-    return '/machinepark/synology/api/' . $endpoint . '?key=' . rawurlencode($key) . ($thumb ? '&variant=thumb' : '');
+    return '/machinepark/synology/api/' . $endpoint . '?key=' . rawurlencode($key)
+        . ($thumb ? '&variant=thumb' : '')
+        . ($mediaKind === 'video' ? '&media=video' : '');
+}
+
+function mp_photo_ref_for_base(string $endpoint, string $key, string $basePath, bool $thumb = false): string {
+    return mp_photo_ref($endpoint, $key, $thumb, mp_photo_is_video_base($basePath) ? 'video' : 'image');
 }
 
 function mp_photo_key_from_ref($value, string $endpoint, string $prefix): string {

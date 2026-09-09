@@ -49,7 +49,8 @@ if ($action === 'thumbnail') {
     $key = device_photo_key_from_ref($body['photoRef'] ?? '');
     if ($key === '' || strpos($key, $prefix) !== 0) mp_photo_json(['error'=>'Een fotoreferentie hoort niet bij dit toestel.'],400);
     list($_dir, $base) = device_photo_location($key);
-    if (!mp_photo_exists($base)) mp_photo_json(['error'=>'De originele toestelfoto bestaat niet meer.'],404);
+    if (!mp_photo_exists($base)) mp_photo_json(['error'=>'De originele toestelmedia bestaat niet meer.'],404);
+    if (mp_photo_is_video_base($base)) mp_photo_json(['error'=>'Een video gebruikt geen afbeeldings-thumbnail.'],400);
     $thumb = mp_photo_parse_data_image($body['thumbnail'] ?? '', 180000);
     mp_photo_write_thumb($base, $thumb);
     mp_photo_json(['ok'=>true,'thumbnail'=>mp_photo_ref('device-photos.php',$key,true)]);
@@ -59,7 +60,8 @@ if (!mp_photo_can($user, ['devices.edit','devices.add'])) mp_photo_json(['error'
 
 $photos = isset($body['photos']) && is_array($body['photos']) ? array_values($body['photos']) : [];
 $thumbnails = isset($body['thumbnails']) && is_array($body['thumbnails']) ? array_values($body['thumbnails']) : [];
-if (count($photos) > 10) mp_photo_json(['error'=>'Een toestel kan maximaal 10 foto’s bevatten.'],400);
+$completeList = !array_key_exists('completeList', $body) || !empty($body['completeList']);
+if (count($photos) > 10) mp_photo_json(['error'=>'Een toestel kan maximaal 10 foto’s en video’s samen bevatten.'],400);
 
 $refs = [];
 $keepTokens = [];
@@ -76,7 +78,7 @@ foreach ($photos as $index => $photoValue) {
         if (!mp_photo_exists($base)) mp_photo_json(['error'=>'Een bestaande toestelfoto ontbreekt op de NAS.'],404);
         $token = basename($base);
         $keepTokens[] = $token;
-        $refs[] = mp_photo_ref('device-photos.php',$existingKey,false);
+        $refs[] = mp_photo_ref_for_base('device-photos.php',$existingKey,$base,false);
         if ($thumbnail !== '') mp_photo_write_thumb($base, mp_photo_parse_data_image($thumbnail,180000));
         continue;
     }
@@ -86,18 +88,18 @@ foreach ($photos as $index => $photoValue) {
         continue;
     }
 
-    try { $parsed = mp_photo_parse_data_image($photo,1200000); }
+    try { $parsed = mp_photo_parse_data_media($photo,1200000,20000000); }
     catch (Throwable $e) { mp_photo_json(['error'=>$e->getMessage()], strpos($e->getMessage(),'te groot')!==false?413:400); }
     $totalBytes += strlen($parsed['bytes']);
-    if ($totalBytes > 4000000) mp_photo_json(['error'=>'De geselecteerde toestelfoto’s zijn samen te groot.'],413);
+    if ($totalBytes > 24000000) mp_photo_json(['error'=>'De geselecteerde toestelmedia zijn samen te groot.'],413);
     $token = bin2hex(random_bytes(16));
     $base = $dir . '/' . $token;
     mp_photo_write_blob($base,$parsed);
     $keepTokens[] = $token;
     $key = $prefix . $token;
-    $refs[] = mp_photo_ref('device-photos.php',$key,false);
+    $refs[] = mp_photo_ref_for_base('device-photos.php',$key,$base,false);
     if ($thumbnail !== '') mp_photo_write_thumb($base, mp_photo_parse_data_image($thumbnail,180000));
 }
 
-mp_photo_cleanup_bases($dir,$keepTokens);
-mp_photo_json(['ok'=>true,'photos'=>$refs,'mode'=>'synology-local']);
+if ($completeList) mp_photo_cleanup_bases($dir,$keepTokens);
+mp_photo_json(['ok'=>true,'photos'=>$refs,'mode'=>'synology-local','completeList'=>$completeList]);
