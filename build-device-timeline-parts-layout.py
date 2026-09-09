@@ -36,6 +36,13 @@ if breakdown_html_new not in index:
         raise SystemExit("Buildvalidatie mislukt: depannage-timeline HTML niet gevonden")
     index = index.replace(breakdown_html_old, breakdown_html_new, 1)
 
+print_anchor = ".timeline-item .date{font-size:8pt;color:#555}.timeline-item p{margin:1.5mm 0 0;color:#333}"
+print_rules = ".timeline-item .date{font-size:8pt;color:#555}.timeline-item p{margin:1.5mm 0 0;color:#333}.timeline-workorder{margin-top:2.5mm}.timeline-workorder-title{font-weight:700;margin-bottom:2mm}.timeline-workorder-grid{display:grid;grid-template-columns:1fr;gap:1.5mm}.timeline-workorder-field{display:block}.timeline-workorder-field span{display:block;font-size:8pt;color:#555;margin-bottom:.5mm}.timeline-workorder-field strong{display:block;font-size:9pt;font-weight:700}"
+if print_rules not in index:
+    if print_anchor not in index:
+        raise SystemExit("Buildvalidatie mislukt: print-CSS anker voor machinelogboek niet gevonden")
+    index = index.replace(print_anchor, print_rules, 1)
+
 style = """
 <style data-machinepark-device-timeline-parts="v1">
 .device-timeline-used-parts{margin-top:8px}
@@ -54,6 +61,9 @@ for needle in [
     "device-timeline-used-parts-list",
     "m.usedParts?.length?deviceTimelineUsedPartsHtml(m.usedParts)",
     "b.usedParts?.length?deviceTimelineUsedPartsHtml(b.usedParts)",
+    ".timeline-workorder-grid{display:grid;grid-template-columns:1fr;gap:1.5mm}",
+    ".timeline-workorder-field span{display:block;font-size:8pt",
+    ".timeline-workorder-field strong{display:block;font-size:9pt",
 ]:
     if needle not in index:
         raise SystemExit("Buildvalidatie mislukt: onderdelenopmaak ontbreekt (" + needle + ")")
