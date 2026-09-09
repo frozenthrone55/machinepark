@@ -62,3 +62,11 @@ test('Synology foto-API gebruikt canonieke machinepark-route en compacte HTTP-fo
   assert.match(builder, /HTTP /);
   assert.match(builder, /<script/);
 });
+
+
+test('servicefoto lijst geeft thumbnails nooit terug als aparte conceptfoto', () => {
+  assert.match(service, /machinepark-service-photo-list-originals-only-v1/);
+  assert.match(service, /substr\(\(string\)\$file, -10\) === '\.thumb\.bin'/);
+  const listBlock=service.slice(service.indexOf("if ($action === 'list')"), service.indexOf("if ($action === 'thumbnail')"));
+  assert.ok(listBlock.indexOf(".thumb.bin") < listBlock.indexOf("basename($file, '.bin')"));
+});

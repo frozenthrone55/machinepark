@@ -63,6 +63,9 @@ if ($action === 'list') {
     });
     foreach ($files as $file) {
         if (!is_file($file)) continue;
+        // machinepark-service-photo-list-originals-only-v1
+        // *.bin matcht ook <token>.thumb.bin. Een thumbnail is geen aparte foto.
+        if (substr((string)$file, -10) === '.thumb.bin') continue;
         $token = basename($file, '.bin');
         if (mp_photo_safe_token($token) === '') continue;
         $refs[] = mp_photo_ref('service-photos.php', $prefix . $token, false);
