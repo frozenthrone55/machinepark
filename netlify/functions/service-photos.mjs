@@ -154,7 +154,7 @@ export default async (req) => {
 
     const photos = Array.isArray(body?.photos) ? body.photos : [];
     const thumbnails = Array.isArray(body?.thumbnails) ? body.thumbnails : [];
-    if (photos.length > 5) return json({ error: 'Een onderhouds- of depannageverslag kan maximaal 5 foto’s bevatten.' }, 400);
+    if (photos.length > 10) return json({ error: 'Een onderhouds- of depannageverslag kan maximaal 10 foto’s bevatten.' }, 400);
 
     const refs = new Array(photos.length);
     const keepKeys = new Set();
@@ -178,7 +178,7 @@ export default async (req) => {
       if (!parsed) return json({ error: 'Een verslagfoto bevat ongeldige gegevens.' }, 400);
       if (parsed.bytes.length > 1_200_000) return json({ error: 'Een verslagfoto is te groot. Kies een kleinere foto.' }, 413);
       totalBytes += parsed.bytes.length;
-      if (totalBytes > 4_000_000) return json({ error: 'De geselecteerde verslagfoto’s zijn samen te groot.' }, 413);
+      if (totalBytes > 8_000_000) return json({ error: 'De geselecteerde verslagfoto’s zijn samen te groot.' }, 413);
 
       const key = `${prefix}${crypto.randomUUID()}`;
       keepKeys.add(key);
