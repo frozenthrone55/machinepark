@@ -23,7 +23,7 @@ if MARKER not in index:
 
     replace_once(
         "notes:val(fd,'notes'),createdAt:old.createdAt||now",
-        "notes:val(fd,'notes'),devicePhotos:(typeof window.machineparkDevicePhotosFromForm==='function'?window.machineparkDevicePhotosFromForm(fd,old):(Array.isArray(old.devicePhotos)?old.devicePhotos.slice(0,5):[])),deviceOverviewPhotoIndex:(typeof window.machineparkDeviceOverviewIndexFromForm==='function'?window.machineparkDeviceOverviewIndexFromForm(fd,old):Number(old.deviceOverviewPhotoIndex||0)),createdAt:old.createdAt||now",
+        "notes:val(fd,'notes'),devicePhotos:(typeof window.machineparkDevicePhotosFromForm==='function'?window.machineparkDevicePhotosFromForm(fd,old):(Array.isArray(old.devicePhotos)?old.devicePhotos.slice(0,10):[])),deviceOverviewPhotoIndex:(typeof window.machineparkDeviceOverviewIndexFromForm==='function'?window.machineparkDeviceOverviewIndexFromForm(fd,old):Number(old.deviceOverviewPhotoIndex||0)),createdAt:old.createdAt||now",
         'toestelfoto opslag',
     )
 
@@ -67,7 +67,7 @@ if MARKER not in index:
     script = r'''
 <script data-machinepark-build-fix="device-photos-v2">
 (() => {
-  const DEVICE_PHOTO_LIMIT = 5;
+  const DEVICE_PHOTO_LIMIT = 10;
 
   function normalizedDevicePhotos(device) {
     return (Array.isArray(device?.devicePhotos) ? device.devicePhotos : [])
@@ -307,7 +307,7 @@ if MARKER not in index:
 
 required = [
     MARKER,
-    'const DEVICE_PHOTO_LIMIT = 5;',
+    'const DEVICE_PHOTO_LIMIT = 10;',
     'function compressDevicePhoto(file)',
     'const max = 720;',
     'data-photo-lightbox',
@@ -317,4 +317,4 @@ for needle in required:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: geconsolideerde toestelfoto-code ontbreekt ({needle})')
 
-print('[Machinepark] maximaal 5 compacte toestelfoto’s met overzichtsfoto actief')
+print('[Machinepark] maximaal 10 compacte toestelfoto’s met overzichtsfoto actief')
