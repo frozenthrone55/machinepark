@@ -366,17 +366,23 @@ if MARKER not in index:
   }
 
   function actionHistoryHtml(item) {
-    const activeServiceIds=new Set([
+    const linkedServiceIds=new Set([
       ...(Array.isArray(item.serviceReportIds)?item.serviceReportIds:[]),
       ...(Array.isArray(item.serviceLinks)?item.serviceLinks.map(link=>link&&link.id):[]),
       item.sourceKind==='service-report'?item.sourceId:''
     ].filter(Boolean).map(String));
+    const existingDraftReportIds=new Set(
+      [...(state.maintenance||[]),...(state.breakdowns||[])]
+        .filter(record=>record&&record.isDraft===true&&record.draftKind==='serviceVisit'&&record.draftRole==='header'&&record.draftReportId)
+        .map(record=>String(record.draftReportId))
+    );
+    const activeDraftServiceIds=new Set([...linkedServiceIds].filter(id=>existingDraftReportIds.has(id)));
     const rows=[...(Array.isArray(item.history)?item.history:[])].filter(entry=>{
       const label=String(entry&&entry.label||'').toLowerCase();
       const isConcept=label.includes('serviceconcept');
       if(!isConcept)return true;
-      if(entry&&entry.serviceReportId)return activeServiceIds.has(String(entry.serviceReportId));
-      return activeServiceIds.size>0;
+      if(entry&&entry.serviceReportId)return existingDraftReportIds.has(String(entry.serviceReportId));
+      return activeDraftServiceIds.size>0;
     }).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
     return rows.length?`<div class="action-history">${rows.map(h=>`<div class="action-history-row"><strong>${esc(h.label||h.type||'Wijziging')}</strong><small>${esc(h.byName||'Gebruiker')} · ${h.at?esc(new Date(h.at).toLocaleString('nl-BE')):''}${h.detail?' · '+esc(h.detail):''}</small></div>`).join('')}</div>`:'<div class="muted">Nog geen historiek.</div>';
   }

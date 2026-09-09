@@ -421,3 +421,16 @@ test('oude verweesde serviceconceptregels worden niet meer getoond in ToDo histo
   assert.match(actions, /entry&&entry\.serviceReportId/);
   assert.match(actions, /return activeServiceIds\.size>0/);
 });
+
+
+test('serviceconcept historiek vereist bestaand concept en niet alleen een oude service-id', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  assert.match(actions, /existingDraftReportIds=new Set/);
+  assert.match(actions, /record\.isDraft===true/);
+  assert.match(actions, /record\.draftKind==='serviceVisit'/);
+  assert.match(actions, /record\.draftRole==='header'/);
+  assert.match(actions, /record\.draftReportId/);
+  assert.match(actions, /activeDraftServiceIds=new Set/);
+  assert.match(actions, /existingDraftReportIds\.has\(String\(entry\.serviceReportId\)\)/);
+  assert.match(actions, /return activeDraftServiceIds\.size>0/);
+});
