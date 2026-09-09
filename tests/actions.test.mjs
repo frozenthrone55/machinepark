@@ -452,3 +452,12 @@ test('machinelogboek onderdeelregels gebruiken kleiner lettertype', () => {
   assert.match(builder, /device-timeline-used-part\{display:block;font-size:14px;line-height:1\.35/);
   assert.match(builder, /device-timeline-used-parts>strong\{display:block;margin-bottom:4px\}/);
 });
+
+
+test('afdruk machinelogboek zet werkbon label en waarde onder elkaar', () => {
+  const builder = readFileSync(new URL('../build-device-timeline-parts-layout.py', import.meta.url), 'utf8');
+  assert.match(builder, /\.timeline-workorder-grid\{display:grid;grid-template-columns:1fr;gap:1\.5mm\}/);
+  assert.match(builder, /\.timeline-workorder-field\{display:block\}/);
+  assert.match(builder, /\.timeline-workorder-field span\{display:block;font-size:8pt/);
+  assert.match(builder, /\.timeline-workorder-field strong\{display:block;font-size:9pt/);
+});
