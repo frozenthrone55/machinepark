@@ -445,3 +445,10 @@ test('machinelogboek toont gebruikte onderdelen onder elkaar', () => {
   assert.match(builder, /m\.usedParts\?\.length\?deviceTimelineUsedPartsHtml\(m\.usedParts\)/);
   assert.match(builder, /b\.usedParts\?\.length\?deviceTimelineUsedPartsHtml\(b\.usedParts\)/);
 });
+
+
+test('machinelogboek onderdeelregels gebruiken kleiner lettertype', () => {
+  const builder = readFileSync(new URL('../build-device-timeline-parts-layout.py', import.meta.url), 'utf8');
+  assert.match(builder, /device-timeline-used-part\{display:block;font-size:14px;line-height:1\.35/);
+  assert.match(builder, /device-timeline-used-parts>strong\{display:block;margin-bottom:4px\}/);
+});

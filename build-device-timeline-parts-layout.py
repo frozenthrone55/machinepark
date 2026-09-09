@@ -41,7 +41,7 @@ style = """
 .device-timeline-used-parts{margin-top:8px}
 .device-timeline-used-parts>strong{display:block;margin-bottom:4px}
 .device-timeline-used-parts-list{display:flex;flex-direction:column;gap:3px}
-.device-timeline-used-part{display:block;line-height:1.4;overflow-wrap:anywhere}
+.device-timeline-used-part{display:block;font-size:14px;line-height:1.35;overflow-wrap:anywhere}
 </style>
 """
 if 'data-machinepark-device-timeline-parts="v1"' not in index:
