@@ -15,8 +15,8 @@ if "function deviceTimelineUsedPartsHtml(items=[])" not in index:
         raise SystemExit("Buildvalidatie mislukt: deviceUnifiedTimelineHtml niet gevonden")
     index = index.replace(helper_anchor, helper + helper_anchor, 1)
 
-maintenance_old = """<p>\${esc(m.notes||'Geen notitie')}\${m.usedParts?.length?'<br>Onderdelen: '+esc(usedPartsText(m.usedParts)):''}</p>"""
-maintenance_new = """<p>\${esc(m.notes||'Geen notitie')}</p>\${m.usedParts?.length?deviceTimelineUsedPartsHtml(m.usedParts):''}"""
+maintenance_old = """<p>${esc(m.notes||'Geen notitie')}${m.usedParts?.length?'<br>Onderdelen: '+esc(usedPartsText(m.usedParts)):''}</p>"""
+maintenance_new = """<p>${esc(m.notes||'Geen notitie')}</p>${m.usedParts?.length?deviceTimelineUsedPartsHtml(m.usedParts):''}"""
 if maintenance_new not in index:
     if maintenance_old not in index:
         raise SystemExit("Buildvalidatie mislukt: onderhoudsonderdelen in machinelogboek niet gevonden")
@@ -29,8 +29,8 @@ if breakdown_new not in index:
         raise SystemExit("Buildvalidatie mislukt: depannageonderdelen in machinelogboek niet gevonden")
     index = index.replace(breakdown_old, breakdown_new, 1)
 
-breakdown_html_old = """<strong>\${esc(b.issue)}</strong><p>\${extras.join('<br>')}</p>\`})});"""
-breakdown_html_new = """<strong>\${esc(b.issue)}</strong><p>\${extras.join('<br>')}</p>\${partsHtml}\`})});"""
+breakdown_html_old = """<p>${extras.join('<br>')}</p>${workOrderTimelineHtml(b.workOrder)}"""
+breakdown_html_new = """<p>${extras.join('<br>')}</p>${partsHtml}${workOrderTimelineHtml(b.workOrder)}"""
 if breakdown_html_new not in index:
     if breakdown_html_old not in index:
         raise SystemExit("Buildvalidatie mislukt: depannage-timeline HTML niet gevonden")
