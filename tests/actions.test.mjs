@@ -434,3 +434,14 @@ test('serviceconcept historiek vereist bestaand concept en niet alleen een oude 
   assert.match(actions, /existingDraftReportIds\.has\(String\(entry\.serviceReportId\)\)/);
   assert.match(actions, /return activeDraftServiceIds\.size>0/);
 });
+
+
+test('machinelogboek toont gebruikte onderdelen onder elkaar', () => {
+  const builder = readFileSync(new URL('../build-device-timeline-parts-layout.py', import.meta.url), 'utf8');
+  assert.match(builder, /deviceTimelineUsedPartsHtml/);
+  assert.match(builder, /device-timeline-used-parts-list/);
+  assert.match(builder, /device-timeline-used-part/);
+  assert.match(builder, /flex-direction:column/);
+  assert.match(builder, /m\.usedParts\?\.length\?deviceTimelineUsedPartsHtml\(m\.usedParts\)/);
+  assert.match(builder, /b\.usedParts\?\.length\?deviceTimelineUsedPartsHtml\(b\.usedParts\)/);
+});
