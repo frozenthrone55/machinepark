@@ -59,7 +59,7 @@ if (!mp_photo_can($user, ['devices.edit','devices.add'])) mp_photo_json(['error'
 
 $photos = isset($body['photos']) && is_array($body['photos']) ? array_values($body['photos']) : [];
 $thumbnails = isset($body['thumbnails']) && is_array($body['thumbnails']) ? array_values($body['thumbnails']) : [];
-if (count($photos) > 5) mp_photo_json(['error'=>'Een toestel kan maximaal 5 foto’s bevatten.'],400);
+if (count($photos) > 10) mp_photo_json(['error'=>'Een toestel kan maximaal 10 foto’s bevatten.'],400);
 
 $refs = [];
 $keepTokens = [];
