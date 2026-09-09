@@ -559,11 +559,44 @@ if MARKER not in index:
     }).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
     return rows.length?`<div class="action-history">${rows.map(h=>`<div class="action-history-row"><strong>${esc(h.label||h.type||'Wijziging')}</strong><small>${esc(h.byName||'Gebruiker')} · ${h.at?esc(new Date(h.at).toLocaleString('nl-BE')):''}${h.detail?' · '+esc(h.detail):''}</small></div>`).join('')}</div>`:'<div class="muted">Nog geen historiek.</div>';
   }
+  function actionPrintStatus(item) {
+    return item?.status==='done'?'Uitgevoerd':item?.status==='in_progress'?'In behandeling':'Nog te doen';
+  }
+  function actionPrintPhotoList(item) {
+    return actionPhotoList(item?.photos||[]).filter(src=>!(typeof window.machineparkIsVideoMedia==='function'&&window.machineparkIsVideoMedia(src)));
+  }
+  function actionPrintHtml(item) {
+    const device=actionDeviceLabel(item),photos=actionPrintPhotoList(item),history=actionHistoryHtml(item);
+    const photoHtml=photos.length?'<section><h2>Foto’s</h2><div class="print-photo-grid">'+photos.map((src,i)=>'<img src="'+esc(src)+'" alt="ToDo-foto '+(i+1)+'">').join('')+'</div></section>':'';
+    const done=item.status==='done'?'<div class="print-field"><span>Uitgevoerd door</span><strong>'+esc(item.completedByName||'—')+'</strong></div><div class="print-field"><span>Uitgevoerd op</span><strong>'+actionDate(item.completedDate)+'</strong></div><div class="print-field full"><span>Opmerking uitvoering</span><strong>'+esc(item.completionNote||'—')+'</strong></div>':'';
+    return '<!doctype html><html><head><meta charset="utf-8"><title>ToDo - '+esc(item.title||'ToDo')+'</title><style>'+
+      '@page{size:A4;margin:15mm}body{font-family:Arial,sans-serif;color:#18211e;margin:0;font-size:11pt}h1{margin:0 0 3mm;font-size:22pt}h2{font-size:13pt;margin:7mm 0 3mm;border-bottom:1px solid #ccd7d2;padding-bottom:2mm}.meta{display:grid;grid-template-columns:1fr 1fr;gap:4mm 7mm;margin-top:6mm}.print-field{border:1px solid #d9e1de;border-radius:3mm;padding:3mm}.print-field.full{grid-column:1/-1}.print-field span{display:block;font-size:8.5pt;color:#5c6863;text-transform:uppercase;font-weight:700;margin-bottom:1mm}.print-field strong{display:block;white-space:pre-wrap}.status{display:inline-block;padding:1.5mm 3mm;border:1px solid #b9c9c3;border-radius:999px;font-weight:700}.notes{white-space:pre-wrap;border-left:3px solid #c8d7d1;padding-left:3mm;margin-top:4mm}.print-photo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4mm}.print-photo-grid img{width:100%;height:70mm;object-fit:contain;border:1px solid #d9e1de;border-radius:2mm;background:#fff}.action-history{display:grid;gap:2mm}.action-history-row{border-left:3px solid #c8d7d1;padding:1.5mm 0 1.5mm 3mm}.action-history-row strong{display:block}.action-history-row small{display:block;color:#5c6863;margin-top:1mm}.muted{color:#5c6863}@media print{button{display:none}}</style></head><body>'+
+      '<div class="status">'+esc(actionPrintStatus(item))+'</div><h1>'+esc(item.title||'ToDo')+'</h1>'+
+      (item.notes?'<div class="notes">'+esc(item.notes)+'</div>':'')+
+      '<div class="meta"><div class="print-field"><span>Prioriteit</span><strong>'+esc(actionPriorityLabel(item.priority))+'</strong></div><div class="print-field"><span>Toegewezen aan</span><strong>'+esc(item.assigneeName||'—')+'</strong></div><div class="print-field"><span>Tegen wanneer</span><strong>'+actionDate(item.dueDate)+'</strong></div><div class="print-field"><span>Locatie</span><strong>'+esc(item.location||'—')+'</strong></div><div class="print-field"><span>Toestel</span><strong>'+esc(device||'—')+'</strong></div>'+(item.sourceLabel?'<div class="print-field"><span>Bron</span><strong>'+esc(item.sourceLabel)+'</strong></div>':'')+done+'</div>'+
+      photoHtml+'<section><h2>Historiek</h2>'+history+'</section></body></html>';
+  }
+  function printAction(id) {
+    const item=(state.actions||[]).find(a=>a.id===id);if(!item)return;
+    const printWindow=window.open('','_blank');
+    if(!printWindow){alert('Sta pop-ups toe om de ToDo af te drukken.');return;}
+    printWindow.document.open();
+    printWindow.document.write(actionPrintHtml(item));
+    printWindow.document.close();
+    const images=[...printWindow.document.images];
+    const finish=()=>setTimeout(()=>{try{printWindow.focus();printWindow.print();}catch(_){}},120);
+    if(!images.length){finish();return;}
+    let pending=images.length;
+    const done=()=>{pending-=1;if(pending<=0)finish();};
+    images.forEach(img=>{if(img.complete)done();else{img.onload=done;img.onerror=done;}});
+    setTimeout(()=>{if(pending>0)finish();},1800);
+  }
+
   function openActionDetails(id) {
     const item=(state.actions||[]).find(a=>a.id===id);if(!item)return;const device=actionDeviceLabel(item);
     const body=`<div class="action-form-grid"><div class="field full"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="action-badge ${item.priority==='urgent'?'urgent':''}">${esc(actionPriorityLabel(item.priority))}</span>${item.status==='done'?'<span class="action-badge done">✓ Uitgevoerd</span>':''}</div><h3 style="margin:9px 0 3px">${esc(item.title)}</h3>${item.notes?`<div class="muted" style="white-space:pre-wrap">${esc(item.notes)}</div>`:''}</div><div class="field"><label>Toegewezen aan</label><strong>${esc(item.assigneeName||'—')}</strong></div><div class="field"><label>Tegen wanneer</label><strong>${actionDate(item.dueDate)}</strong></div><div class="field"><label>Locatie</label><strong>${esc(item.location||'—')}</strong></div><div class="field"><label>Toestel</label><strong>${esc(device||'—')}</strong></div>${item.sourceLabel?`<div class="field full"><label>Bron</label><strong>${esc(item.sourceLabel)}</strong></div>`:''}<div class="field full"><label>Foto’s</label>${actionPhotoGridHtml(item.photos||[],false)}</div>${item.status==='done'?`<div class="field"><label>Uitgevoerd door</label><strong>${esc(item.completedByName||'—')}</strong></div><div class="field"><label>Uitgevoerd op</label><strong>${actionDate(item.completedDate)}</strong></div><div class="field full"><label>Opmerking uitvoering</label><div>${esc(item.completionNote||'—')}</div></div>`:''}<div class="field full"><label>Historiek</label>${actionHistoryHtml(item)}</div></div>`;
     showModal('Actie',body,'Sluiten',async()=>closeModal());
-    setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.textContent='Verwijderen';remove.onclick=()=>void deleteAction(item.id);foot.insertBefore(remove,foot.firstChild);const edit=document.createElement('button');edit.type='button';edit.className='btn';edit.textContent='Bewerken';edit.onclick=()=>{closeModal();void openActionEditor(item.id);};foot.insertBefore(edit,submit);if(item.status==='done'){const reopen=document.createElement('button');reopen.type='button';reopen.className='btn';reopen.textContent='Heropenen';reopen.onclick=()=>{closeModal();void reopenAction(item.id);};foot.insertBefore(reopen,submit);}else{const complete=document.createElement('button');complete.type='button';complete.className='btn primary';complete.textContent='✓ Afronden';complete.onclick=()=>{closeModal();void openCompleteAction(item.id);};submit.classList.remove('primary');foot.appendChild(complete);}},0);
+    setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.textContent='Verwijderen';remove.onclick=()=>void deleteAction(item.id);foot.insertBefore(remove,foot.firstChild);const print=document.createElement('button');print.type='button';print.className='btn';print.textContent='Afdrukken';print.onclick=()=>printAction(item.id);foot.insertBefore(print,submit);const edit=document.createElement('button');edit.type='button';edit.className='btn';edit.textContent='Bewerken';edit.onclick=()=>{closeModal();void openActionEditor(item.id);};foot.insertBefore(edit,submit);if(item.status==='done'){const reopen=document.createElement('button');reopen.type='button';reopen.className='btn';reopen.textContent='Heropenen';reopen.onclick=()=>{closeModal();void reopenAction(item.id);};foot.insertBefore(reopen,submit);}else{const complete=document.createElement('button');complete.type='button';complete.className='btn primary';complete.textContent='✓ Afronden';complete.onclick=()=>{closeModal();void openCompleteAction(item.id);};submit.classList.remove('primary');foot.appendChild(complete);}},0);
   }
 
   function contextFor(kind,id) {
@@ -672,6 +705,8 @@ required = [
     "actionPhotoEditorHtml",
     "initActionPhotoEditor",
     "action-photo-pending",
+    "printAction",
+    "Afdrukken",
     "machineparkPersistActionPhotos",
     "/machinepark/synology/api/action-photos.php",
 ]

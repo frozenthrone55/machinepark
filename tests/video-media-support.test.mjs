@@ -69,3 +69,15 @@ test('PDF-fotolijsten slaan video volledig over',()=>{
 test('ToDo video preview vraagt geen afbeeldings-thumbnail op',()=>{
   assert.match(builder,/window\.machineparkIsVideoMedia\?\.\(value\)\)return value/);
 });
+
+
+test('videokaarten volgen exact de foto-afmetingen per mediolocatie',()=>{
+  assert.match(builder,/\.photo-preview \.machinepark-media-video\{width:100%;height:100%;min-height:0;max-height:none\}/);
+  assert.match(builder,/\.service-photo-item video\{width:100%;height:96px/);
+  assert.match(builder,/\.service-photo-details video\{width:100%;height:150px/);
+  assert.match(builder,/\.action-photo-item video\{width:100%;height:96px/);
+  assert.match(builder,/\.action-photo-details video\{width:100%;height:105px/);
+  assert.match(builder,/\.service-visit-photo-grid video\{width:100%;height:130px/);
+  assert.match(builder,/\.timeline-service-photo\.machinepark-media-video\{width:64px;height:64px/);
+  assert.doesNotMatch(builder,/photo-preview \.machinepark-media-video\{min-height:150px/);
+});

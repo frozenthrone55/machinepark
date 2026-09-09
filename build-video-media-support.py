@@ -16,10 +16,16 @@ sw = SW.read_text(encoding="utf-8")
 if MARKER not in index:
     helper = r'''
 <style data-machinepark-build-fix="video-media-support-v1">
-.machinepark-media-video{display:block;width:100%;height:100%;object-fit:cover;background:#111;border-radius:inherit}
-.photo-preview .machinepark-media-video{min-height:150px;max-height:260px}
-.service-photo-item video,.service-photo-details video,.action-photo-item video,.action-photo-details video,
-.device-photo-card video,.device-detail-photo video,.service-visit-photo-grid video{width:100%;height:100%;object-fit:cover;border-radius:8px;background:#111}
+.machinepark-media-video{display:block;width:100%;object-fit:cover;background:#111;border-radius:inherit}
+.photo-preview .machinepark-media-video{width:100%;height:100%;min-height:0;max-height:none}
+.service-photo-item video{width:100%;height:96px;object-fit:cover;border-radius:8px;background:#111}
+.service-photo-details video{width:100%;height:150px;object-fit:cover;border-radius:12px;background:#111}
+.action-photo-item video{width:100%;height:96px;object-fit:cover;border-radius:8px;background:#111}
+.action-photo-details video{width:100%;height:105px;object-fit:cover;border-radius:10px;background:#111}
+.device-photo-card .device-photo-image-wrap>video{width:100%;height:100%;object-fit:cover;background:#111}
+.device-detail-photo video{width:100%;height:100%;object-fit:cover;background:#111}
+.service-visit-photo-grid video{width:100%;height:130px;object-fit:cover;border-radius:7px;background:#111}
+.timeline-service-photo.machinepark-media-video{width:64px;height:64px;object-fit:cover}
 @media print{video.machinepark-media-video{display:none!important}}
 </style>
 <script data-machinepark-build-fix="video-media-support-v1">

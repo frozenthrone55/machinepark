@@ -540,3 +540,21 @@ test('ToDo opslag gebruikt de reeds getoonde pending bestanden', () => {
   const block=actions.slice(start,end);
   assert.match(block,/editor\.__actionPendingFiles/);
 });
+
+
+test('ToDo detail heeft een eigen afdrukknop en afdrukweergave', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  assert.match(actions,/function printAction\(id\)/);
+  assert.match(actions,/function actionPrintHtml\(item\)/);
+  assert.match(actions,/print\.textContent='Afdrukken'/);
+  assert.match(actions,/printWindow\.print\(\)/);
+  assert.match(actions,/Historiek/);
+  assert.match(actions,/Toegewezen aan/);
+});
+
+test('ToDo afdruk toont fotos maar geen opgeslagen videos als kapot beeld', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  assert.match(actions,/function actionPrintPhotoList\(item\)/);
+  assert.match(actions,/window\.machineparkIsVideoMedia/);
+  assert.match(actions,/print-photo-grid/);
+});
