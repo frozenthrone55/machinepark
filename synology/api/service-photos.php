@@ -68,7 +68,7 @@ if (!mp_photo_can($user, [$permissionPrefix.'.edit',$permissionPrefix.'.add'])) 
 
 $photos = isset($body['photos']) && is_array($body['photos']) ? array_values($body['photos']) : [];
 $thumbnails = isset($body['thumbnails']) && is_array($body['thumbnails']) ? array_values($body['thumbnails']) : [];
-if (count($photos)>5) mp_photo_json(['error'=>'Een onderhouds- of depannageverslag kan maximaal 5 foto’s bevatten.'],400);
+if (count($photos)>10) mp_photo_json(['error'=>'Een onderhouds- of depannageverslag kan maximaal 10 foto’s bevatten.'],400);
 
 $refs=[];$keepTokens=[];$totalBytes=0;$seenHashes=[];$seenLegacy=[];
 foreach($photos as $index=>$photoValue){
@@ -114,7 +114,7 @@ foreach($photos as $index=>$photoValue){
     $seenHashes[$hash]=true;
 
     $totalBytes+=strlen($parsed['bytes']);
-    if($totalBytes>4000000)mp_photo_json(['error'=>'De geselecteerde verslagfoto’s zijn samen te groot.'],413);
+    if($totalBytes>8000000)mp_photo_json(['error'=>'De geselecteerde verslagfoto’s zijn samen te groot.'],413);
     $token=bin2hex(random_bytes(16));
     $base=$dir.'/'.$token;
     mp_photo_write_blob($base,$parsed);
