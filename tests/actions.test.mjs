@@ -401,3 +401,23 @@ test('dashboard ToDo zoeken respecteert view actions recht', () => {
   const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
   assert.match(dashboard, /machineparkHasPermission\('view\.actions'\)/);
 });
+
+
+test('verwijderd serviceconcept laat geen ToDo spookhistoriek achter', () => {
+  const linking = readFileSync(new URL('../build-action-service-linking.py', import.meta.url), 'utf8');
+  assert.match(linking, /serviceReportId:reportId/);
+  assert.match(linking, /serviceLinkKind:finalized\?'report':'draft'/);
+  assert.match(linking, /machineparkClearServiceDraftActionLinks=async function\(context\)/);
+  assert.match(linking, /String\(entry&&entry\.serviceReportId\|\|''\)===reportId/);
+  assert.match(linking, /label\.includes\('serviceconcept'\)/);
+  assert.match(linking, /remainingIds\.size===0/);
+  assert.match(linking, /header\.draftReportId,date:header\.date,locations:/);
+});
+
+test('oude verweesde serviceconceptregels worden niet meer getoond in ToDo historiek', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  assert.match(actions, /const activeServiceIds=new Set/);
+  assert.match(actions, /label\.includes\('serviceconcept'\)/);
+  assert.match(actions, /entry&&entry\.serviceReportId/);
+  assert.match(actions, /return activeServiceIds\.size>0/);
+});

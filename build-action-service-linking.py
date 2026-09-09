@@ -152,8 +152,8 @@ if MARKER not in index:
       const labelChanged=Boolean(want&&oldLink&&String(oldLink.label||'')!==linkLabel);
       if(was===want&&!labelChanged)continue;
       let updated={...item,serviceReportIds:[...new Set(serviceIds.map(String))],serviceLinks:links,updatedAt:new Date().toISOString()};
-      if(want&&!was)updated.history=appendActionHistory(item,historyEntry('linked',finalized?'Gekoppeld aan serviceverslag':'Gekoppeld aan serviceconcept',contextLabel));
-      if(!want&&was)updated.history=appendActionHistory(item,historyEntry('unlinked',finalized?'Losgekoppeld van serviceverslag':'Losgekoppeld van serviceconcept',contextLabel));
+      if(want&&!was)updated.history=appendActionHistory(item,{...historyEntry('linked',finalized?'Gekoppeld aan serviceverslag':'Gekoppeld aan serviceconcept',contextLabel),serviceReportId:reportId,serviceLinkKind:finalized?'report':'draft'});
+      if(!want&&was)updated.history=appendActionHistory(item,{...historyEntry('unlinked',finalized?'Losgekoppeld van serviceverslag':'Losgekoppeld van serviceconcept',contextLabel),serviceReportId:reportId,serviceLinkKind:finalized?'report':'draft'});
       if(!want&&item.sourceKind==='service-report'&&String(item.sourceId||'')===reportId)updated={...updated,sourceKind:'',sourceId:'',sourceLabel:''};
       await put('actions',updated);changed=true;
     }
@@ -219,9 +219,37 @@ if MARKER not in index:
     catch(error){console.warn('Actiekoppeling serviceconcept finaliseren',error);toast('Serviceverslag opgeslagen, maar de actiekoppeling kon niet bijgewerkt worden.');}
   };
 
-  window.machineparkClearServiceDraftActionLinks=async function(reportId){
-    try{await applyServiceDraftActionLinks({reportId:reportId,locations:[],date:''},[],false);}
-    catch(error){console.warn('Actiekoppeling verwijderd serviceconcept opruimen',error);}
+  window.machineparkClearServiceDraftActionLinks=async function(context){
+    try{
+      const ctx=context&&typeof context==='object'?context:{reportId:context};
+      const reportId=String(ctx&&ctx.reportId||'');if(!reportId)return;
+      const contextLabel=serviceDraftContextLabel(ctx);
+      const linked=linkedActionsForService(reportId);
+      let changed=false;
+      for(const item of linked){
+        const serviceIds=actionServiceIds(item).filter(id=>String(id)!==reportId);
+        const links=(Array.isArray(item.serviceLinks)?item.serviceLinks:[]).filter(link=>String(link&&link.id||'')!==reportId);
+        const remainingIds=new Set([...serviceIds,...links.map(link=>String(link&&link.id||'')).filter(Boolean)]);
+        let history=(Array.isArray(item.history)?item.history:[]).filter(entry=>{
+          if(String(entry&&entry.serviceReportId||'')===reportId)return false;
+          const label=String(entry&&entry.label||'').toLowerCase();
+          if(!label.includes('serviceconcept'))return true;
+          if(contextLabel&&String(entry&&entry.detail||'')===contextLabel)return false;
+          // Legacy regels hadden nog geen serviceReportId. Als na deze verwijdering
+          // geen enkele servicekoppeling meer overblijft, zijn die conceptregels weesdata.
+          if(!entry?.serviceReportId&&remainingIds.size===0)return false;
+          return true;
+        });
+        let updated={...item,serviceReportIds:[...new Set(serviceIds.map(String))],serviceLinks:links,history,updatedAt:new Date().toISOString()};
+        if(item.sourceKind==='service-report'&&String(item.sourceId||'')===reportId)updated={...updated,sourceKind:'',sourceId:'',sourceLabel:''};
+        await put('actions',updated);changed=true;
+      }
+      if(changed){
+        state.actions=await getAll('actions');
+        renderActions();renderActionDashboard();
+        if(typeof window.renderMachineparkServiceVisits==='function')window.renderMachineparkServiceVisits();
+      }
+    }catch(error){console.warn('Actiekoppeling verwijderd serviceconcept opruimen',error);}
   };
 
   async function linkExistingActionToService(report) {
@@ -373,7 +401,7 @@ if "machineparkFinalizeServiceDraftActions" not in service:
     service = service.replace(finalize_old, finalize_new, 1)
 
 delete_draft_old = "await refreshVisitState();await syncVisitDraft();toast('Serviceconcept verwijderd');"
-delete_draft_new = "if(header.draftReportId&&typeof window.machineparkClearServiceDraftActionLinks==='function')await window.machineparkClearServiceDraftActionLinks(header.draftReportId);await refreshVisitState();await syncVisitDraft();toast('Serviceconcept verwijderd');"
+delete_draft_new = "if(header.draftReportId&&typeof window.machineparkClearServiceDraftActionLinks==='function')await window.machineparkClearServiceDraftActionLinks({reportId:header.draftReportId,date:header.date,locations:(Array.isArray(header.locations)?header.locations.map(x=>x&&x.label||x).filter(Boolean):[header.locationLabel].filter(Boolean))});await refreshVisitState();await syncVisitDraft();toast('Serviceconcept verwijderd');"
 if "machineparkClearServiceDraftActionLinks(header.draftReportId)" not in service:
     if delete_draft_old not in service:
         raise SystemExit("Buildvalidatie mislukt: verwijderen-serviceconceptanker voor acties ontbreekt")
