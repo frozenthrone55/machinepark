@@ -423,7 +423,7 @@
     const onlineDevicePhotos = window.machineparkPersistDevicePhotoList;
     if (typeof onlineDevicePhotos === 'function') {
       window.machineparkPersistDevicePhotoList = async function(deviceId, photos, options = {}) {
-        const list = (Array.isArray(photos) ? photos : []).filter((x) => typeof x === 'string' && x.trim()).slice(0, 5);
+        const list = (Array.isArray(photos) ? photos : []).filter((x) => typeof x === 'string' && x.trim()).slice(0, 10);
         if (!navigator.onLine) { await markDirty(); return list; }
         try { return await onlineDevicePhotos(deviceId, list, options); }
         catch (error) {
@@ -449,7 +449,7 @@
     const onlineServicePhotos = window.machineparkPersistServicePhotos;
     if (typeof onlineServicePhotos === 'function') {
       window.machineparkPersistServicePhotos = async function(storeName, entityId, photos) {
-        const list = (Array.isArray(photos) ? photos : []).filter((x) => typeof x === 'string' && x.trim()).slice(0, 5);
+        const list = (Array.isArray(photos) ? photos : []).filter((x) => typeof x === 'string' && x.trim()).slice(0, 10);
         if (!navigator.onLine) { await markDirty(); return list; }
         try { return await onlineServicePhotos(storeName, entityId, list); }
         catch (error) {

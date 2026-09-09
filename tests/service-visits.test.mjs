@@ -344,3 +344,12 @@ test('geen foto-gerelateerde buildlimiet blijft op 5 staan', () => {
   assert.match(deviceImport, /MAX_DEVICE_IMPORT_PHOTOS = 10/);
   assert.doesNotMatch(deviceImport, /MAX_DEVICE_IMPORT_PHOTOS = 5/);
 });
+
+
+test('offline foto-opslag bewaart maximaal 10 toestel- en servicefotos', () => {
+  const offline = readFileSync(new URL('../offline-first.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(offline, /machineparkPersistDevicePhotoList[\s\S]{0,500}slice\(0,\s*5\)/);
+  assert.match(offline, /machineparkPersistDevicePhotoList[\s\S]{0,500}slice\(0,\s*10\)/);
+  assert.doesNotMatch(offline, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*5\)/);
+  assert.match(offline, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*10\)/);
+});
