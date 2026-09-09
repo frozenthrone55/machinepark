@@ -122,7 +122,7 @@ export default async (req) => {
       if (!(await canManageDevicePhotos(store, auth))) return json({ error: 'Deze rol mag toestelfoto’s niet wijzigen.' }, 403);
       const photos = Array.isArray(body?.photos) ? body.photos : [];
       const thumbnails = Array.isArray(body?.thumbnails) ? body.thumbnails : [];
-      if (photos.length > 5) return json({ error: 'Een toestel kan maximaal 5 foto’s bevatten.' }, 400);
+      if (photos.length > 10) return json({ error: 'Een toestel kan maximaal 10 foto’s bevatten.' }, 400);
 
       const refs = new Array(photos.length);
       const keepKeys = new Set();
