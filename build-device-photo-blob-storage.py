@@ -29,7 +29,7 @@ if MARKER not in index:
   }
 
   window.machineparkPersistDevicePhotoList = async function(deviceId, photos, { force = false } = {}) {
-    const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 5);
+    const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 10);
     if (!force && !hasRawDevicePhoto(list)) return list;
     const headers = await centralHeaders(true);
     const res = await fetch(DEVICE_PHOTO_STORAGE_URL, {
@@ -42,7 +42,7 @@ if MARKER not in index:
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) {}
     if (!res.ok) throw new Error(body.error || text || `Toestelfoto’s opslaan mislukt (${res.status})`);
-    return Array.isArray(body.photos) ? body.photos.slice(0, 5) : list;
+    return Array.isArray(body.photos) ? body.photos.slice(0, 10) : list;
   };
 
   function writeDeviceDirect(device) {
@@ -77,7 +77,7 @@ if MARKER not in index:
   };
 
   indexPhotoRefs = function(device) {
-    return (Array.isArray(device?.devicePhotos) ? device.devicePhotos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 5);
+    return (Array.isArray(device?.devicePhotos) ? device.devicePhotos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 10);
   };
 })();
 </script>
