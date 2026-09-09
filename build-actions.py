@@ -279,8 +279,13 @@ if MARKER not in index:
         const isVideo=String(file.type||'').startsWith('video/')||/\.(mp4|webm|mov|m4v)$/i.test(String(file.name||''));
         const media=document.createElement(isVideo?'video':'img');
         media.src=url;
-        if(isVideo){media.controls=true;media.playsInline=true;media.preload='metadata';}
-        else{media.loading='lazy';media.decoding='async';}
+        if(isVideo){
+          media.controls=false;media.muted=true;media.playsInline=true;media.preload='metadata';
+          media.dataset.machineparkVideoPending='1';media.dataset.fullSrc=url;
+          media.classList.add('machinepark-media-video');
+          media.title='Klik om video groter af te spelen';
+          if(typeof window.machineparkMarkVideoThumbnail==='function')window.machineparkMarkVideoThumbnail(media,url);
+        }else{media.loading='lazy';media.decoding='async';}
         media.setAttribute('aria-label',isVideo?'Nieuwe ToDo-video':'Nieuwe ToDo-foto');
         const remove=document.createElement('button');remove.type='button';remove.className='btn small action-photo-pending-remove';remove.textContent='Verwijderen';
         remove.onclick=()=>{

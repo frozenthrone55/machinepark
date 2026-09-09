@@ -81,3 +81,20 @@ test('videokaarten volgen exact de foto-afmetingen per mediolocatie',()=>{
   assert.match(builder,/\.timeline-service-photo\.machinepark-media-video\{width:64px;height:64px/);
   assert.doesNotMatch(builder,/photo-preview \.machinepark-media-video\{min-height:150px/);
 });
+
+
+test('videothumbnail opent grote speler met originele beeldverhouding',()=>{
+  assert.match(builder,/machinepark-video-lightbox-player/);
+  assert.match(builder,/window\.machineparkOpenVideoMedia=function/);
+  assert.match(builder,/max-width:94vw/);
+  assert.match(builder,/max-height:88vh/);
+  assert.match(builder,/object-fit:contain/);
+  assert.match(builder,/video\.controls=false/);
+  assert.match(builder,/data-machinepark-video-thumb/);
+});
+
+test('videospeler sluit op achtergrond knop of Escape',()=>{
+  assert.match(builder,/machinepark-video-lightbox-close/);
+  assert.match(builder,/event\.key==='Escape'/);
+  assert.match(builder,/player\.pause\(\)/);
+});

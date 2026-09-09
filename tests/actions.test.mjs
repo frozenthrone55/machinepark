@@ -558,3 +558,12 @@ test('ToDo afdruk toont fotos maar geen opgeslagen videos als kapot beeld', () =
   assert.match(actions,/window\.machineparkIsVideoMedia/);
   assert.match(actions,/print-photo-grid/);
 });
+
+
+test('nieuwe ToDo video blijft thumbnail en opent via de grote videoviewer', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  assert.match(actions,/media\.controls=false/);
+  assert.match(actions,/machineparkVideoPending/);
+  assert.match(actions,/machineparkMarkVideoThumbnail/);
+  assert.match(actions,/Klik om video groter af te spelen/);
+});

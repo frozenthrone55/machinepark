@@ -26,7 +26,14 @@ if MARKER not in index:
 .device-detail-photo video{width:100%;height:100%;object-fit:cover;background:#111}
 .service-visit-photo-grid video{width:100%;height:130px;object-fit:cover;border-radius:7px;background:#111}
 .timeline-service-photo.machinepark-media-video{width:64px;height:64px;object-fit:cover}
-@media print{video.machinepark-media-video{display:none!important}}
+video.machinepark-media-video[data-machinepark-video-thumb="1"]{cursor:zoom-in}
+.machinepark-video-lightbox{position:fixed;inset:0;z-index:100000;background:rgba(8,16,13,.9);display:none;align-items:center;justify-content:center;padding:22px}
+.machinepark-video-lightbox.show{display:flex}
+.machinepark-video-lightbox-shell{position:relative;display:flex;align-items:center;justify-content:center;max-width:96vw;max-height:94vh}
+.machinepark-video-lightbox-player{display:block;width:auto!important;height:auto!important;max-width:94vw!important;max-height:88vh!important;object-fit:contain!important;background:#000;border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.machinepark-video-lightbox-close{position:absolute;right:-12px;top:-12px;width:38px;height:38px;border:0;border-radius:50%;background:#fff;color:#1c2924;font-size:22px;line-height:1;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.3)}
+@media(max-width:700px){.machinepark-video-lightbox{padding:10px}.machinepark-video-lightbox-player{max-width:96vw!important;max-height:90vh!important}.machinepark-video-lightbox-close{right:0;top:-44px}}
+@media print{video.machinepark-media-video,.machinepark-video-lightbox{display:none!important}}
 </style>
 <script data-machinepark-build-fix="video-media-support-v1">
 (() => {
@@ -70,6 +77,50 @@ if MARKER not in index:
     const final=await mediaPost(url,{...idBody,photos:refs,completeList:true},label);
     return (Array.isArray(final.photos)?final.photos:refs).filter(Boolean).slice(0,10);
   };
+  function ensureVideoLightbox() {
+    let box=document.getElementById('machineparkVideoLightbox');
+    if(box)return box;
+    box=document.createElement('div');
+    box.id='machineparkVideoLightbox';
+    box.className='machinepark-video-lightbox';
+    box.setAttribute('aria-hidden','true');
+    box.innerHTML='<div class="machinepark-video-lightbox-shell"><video class="machinepark-video-lightbox-player" controls playsinline preload="metadata"></video><button type="button" class="machinepark-video-lightbox-close" aria-label="Video sluiten">×</button></div>';
+    const close=()=>{
+      const player=box.querySelector('.machinepark-video-lightbox-player');
+      try{player.pause();}catch(_){}
+      player.removeAttribute('src');player.load();
+      box.classList.remove('show');box.setAttribute('aria-hidden','true');
+    };
+    box.querySelector('.machinepark-video-lightbox-close').onclick=close;
+    box.addEventListener('click',event=>{if(event.target===box)close();});
+    box.__machineparkClose=close;
+    document.body.appendChild(box);
+    return box;
+  }
+  window.machineparkOpenVideoMedia=function(src) {
+    const value=String(src||'').trim();if(!value)return;
+    const box=ensureVideoLightbox(),player=box.querySelector('.machinepark-video-lightbox-player');
+    player.src=value;
+    box.classList.add('show');box.setAttribute('aria-hidden','false');
+    player.load();
+    const play=player.play();if(play&&typeof play.catch==='function')play.catch(()=>{});
+  };
+  function markVideoThumbnail(video,src='') {
+    const full=String(src||video?.dataset?.fullSrc||video?.getAttribute?.('src')||'').trim();
+    if(!video||!full)return video;
+    video.dataset.machineparkVideoThumb='1';
+    video.dataset.fullSrc=full;
+    video.controls=false;
+    video.muted=true;
+    video.playsInline=true;
+    video.preload='metadata';
+    video.tabIndex=0;
+    video.setAttribute('role','button');
+    video.setAttribute('aria-label','Video groter afspelen');
+    video.title='Klik om video groter af te spelen';
+    return video;
+  }
+  window.machineparkMarkVideoThumbnail=markVideoThumbnail;
   function enhance(root=document){
     const imgs=[];
     if(root?.matches?.('img'))imgs.push(root);
@@ -79,8 +130,8 @@ if MARKER not in index:
       if(!window.machineparkIsVideoMedia(full))continue;
       const video=document.createElement('video');
       video.className=(img.className?img.className+' ':'')+'machinepark-media-video';
-      video.src=full;video.controls=true;video.playsInline=true;video.preload='metadata';
-      video.setAttribute('aria-label',img.alt||'Video');
+      video.src=full;markVideoThumbnail(video,full);
+      video.setAttribute('aria-label',(img.alt||'Video')+' · klik om groter af te spelen');
       if(img.getAttribute('style'))video.setAttribute('style',img.getAttribute('style'));
       if(img.dataset.fullSrc)video.dataset.fullSrc=full;
       const card=img.closest('.device-photo-card');
@@ -93,8 +144,19 @@ if MARKER not in index:
       }
     }
   }
-  const observer=new MutationObserver(records=>records.forEach(r=>r.addedNodes.forEach(node=>{if(node.nodeType===1)enhance(node)})));
-  const start=()=>{enhance(document);observer.observe(document.documentElement,{childList:true,subtree:true});setTimeout(()=>{const base=window.machineparkDeviceOverviewPhoto;if(typeof base==='function'&&!base.__mediaWrapped){const wrapped=function(device){const chosen=base(device);if(chosen&&!window.machineparkIsVideoMedia(chosen))return chosen;return (Array.isArray(device?.devicePhotos)?device.devicePhotos:[]).find(src=>src&&!window.machineparkIsVideoMedia(src))||''};wrapped.__mediaWrapped=true;window.machineparkDeviceOverviewPhoto=wrapped;if(typeof window.renderDevices==='function')window.renderDevices();}},0)};
+  const observer=new MutationObserver(records=>records.forEach(r=>r.addedNodes.forEach(node=>{if(node.nodeType===1){enhance(node);if(node.matches?.('video[data-machinepark-video-pending="1"]'))markVideoThumbnail(node);node.querySelectorAll?.('video[data-machinepark-video-pending="1"]').forEach(v=>markVideoThumbnail(v));}})));
+  document.addEventListener('click',event=>{
+    const thumb=event.target.closest?.('video[data-machinepark-video-thumb="1"]');
+    if(!thumb)return;
+    event.preventDefault();event.stopPropagation();
+    window.machineparkOpenVideoMedia(thumb.dataset.fullSrc||thumb.currentSrc||thumb.src);
+  },true);
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){document.getElementById('machineparkVideoLightbox')?.__machineparkClose?.();return;}
+    const thumb=event.target?.closest?.('video[data-machinepark-video-thumb="1"]');
+    if(thumb&&(event.key==='Enter'||event.key===' ')){event.preventDefault();window.machineparkOpenVideoMedia(thumb.dataset.fullSrc||thumb.currentSrc||thumb.src);}
+  });
+  const start=()=>{enhance(document);document.querySelectorAll('video[data-machinepark-video-pending="1"]').forEach(v=>markVideoThumbnail(v));observer.observe(document.documentElement,{childList:true,subtree:true});setTimeout(()=>{const base=window.machineparkDeviceOverviewPhoto;if(typeof base==='function'&&!base.__mediaWrapped){const wrapped=function(device){const chosen=base(device);if(chosen&&!window.machineparkIsVideoMedia(chosen))return chosen;return (Array.isArray(device?.devicePhotos)?device.devicePhotos:[]).find(src=>src&&!window.machineparkIsVideoMedia(src))||''};wrapped.__mediaWrapped=true;window.machineparkDeviceOverviewPhoto=wrapped;if(typeof window.renderDevices==='function')window.renderDevices();}},0)};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
 </script>
@@ -283,4 +345,7 @@ if "src.startsWith('data:video/')" not in built:
     raise SystemExit("Buildvalidatie mislukt: raw video wordt niet door de service-mediafilter behouden")
 if "const photos = (model.photos || []).filter(src=>!window.machineparkIsVideoMedia?.(src));" not in built:
     raise SystemExit("Buildvalidatie mislukt: generieke PDF filtert video niet uit")
-print("[Machinepark] foto + video media actief · maximaal 10 items per bestaande fotolijst")
+for needle in ["machinepark-video-lightbox-player","machineparkOpenVideoMedia","data-machinepark-video-thumb","max-width:94vw","max-height:88vh","object-fit:contain"]:
+    if needle not in built:
+        raise SystemExit(f"Buildvalidatie mislukt: grote videoweergave ontbreekt ({needle})")
+print("[Machinepark] foto + video media actief · thumbnails fotoformaat, video groot in originele verhouding")
