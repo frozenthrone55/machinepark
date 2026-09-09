@@ -302,3 +302,10 @@ test('afdruk onderhoud en depannage accepteert Synology foto-urls en maximaal 10
   assert.match(printer, /record\.photos\.filter\(x => typeof x === 'string' && x\.trim\(\)\)\.slice\(0,10\)/);
   assert.doesNotMatch(printer, /startsWith\('data:image\/'\)/);
 });
+
+
+test('shared data safety knipt servicefotos niet terug naar 5', () => {
+  const safety = readFileSync(new URL('../build-shared-data-safety.py', import.meta.url), 'utf8');
+  assert.doesNotMatch(safety, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*5\)/);
+  assert.match(safety, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*10\)/);
+});
