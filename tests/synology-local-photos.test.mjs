@@ -17,7 +17,7 @@ test('foto’s worden buiten webroot opgeslagen', () => {
 });
 
 test('lokale foto-opslag valideert afbeeldingen en bewaart thumbnails', () => {
-  assert.match(lib, /data:\(image\//);
+  assert.match(lib, /(?:image\|video)|mp_photo_parse_data_media/);
   assert.match(lib, /180000|thumb/);
   assert.match(lib, /\.thumb\.bin/);
   assert.match(lib, /image\/jpeg/);
