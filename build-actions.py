@@ -419,14 +419,53 @@ if MARKER not in index:
     await put('actions',updated);await refresh();toast('Actie opnieuw geopend');
   }
 
+  async function pushActionDeletionNow(id) {
+    if(!centralSync?.enabled||navigator.onLine===false)return false;
+    const pushNow=async()=>{
+      clearTimeout(centralSync.pushTimer);
+      centralSync.pushTimer=null;
+      centralSync.pending=true;
+      await centralPush();
+    };
+    try{
+      await pushNow();
+      return true;
+    }catch(firstError){
+      // machinepark-action-delete-one-click-v1
+      // Een 409-pull kan de zonet verwijderde ToDo lokaal opnieuw binnenhalen.
+      // De gebruiker heeft de verwijdering al bevestigd: verwijder die record
+      // automatisch opnieuw en push nog één keer met de verse centrale etag.
+      const restored=(await getAll('actions')).some(action=>String(action?.id||'')===String(id));
+      if(restored){
+        await del('actions',id);
+        try{
+          await pushNow();
+          return true;
+        }catch(secondError){
+          console.warn('ToDo-verwijdering wacht op centrale synchronisatie',secondError);
+          scheduleCentralSync();
+          return false;
+        }
+      }
+      console.warn('ToDo-verwijdering lokaal uitgevoerd; centrale synchronisatie wordt opnieuw geprobeerd',firstError);
+      scheduleCentralSync();
+      return false;
+    }
+  }
+
   async function deleteAction(id) {
     const item=(state.actions||[]).find(a=>a.id===id);if(!item)return;
     const linked=actionDeviceLabel(item);
     const message=`Actie “${item.title||'Actie'}” definitief verwijderen?${linked?`\n\nDe koppeling met ${linked} verdwijnt eveneens.`:''}\n\nDeze verwijdering wordt centraal gesynchroniseerd.`;
     if(!confirm(message))return;
     try{
-      if(navigator.onLine!==false&&typeof window.machineparkPersistActionPhotos==='function'&&actionPhotoList(item.photos).length){try{await window.machineparkPersistActionPhotos(item.id,[]);}catch(error){console.warn('ToDo-foto’s opruimen',error);}}
+      // Eerst de ToDo-record verwijderen. Media-opruiming mag de recorddelete nooit blokkeren.
       await del('actions',item.id);
+      await pushActionDeletionNow(item.id);
+      if(navigator.onLine!==false&&typeof window.machineparkPersistActionPhotos==='function'&&actionPhotoList(item.photos).length){
+        try{await window.machineparkPersistActionPhotos(item.id,[]);}
+        catch(error){console.warn('ToDo-foto’s/video’s opruimen',error);}
+      }
       closeModal();
       await refresh();
       toast('Actie verwijderd');
@@ -562,6 +601,8 @@ required = [
     "action-device-summary",
     "machinepark-action-users-v1",
     "deleteAction",
+    "pushActionDeletionNow",
+    "machinepark-action-delete-one-click-v1",
     "Actie verwijderd",
     "'breakdowns','actions','faults'",
     "ACTION_PHOTO_LIMIT = 10",

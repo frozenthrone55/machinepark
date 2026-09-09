@@ -486,3 +486,29 @@ test('ToDo verwijderen ruimt alleen zijn eigen foto-opslag op', () => {
   assert.match(api, /\$prefix = MP_ACTION_PHOTO_PREFIX \. \$actionId \. '\/'/);
   assert.match(api, /strpos\(\$existingKey,\$prefix\)!==0/);
 });
+
+
+test('ToDo verwijderen gebeurt in één klik en synchroniseert direct voor media-opruiming', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  const start=actions.indexOf('async function deleteAction');
+  const end=actions.indexOf('function actionHistoryHtml',start);
+  const block=actions.slice(start,end);
+  assert.match(actions,/machinepark-action-delete-one-click-v1/);
+  assert.match(actions,/async function pushActionDeletionNow/);
+  assert.match(actions,/clearTimeout\(centralSync\.pushTimer\)/);
+  assert.match(actions,/await centralPush\(\)/);
+  assert.match(actions,/const restored=\(await getAll\('actions'\)\)\.some/);
+  assert.ok(block.indexOf("await del('actions',item.id)") < block.indexOf('machineparkPersistActionPhotos'));
+  assert.ok(block.indexOf('await pushActionDeletionNow(item.id)') < block.indexOf('machineparkPersistActionPhotos'));
+});
+
+test('ToDo delete retry verwijdert een door conflict teruggezette record automatisch opnieuw', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  const start=actions.indexOf('async function pushActionDeletionNow');
+  const end=actions.indexOf('async function deleteAction',start);
+  const block=actions.slice(start,end);
+  assert.match(block,/if\(restored\)/);
+  assert.match(block,/await del\('actions',id\)/);
+  assert.match(block,/await pushNow\(\)/);
+  assert.match(block,/scheduleCentralSync\(\)/);
+});
