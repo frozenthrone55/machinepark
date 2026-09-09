@@ -40,7 +40,7 @@ if MARKER not in index:
     window.machineparkPersistServicePhotos = async function(_storeName, _entityId, photos) {
       return (Array.isArray(photos) ? photos : [])
         .filter((src) => typeof src === 'string' && src.trim())
-        .slice(0, 5);
+        .slice(0, 10);
     };
   }
 })();
