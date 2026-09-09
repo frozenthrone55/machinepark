@@ -28,11 +28,15 @@ if MARKER not in index:
     sort_anchor = " events.sort((a,b)=>(b.moment||'').localeCompare(a.moment||''));"
     action_events = """
  const actionBelongsToDevice=a=>{
-   if(String(a?.deviceId||'')===String(d.id||''))return true;
+   const actionDeviceId=String(a?.deviceId||'');
+   const currentDeviceId=String(d.id||'');
+   // Heeft de ToDo expliciet een toestel, dan hoort hij uitsluitend bij dat toestel.
+   if(actionDeviceId)return actionDeviceId===currentDeviceId;
+   // Alleen toestel-loze ToDo's mogen via een gekoppelde service op alle betrokken machines verschijnen.
    const linkedServiceIds=new Set((typeof actionServiceIds==='function'?actionServiceIds(a):Array.isArray(a?.serviceReportIds)?a.serviceReportIds:[]).map(String).filter(Boolean));
    if(!linkedServiceIds.size)return false;
    return [...(state.maintenance||[]),...(state.breakdowns||[])].some(item=>{
-     if(item?.isDraft===true||String(item?.deviceId||'')!==String(d.id||''))return false;
+     if(item?.isDraft===true||String(item?.deviceId||'')!==currentDeviceId)return false;
      const reportId=String(item?.serviceReportId||item?.serviceVisitId||'');
      return reportId&&linkedServiceIds.has(reportId);
    });
@@ -79,6 +83,7 @@ required = [
     "event-label action",
     "data-action-open=",
     "actionBelongsToDevice",
+    "if(actionDeviceId)return actionDeviceId===currentDeviceId",
     "serviceReportIds",
     "serviceReportId||item?.serviceVisitId",
     "item?.isDraft===true",
@@ -93,4 +98,4 @@ if "holder.innerHTML=deviceActionsHtml" in index:
     raise SystemExit("Buildvalidatie mislukt: apart actieblok wordt nog in machinedetails geplaatst")
 
 INDEX.write_text(index, encoding="utf-8")
-print("[Machinepark] machine-acties geïntegreerd in chronologische tijdlijn, inclusief servicegekoppelde ToDo's op alle betrokken machines")
+print("[Machinepark] ToDo met specifiek toestel alleen op dat toestel; toestel-loze service-ToDo op alle betrokken machines")
