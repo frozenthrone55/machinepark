@@ -402,7 +402,7 @@
     const photoLabel=kind === 'maintenance' ? 'onderhoud' : (kind === 'otherworks' ? 'Andere werken' : 'depannage');
     return `<div class="service-visit-parts"><div class="service-visit-parts-head"><strong>Gebruikte onderdelen</strong><button type="button" class="btn small sv-add-part">+ Onderdeelregel</button></div><div class="muted" style="font-size:11px;margin:-3px 0 7px">Onderdelen blijven gekoppeld aan dit toestel en deze ${recordLabel}.</div><div class="usage-list sv-usage-list">${used}</div></div>
       <div class="service-visit-oneoff"><div class="service-visit-parts-head"><strong>Eenmalige onderdelen / leverancier</strong><button type="button" class="btn small sv-add-oneoff">+ Eenmalig onderdeel</button></div><div class="service-visit-oneoff-list">${one}</div></div>
-      <div class="field full sv-photo-editor" data-existing-photos='${svEsc(JSON.stringify(item.photos || []))}'><label>Foto’s bij ${photoLabel}</label>${photoDraftHtml(item.photos || [])}<input class="sv-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 5 foto’s per toestelregistratie.</div></div>`;
+      <div class="field full sv-photo-editor" data-existing-photos='${svEsc(JSON.stringify(item.photos || []))}'><label>Foto’s bij ${photoLabel}</label>${photoDraftHtml(item.photos || [])}<input class="sv-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 10 foto’s per toestelregistratie.</div></div>`;
   }
 
   function svOtherWorkTypeNames(extra='') {
@@ -690,7 +690,7 @@
       const clean=value.trim();
       if(seen.has(clean))continue;
       seen.add(clean);out.push(clean);
-      if(out.length>=5)break;
+      if(out.length>=10)break;
     }
     return out;
   }
@@ -727,7 +727,7 @@
       if(!fileMap.has(key))fileMap.set(key,file);
     }
     const files=[...fileMap.values()];
-    if(kept.length+files.length>5)throw new Error(`Maximaal 5 foto’s per toestelregistratie (${svDeviceShort(panel.closest('.service-visit-device')?.dataset.serviceVisitDevice)}).`);
+    if(kept.length+files.length>10)throw new Error(`Maximaal 10 foto’s per toestelregistratie (${svDeviceShort(panel.closest('.service-visit-device')?.dataset.serviceVisitDevice)}).`);
 
     // machinepark-service-photo-edit-id-v1
     // Een gewone servicebewerking mag bestaande foto’s niet opnieuw naar de API sturen.
