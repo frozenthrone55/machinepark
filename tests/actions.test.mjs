@@ -512,3 +512,31 @@ test('ToDo delete retry verwijdert een door conflict teruggezette record automat
   assert.match(block,/await pushNow\(\)/);
   assert.match(block,/scheduleCentralSync\(\)/);
 });
+
+
+test('ToDo toont nieuw gekozen fotos en videos onmiddellijk voor opslaan', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  assert.match(actions,/function initActionPhotoEditor\(\)/);
+  assert.match(actions,/action-photo-pending/);
+  assert.match(actions,/URL\.createObjectURL\(file\)/);
+  assert.match(actions,/editor\.__actionPendingFiles/);
+  assert.match(actions,/renderActionPendingMedia\(editor\)/);
+  assert.match(actions,/initActionPhotoEditor\(\)/);
+});
+
+test('ToDo preview houdt de gezamenlijke limiet 10 bij en laat selectie verwijderen', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  assert.match(actions,/actionExistingKeptCount\(editor\)/);
+  assert.match(actions,/ACTION_PHOTO_LIMIT-kept-current\.length/);
+  assert.match(actions,/action-photo-pending-remove/);
+  assert.match(actions,/next\.splice\(index,1\)/);
+  assert.match(actions,/const total=actionExistingKeptCount\(editor\)\+files\.length/);
+});
+
+test('ToDo opslag gebruikt de reeds getoonde pending bestanden', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  const start=actions.indexOf('async function collectActionPhotos');
+  const end=actions.indexOf('function actionCard',start);
+  const block=actions.slice(start,end);
+  assert.match(block,/editor\.__actionPendingFiles/);
+});

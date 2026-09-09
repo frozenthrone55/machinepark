@@ -88,6 +88,10 @@ if MARKER not in index:
 .action-photo-item label{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:10.5px;color:#52615b}
 .action-photo-item input[type="checkbox"]{width:auto}
 .action-photo-editor input[type="file"]{margin-top:9px}
+.action-photo-pending{margin-top:9px}
+.action-photo-pending .action-photo-grid{margin-top:0}
+.action-photo-pending video{display:block;width:100%;height:96px;object-fit:cover;border-radius:8px;background:#111}
+.action-photo-pending-remove{margin-top:6px;width:100%}
 .action-photo-details{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:9px}
 .action-photo-details img{display:block;width:100%;height:105px;object-fit:cover;border-radius:10px;border:1px solid #dbe5e1;background:#eef3f1;cursor:pointer}
 .action-badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:850;background:#edf2f0;color:#50615a}
@@ -252,8 +256,67 @@ if MARKER not in index:
     return '<div class="action-photo-grid">'+list.map((src,i)=>'<div class="action-photo-item"><img src="'+esc(actionPhotoPreview(src))+'" data-full-src="'+esc(src)+'" data-photo-lightbox loading="lazy" decoding="async" alt="ToDo-foto '+(i+1)+'"><label><input type="checkbox" class="action-photo-remove" value="'+i+'"> Verwijderen</label></div>').join('')+'</div>';
   }
   function actionPhotoEditorHtml(photos=[]) {
-    return '<div class="field full action-photo-editor"><label>Foto’s bij ToDo <span class="muted">(optioneel)</span></label>'+actionPhotoGridHtml(photos,true)+'<input class="action-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal '+ACTION_PHOTO_LIMIT+' foto’s per ToDo.</div></div>';
+    return '<div class="field full action-photo-editor"><label>Foto’s bij ToDo <span class="muted">(optioneel)</span></label>'+actionPhotoGridHtml(photos,true)+'<input class="action-photo-files" type="file" accept="image/*" multiple><div class="action-photo-pending"></div><div class="action-photo-count muted" style="font-size:11px;margin-top:4px"></div><div class="muted" style="font-size:11px;margin-top:2px">Maximaal '+ACTION_PHOTO_LIMIT+' foto’s per ToDo.</div></div>';
   }
+  function actionExistingKeptCount(editor) {
+    const existing=[...editor.querySelectorAll('.action-photo-remove')];
+    return existing.filter(input=>!input.checked).length;
+  }
+  function renderActionPendingMedia(editor) {
+    const holder=editor?.querySelector('.action-photo-pending');
+    const count=editor?.querySelector('.action-photo-count');
+    if(!holder)return;
+    const files=Array.isArray(editor.__actionPendingFiles)?editor.__actionPendingFiles:[];
+    const oldUrls=Array.isArray(editor.__actionPendingUrls)?editor.__actionPendingUrls:[];
+    oldUrls.forEach(url=>{try{URL.revokeObjectURL(url);}catch(_){ }});
+    const urls=[];
+    holder.innerHTML='';
+    if(files.length){
+      const grid=document.createElement('div');grid.className='action-photo-grid';
+      files.forEach((file,index)=>{
+        const url=URL.createObjectURL(file);urls.push(url);
+        const item=document.createElement('div');item.className='action-photo-item action-photo-pending-item';
+        const isVideo=String(file.type||'').startsWith('video/')||/\.(mp4|webm|mov|m4v)$/i.test(String(file.name||''));
+        const media=document.createElement(isVideo?'video':'img');
+        media.src=url;
+        if(isVideo){media.controls=true;media.playsInline=true;media.preload='metadata';}
+        else{media.loading='lazy';media.decoding='async';}
+        media.setAttribute('aria-label',isVideo?'Nieuwe ToDo-video':'Nieuwe ToDo-foto');
+        const remove=document.createElement('button');remove.type='button';remove.className='btn small action-photo-pending-remove';remove.textContent='Verwijderen';
+        remove.onclick=()=>{
+          const next=[...(editor.__actionPendingFiles||[])];next.splice(index,1);editor.__actionPendingFiles=next;renderActionPendingMedia(editor);
+        };
+        item.append(media,remove);grid.appendChild(item);
+      });
+      holder.appendChild(grid);
+    }
+    editor.__actionPendingUrls=urls;
+    if(count){
+      const total=actionExistingKeptCount(editor)+files.length;
+      count.textContent=total+' van maximaal '+ACTION_PHOTO_LIMIT+' foto’s geselecteerd';
+    }
+  }
+  function initActionPhotoEditor() {
+    const editor=document.querySelector('#modal .action-photo-editor');
+    if(!editor||editor.dataset.previewReady==='1')return;
+    editor.dataset.previewReady='1';
+    editor.__actionPendingFiles=[];
+    editor.__actionPendingUrls=[];
+    const input=editor.querySelector('.action-photo-files');
+    if(input)input.addEventListener('change',()=>{
+      const chosen=[...(input.files||[])].filter(file=>file&&file.size);
+      const current=[...(editor.__actionPendingFiles||[])];
+      const kept=actionExistingKeptCount(editor);
+      const available=Math.max(0,ACTION_PHOTO_LIMIT-kept-current.length);
+      if(chosen.length>available)alert('Je kunt nog maximaal '+available+' foto'+(available===1?'':'’s')+' toevoegen. Een ToDo kan maximaal '+ACTION_PHOTO_LIMIT+' foto’s bevatten.');
+      editor.__actionPendingFiles=[...current,...chosen.slice(0,available)];
+      input.value='';
+      renderActionPendingMedia(editor);
+    });
+    editor.addEventListener('change',event=>{if(event.target?.classList?.contains('action-photo-remove'))renderActionPendingMedia(editor);});
+    renderActionPendingMedia(editor);
+  }
+
   async function actionPhotoPost(body) {
     const headers=typeof centralHeaders==='function'?await centralHeaders(true):{'Content-Type':'application/json'};
     if(!headers['Content-Type'])headers['Content-Type']='application/json';
@@ -274,7 +337,7 @@ if MARKER not in index:
     if(!editor)return current;
     const remove=new Set([...editor.querySelectorAll('.action-photo-remove:checked')].map(x=>Number(x.value)).filter(Number.isFinite));
     const kept=current.filter((_,i)=>!remove.has(i));
-    const files=[...(editor.querySelector('.action-photo-files')?.files||[])].filter(file=>file&&file.size);
+    const files=Array.isArray(editor.__actionPendingFiles)?editor.__actionPendingFiles:[...(editor.querySelector('.action-photo-files')?.files||[])].filter(file=>file&&file.size);
     if(kept.length+files.length>ACTION_PHOTO_LIMIT)throw new Error('Maximaal '+ACTION_PHOTO_LIMIT+' foto’s per ToDo.');
     if(!remove.size&&!files.length)return current;
     if(navigator.onLine===false)throw new Error('Foto’s toevoegen of verwijderen bij een ToDo vereist tijdelijk een internetverbinding.');
@@ -390,7 +453,7 @@ if MARKER not in index:
       const obj={...old,id:actionId,title,notes:val(fd,'notes'),priority:val(fd,'priority')||'normal',dueDate:val(fd,'dueDate'),location,deviceId:newDeviceId,assigneeId:assignee.id,assigneeName:assignee.name,assigneeEmail:assignee.email,photos,status:old.status||'open',sourceKind:context.sourceKind||old.sourceKind||'',sourceId:context.sourceId||old.sourceId||'',sourceLabel:sourceLabel,createdAt:old.createdAt||now,createdById:old.createdById||me.id,createdByName:old.createdByName||me.name,createdByEmail:old.createdByEmail||me.email,updatedAt:now,history};
       await put('actions',obj);closeModal();await refresh();toast(id?'Actie bijgewerkt':'Actie toegevoegd');
     });
-    setTimeout(()=>{initActionDeviceSearch(deviceId);document.querySelector('#modal [name="title"]')?.focus();},0);
+    setTimeout(()=>{initActionDeviceSearch(deviceId);initActionPhotoEditor();document.querySelector('#modal [name="title"]')?.focus();},0);
   }
   window.machineparkOpenActionEditor=openActionEditor;
 
@@ -607,6 +670,8 @@ required = [
     "'breakdowns','actions','faults'",
     "ACTION_PHOTO_LIMIT = 10",
     "actionPhotoEditorHtml",
+    "initActionPhotoEditor",
+    "action-photo-pending",
     "machineparkPersistActionPhotos",
     "/machinepark/synology/api/action-photos.php",
 ]
