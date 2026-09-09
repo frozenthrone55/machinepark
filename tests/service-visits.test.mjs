@@ -287,3 +287,18 @@ test('bewerkknop legt uit dat Wijzigingen opslaan meteen definitief bewaart', ()
   assert.match(js, /Wijzigingen worden tussentijds veilig bewaard; “Wijzigingen opslaan” maakt ze meteen definitief\./);
   assert.match(js, /current\.editMode\?'gewijzigd en opgeslagen':'opgeslagen'/);
 });
+
+
+test('alle onderhoud en depannage fotolagen behouden 10 fotos', () => {
+  const drafts = readFileSync(new URL('../build-service-drafts.py', import.meta.url), 'utf8');
+  assert.doesNotMatch(drafts, /slice\(0,\s*5\)/);
+  assert.doesNotMatch(drafts, /Maximaal 5 foto/);
+  assert.match(drafts, /slice\(0,10\)/);
+  assert.match(drafts, /Maximaal 10 foto/);
+});
+
+test('afdruk onderhoud en depannage accepteert Synology foto-urls en maximaal 10', () => {
+  const printer = readFileSync(new URL('../build-print-service-details.py', import.meta.url), 'utf8');
+  assert.match(printer, /record\.photos\.filter\(x => typeof x === 'string' && x\.trim\(\)\)\.slice\(0,10\)/);
+  assert.doesNotMatch(printer, /startsWith\('data:image\/'\)/);
+});

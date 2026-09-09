@@ -196,7 +196,7 @@ if MARKER not in index:
   }
 
   function photoGridHtml(photos) {
-    const list = (Array.isArray(photos) ? photos : []).filter(Boolean).slice(0,5);
+    const list = (Array.isArray(photos) ? photos : []).filter(Boolean).slice(0,10);
     if (!list.length) return '<div class="muted" style="font-size:11px;margin:4px 0 8px">Nog geen foto’s toegevoegd.</div>';
     return `<div class="service-photo-grid">${list.map((src,index) => {
       const preview = typeof window.machineparkThumbnailRef === 'function' ? window.machineparkThumbnailRef(src) : src;
@@ -208,21 +208,21 @@ if MARKER not in index:
     const editor = card.querySelector('.service-photo-editor');
     if (!editor) return;
     const inputClass = kind === 'maintenance' ? 'maintenance-machine-photos' : 'breakdown-machine-photos';
-    editor.innerHTML = `<label>Foto’s bij verslag</label>${photoGridHtml(photos)}<input class="service-photo-files ${inputClass}" type="file" accept="image/*" multiple ${enabled ? '' : 'disabled'}><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 5 foto’s per verslag. Foto’s worden automatisch verkleind en apart opgeslagen.</div><div class="service-photo-selected muted" style="font-size:11px;margin-top:4px"></div>`;
+    editor.innerHTML = `<label>Foto’s bij verslag</label>${photoGridHtml(photos)}<input class="service-photo-files ${inputClass}" type="file" accept="image/*" multiple ${enabled ? '' : 'disabled'}><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 10 foto’s per verslag. Foto’s worden automatisch verkleind en apart opgeslagen.</div><div class="service-photo-selected muted" style="font-size:11px;margin-top:4px"></div>`;
   }
 
   async function collectDraftPhotos(card, kind, itemId, existingPhotos) {
     const editor = card.querySelector('.service-photo-editor');
     if (!editor) return Array.isArray(existingPhotos) ? existingPhotos : [];
-    const existing = (Array.isArray(existingPhotos) ? existingPhotos : []).filter(Boolean).slice(0,5);
+    const existing = (Array.isArray(existingPhotos) ? existingPhotos : []).filter(Boolean).slice(0,10);
     const remove = new Set([...editor.querySelectorAll('.service-photo-remove:checked')].map(input => Number(input.value)));
     const files = [...(editor.querySelector('.service-photo-files')?.files || [])].filter(file => file && file.size);
     if (!remove.size && !files.length) return existing;
     const kept = existing.filter((_,index) => !remove.has(index));
-    if (kept.length + files.length > 5) throw new Error('Maximaal 5 foto’s per onderhouds- of depannageconcept.');
+    if (kept.length + files.length > 10) throw new Error('Maximaal 10 foto’s per onderhouds- of depannageconcept.');
     const added = [];
     for (const file of files) added.push(await compressImage(file));
-    let photos = [...kept, ...added].filter(Boolean).slice(0,5);
+    let photos = [...kept, ...added].filter(Boolean).slice(0,10);
     if (typeof window.machineparkPersistServicePhotos === 'function') photos = await window.machineparkPersistServicePhotos(kindInfo(kind).store, itemId, photos);
     restorePhotoEditor(card, kind, photos, card.querySelector(kind === 'maintenance' ? '.maintenance-machine-check' : '.breakdown-machine-check')?.checked === true);
     return photos;

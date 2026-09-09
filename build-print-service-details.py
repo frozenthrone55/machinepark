@@ -66,7 +66,7 @@ if MARKER not in index:
 
   function serviceRecordPhotos(record) {{
     return Array.isArray(record?.photos)
-      ? record.photos.filter(x => typeof x === 'string' && x.startsWith('data:image/'))
+      ? record.photos.filter(x => typeof x === 'string' && x.trim()).slice(0,10)
       : [];
   }}
 
