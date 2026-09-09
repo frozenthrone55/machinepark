@@ -22,7 +22,7 @@ test('map-import overschrijft geen bestaande toestelfotos', () => {
 });
 
 test('map-import gebruikt bestaande geoptimaliseerde foto-opslag', () => {
-  assert.ok(source.includes('MAX_DEVICE_IMPORT_PHOTOS = 5'));
+  assert.ok(source.includes('MAX_DEVICE_IMPORT_PHOTOS = 10'));
   assert.ok(source.includes('max = 720'));
   assert.ok(source.includes('window.machineparkPersistDevicePhotoList(device.id, compressed, { force: true })'));
   assert.ok(source.includes('deviceOverviewPhotoIndex: 0'));

@@ -402,7 +402,7 @@
     const photoLabel=kind === 'maintenance' ? 'onderhoud' : (kind === 'otherworks' ? 'Andere werken' : 'depannage');
     return `<div class="service-visit-parts"><div class="service-visit-parts-head"><strong>Gebruikte onderdelen</strong><button type="button" class="btn small sv-add-part">+ Onderdeelregel</button></div><div class="muted" style="font-size:11px;margin:-3px 0 7px">Onderdelen blijven gekoppeld aan dit toestel en deze ${recordLabel}.</div><div class="usage-list sv-usage-list">${used}</div></div>
       <div class="service-visit-oneoff"><div class="service-visit-parts-head"><strong>Eenmalige onderdelen / leverancier</strong><button type="button" class="btn small sv-add-oneoff">+ Eenmalig onderdeel</button></div><div class="service-visit-oneoff-list">${one}</div></div>
-      <div class="field full sv-photo-editor" data-service-photo-recovery="1" data-existing-photos='${svEsc(JSON.stringify(item.photos || []))}'><label>Foto’s bij ${photoLabel}</label>${photoDraftHtml(item.photos || [])}<input class="sv-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 10 foto’s per toestelregistratie.</div></div>`;
+      <div class="field full sv-photo-editor" data-service-photo-recovery="1" data-service-photo-kind="${svEsc(kind)}" data-service-photo-record-id="${svEsc(item.id || '')}" data-existing-photos='${svEsc(JSON.stringify(item.photos || []))}'><label>Foto’s bij ${photoLabel}</label>${photoDraftHtml(item.photos || [])}<input class="sv-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal 10 foto’s per toestelregistratie.</div></div>`;
   }
 
   function svOtherWorkTypeNames(extra='') {
@@ -581,6 +581,7 @@
     box.innerHTML=(group.devices||[]).map(d=>deviceCard(d,visit,draftItems)).join('')||'<div class="empty" style="padding:24px">Geen actieve toestellen op deze locatie gevonden.</div>';
     if(count)count.textContent=`${group.devices?.length||0} actief toestel${group.devices?.length===1?'':'len'} op ${group.label}`;
     bindVisitInteractions(box);
+    scheduleVisibleServicePhotoRecovery(box);
     void attachVisitExtras(draftItems);
   }
 
@@ -699,8 +700,8 @@
       for(const editor of root.querySelectorAll?.('.sv-photo-editor[data-service-photo-recovery="1"]')||[]){
         const panel=editor.closest('.service-visit-kind-panel');
         const deviceCard=editor.closest('.service-visit-device');
-        const kind=panel?.dataset?.serviceVisitKind||panel?.dataset?.kind||'';
-        const recordId=String(panel?.dataset?.recordId||panel?.dataset?.serviceVisitRecordId||editor.closest('[data-record-id]')?.dataset?.recordId||'');
+        const kind=editor.dataset.servicePhotoKind||panel?.dataset?.panelKind||panel?.dataset?.serviceVisitKind||panel?.dataset?.kind||'';
+        const recordId=String(editor.dataset.servicePhotoRecordId||panel?.dataset?.recordId||panel?.dataset?.serviceVisitRecordId||editor.closest('[data-record-id]')?.dataset?.recordId||'');
         if(!panel||!recordId||!['maintenance','breakdowns','otherworks'].includes(kind))continue;
         const current=existingPhotoList(panel);
         const recovered=await recoverPhysicalServicePhotos(panel,kind,recordId,current);

@@ -329,4 +329,18 @@ test('service concept herstelt fysieke Synology fotos tot 10', () => {
   assert.match(svc, /recoverPhysicalServicePhotos/);
   assert.match(svc, /machineparkListServicePhotos/);
   assert.match(svc, /uniquePhotoList\(\[\.\.\.current,\.\.\.physical\]\)/);
+  assert.match(svc, /data-service-photo-kind=/);
+  assert.match(svc, /data-service-photo-record-id=/);
+  assert.match(svc, /editor\.dataset\.servicePhotoRecordId/);
+  assert.match(svc, /scheduleVisibleServicePhotoRecovery\(box\)/);
+});
+
+
+test('geen foto-gerelateerde buildlimiet blijft op 5 staan', () => {
+  const reportPhotos = readFileSync(new URL('../scripts/build-machinepark.py', import.meta.url), 'utf8');
+  const deviceImport = readFileSync(new URL('../build-import-device-photo-folders.py', import.meta.url), 'utf8');
+  assert.match(reportPhotos, /REPORT_PHOTO_LIMIT = 10/);
+  assert.doesNotMatch(reportPhotos, /REPORT_PHOTO_LIMIT = 5/);
+  assert.match(deviceImport, /MAX_DEVICE_IMPORT_PHOTOS = 10/);
+  assert.doesNotMatch(deviceImport, /MAX_DEVICE_IMPORT_PHOTOS = 5/);
 });

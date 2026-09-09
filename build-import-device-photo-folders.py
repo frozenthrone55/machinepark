@@ -29,7 +29,7 @@ if MARKER not in index:
     script = r'''
 <script data-machinepark-build-fix="device-photo-folder-import-v1">
 (() => {
-  const MAX_DEVICE_IMPORT_PHOTOS = 5;
+  const MAX_DEVICE_IMPORT_PHOTOS = 10;
   const IMPORT_CARD_ID = 'devicePhotoFolderImportCard';
   let scanRows = [];
 

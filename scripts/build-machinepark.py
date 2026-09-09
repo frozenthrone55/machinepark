@@ -27,7 +27,7 @@ if PATCH_MARKER not in index:
     index = index.replace("</head>", mobile_style + "</head>", 1)
     index_path.write_text(index, encoding="utf-8")
 
-# Onderhoud en depannage krijgen maximaal vijf gecomprimeerde foto's per verslag.
+# Onderhoud en depannage krijgen maximaal tien gecomprimeerde foto's per verslag.
 # Nieuwe/bewerkte foto’s worden via machineparkPersistServicePhotos buiten de centrale
 # snapshot opgeslagen. Bestaande base64-foto’s blijven compatibel tot de achtergrondmigratie.
 if PHOTO_PATCH_MARKER not in index:
@@ -51,7 +51,7 @@ if PHOTO_PATCH_MARKER not in index:
     photo_script = f'''
 <script {PHOTO_PATCH_MARKER}>
 (() => {{
-  const REPORT_PHOTO_LIMIT = 5;
+  const REPORT_PHOTO_LIMIT = 10;
   const SERVICE_PHOTO_ENDPOINT = '/.netlify/functions/service-photos?';
 
   function insertBeforeLastDiv(html, extra) {{
