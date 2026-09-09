@@ -212,8 +212,10 @@ if MARKER not in index:
     if (!storeName || !entityId) return [];
     try {
       const body = await apiPost(SERVICE_PHOTO_URL, { action:'list', storeName, entityId }, 'Verslagfoto’s ophalen mislukt');
+      window.machineparkLastServicePhotoListFailed = false;
       return (Array.isArray(body.photos) ? body.photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 10);
     } catch (error) {
+      window.machineparkLastServicePhotoListFailed = true;
       console.warn('Verslagfoto’s konden niet van Synology worden opgehaald', storeName, entityId, error);
       return [];
     }

@@ -353,3 +353,18 @@ test('offline foto-opslag bewaart maximaal 10 toestel- en servicefotos', () => {
   assert.doesNotMatch(offline, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*5\)/);
   assert.match(offline, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*10\)/);
 });
+
+
+test('servicefoto verwijderen gebeurt in één opslagronde zonder lege conceptfoto terug te zetten', () => {
+  const start=js.indexOf('async function collectPhotos');
+  const end=js.indexOf('function collectHeader',start);
+  const collect=js.slice(start,end);
+  assert.match(js, /function photoIdentity\(value\)/);
+  assert.match(js, /function isStoredServicePhotoRef\(value\)/);
+  assert.match(js, /const physicalIds=new Set\(physical\.map\(photoIdentity\)\)/);
+  assert.match(js, /validCurrent=current\.filter\(src=>!isStoredServicePhotoRef\(src\)\|\|physicalIds\.has\(photoIdentity\(src\)\)\)/);
+  assert.match(collect, /const beforeRecovery=uniquePhotoList/);
+  assert.ok(collect.indexOf("const remove=new Set") < collect.indexOf("recoverPhysicalServicePhotos"));
+  assert.match(collect, /const kept=current\.filter\(src=>!remove\.has\(photoIdentity\(src\)\)\)/);
+  assert.match(js, /machineparkLastServicePhotoListFailed===true/);
+});

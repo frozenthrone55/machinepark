@@ -684,16 +684,32 @@
 
   function collectUsed(panel){return [...(panel?.querySelectorAll('.sv-usage-list .usage-row')||[])].map(r=>({partId:r.querySelector('.usage-part')?.value||'',qty:Number(r.querySelector('.usage-qty')?.value||1)})).filter(u=>u.partId&&u.qty>0);}
   function collectOneOff(panel){return [...(panel?.querySelectorAll('.service-visit-oneoff-row')||[])].map(r=>({supplier:String(r.querySelector('.sv-oneoff-supplier')?.value||'').trim(),supplierCode:String(r.querySelector('.sv-oneoff-code')?.value||'').trim(),description:String(r.querySelector('.sv-oneoff-description')?.value||'').trim(),qty:Math.max(1,Math.round(Number(r.querySelector('.sv-oneoff-qty')?.value)||1))})).filter(p=>p.supplier||p.supplierCode||p.description);}
+  function photoIdentity(value) {
+    const src=String(value||'').trim();
+    const match=src.match(/[?&]key=([^&#]+)/);
+    if(match){
+      try{return 'key:'+decodeURIComponent(match[1]);}
+      catch(_){return 'key:'+match[1];}
+    }
+    return src;
+  }
+  function isStoredServicePhotoRef(value) {
+    return photoIdentity(value).startsWith('key:service-photos/');
+  }
   function uniquePhotoList(values=[]) {
     const seen=new Set(),out=[];
     for(const value of Array.isArray(values)?values:[]){
       if(typeof value!=='string'||!value.trim())continue;
-      const clean=value.trim();
-      if(seen.has(clean))continue;
-      seen.add(clean);out.push(clean);
+      const clean=value.trim(),identity=photoIdentity(clean);
+      if(!identity||seen.has(identity))continue;
+      seen.add(identity);out.push(clean);
       if(out.length>=10)break;
     }
     return out;
+  }
+  function samePhotoList(left=[],right=[]) {
+    const a=uniquePhotoList(left),b=uniquePhotoList(right);
+    return a.length===b.length&&a.every((value,index)=>photoIdentity(value)===photoIdentity(b[index]));
   }
   function scheduleVisibleServicePhotoRecovery(root=document) {
     setTimeout(async()=>{
@@ -717,8 +733,11 @@
     if(typeof window.machineparkListServicePhotos!=='function'||!recordId)return current;
     const store=kind==='maintenance'?'maintenance':'breakdowns';
     const physical=uniquePhotoList(await window.machineparkListServicePhotos(store,String(recordId)));
-    const merged=uniquePhotoList([...current,...physical]);
-    if(merged.length>current.length){
+    if(window.machineparkLastServicePhotoListFailed===true)return current;
+    const physicalIds=new Set(physical.map(photoIdentity));
+    const validCurrent=current.filter(src=>!isStoredServicePhotoRef(src)||physicalIds.has(photoIdentity(src)));
+    const merged=uniquePhotoList([...validCurrent,...physical]);
+    if(!samePhotoList(current,merged)){
       const editor=panel?.querySelector('.sv-photo-editor');
       if(editor)syncPhotoEditorState(editor,merged);
     }
@@ -747,10 +766,13 @@
     const editor=panel?.querySelector('.sv-photo-editor');
     if(!editor)return uniquePhotoList(old||[]);
     const fromEditor=existingPhotoList(panel);
-    let current=uniquePhotoList(fromEditor.length?fromEditor:(old||[]));
-    current=await recoverPhysicalServicePhotos(panel,kind,String(persistRecordId||recordId||''),current);
-    const remove=new Set([...editor.querySelectorAll('.sv-remove-photo:checked')].map(x=>Number(x.value)).filter(Number.isFinite));
-    const kept=current.filter((_,i)=>!remove.has(i));
+    const beforeRecovery=uniquePhotoList(fromEditor.length?fromEditor:(old||[]));
+    const remove=new Set([...editor.querySelectorAll('.sv-remove-photo:checked')].map(x=>{
+      const index=Number(x.value);
+      return Number.isFinite(index)?photoIdentity(beforeRecovery[index]||''):'';
+    }).filter(Boolean));
+    let current=await recoverPhysicalServicePhotos(panel,kind,String(persistRecordId||recordId||''),beforeRecovery);
+    const kept=current.filter(src=>!remove.has(photoIdentity(src)));
     const fileMap=new Map();
     for(const file of [...(editor.querySelector('.sv-photo-files')?.files||[])].filter(f=>f&&f.size)){
       const key=[file.name,file.size,file.lastModified,file.type].join('|');

@@ -8,6 +8,8 @@ DATA_DIR="/volume1/MachineparkData"
 STATE_FILE="$DATA_DIR/data/.machinepark-deploy-sha"
 LOG_FILE="$DATA_DIR/backups/synology-update.log"
 BACKUP_FILE="$DATA_DIR/backups/machinepark-web-last-good.tar.gz"
+READABLE_PHOTO_DIR="$DATA_DIR/Fotos"
+READABLE_PHOTO_API="$WEB_DIR/synology/api/photo-library.php"
 
 CACHE_BUST="$(date +%s)"
 META_URL="https://raw.githubusercontent.com/$REPO/$BRANCH/deploy-meta.json?machinepark=$CACHE_BUST"
@@ -145,6 +147,17 @@ if [ "$DEPLOYED_SHA" != "$REMOTE_SHA" ]; then
     tar -xzf "$BACKUP_FILE" -C "$WEB_DIR" || fail "terugzetten van vorige webapp is mislukt."
   fi
   fail "update is teruggedraaid omdat de geïnstalleerde versie niet klopt."
+fi
+
+# De vroegere leesbare fotospiegel is definitief buiten gebruik.
+# Deze specifieke map mag expliciet worden verwijderd; andere MachineparkData blijft onaangeroerd.
+if [ -d "$READABLE_PHOTO_DIR" ]; then
+  log "Verouderde fotospiegel verwijderen: $READABLE_PHOTO_DIR"
+  rm -rf "$READABLE_PHOTO_DIR" || fail "verouderde fotospiegel kon niet worden verwijderd: $READABLE_PHOTO_DIR"
+fi
+if [ -f "$READABLE_PHOTO_API" ]; then
+  log "Verouderde photo-library API verwijderen: $READABLE_PHOTO_API"
+  rm -f "$READABLE_PHOTO_API" || fail "verouderde photo-library API kon niet worden verwijderd."
 fi
 
 printf '%s' "$REMOTE_SHA" > "$STATE_FILE"

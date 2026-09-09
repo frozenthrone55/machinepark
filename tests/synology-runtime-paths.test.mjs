@@ -97,3 +97,14 @@ test('offline opstart kan ook doorgaan wanneer browser onterecht online rapporte
   assert.match(offline, /let offlineBootPromise = null/);
   assert.match(offline, /window\.machineparkOfflineBootRequested = false/);
 });
+
+
+test('oude leesbare fotospiegel is uit build en Synology runtime verwijderd', () => {
+  const pkgText=readFileSync(new URL('../package.json', import.meta.url),'utf8');
+  const updater=readFileSync(new URL('../synology/update-from-github.sh', import.meta.url),'utf8');
+  assert.doesNotMatch(pkgText, /build-readable-photo-library\.py/);
+  assert.match(updater, /READABLE_PHOTO_DIR="\$DATA_DIR\/Fotos"/);
+  assert.match(updater, /rm -rf "\$READABLE_PHOTO_DIR"/);
+  assert.match(updater, /READABLE_PHOTO_API="\$WEB_DIR\/synology\/api\/photo-library\.php"/);
+  assert.match(updater, /rm -f "\$READABLE_PHOTO_API"/);
+});
