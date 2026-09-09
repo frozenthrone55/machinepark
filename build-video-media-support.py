@@ -141,11 +141,14 @@ index = index.replace(
     "if(list.some(src=>window.machineparkIsRawVideoMedia?.(src))) return await window.machineparkPersistMediaList(DEVICE_PHOTO_URL,{deviceId},list,'Toestelmedia opslaan mislukt');\n    const rawIndexes = list.map((src, index) => isRawPhoto(src) ? index : -1).filter((index) => index >= 0);\n    photoSaveBusy += 1;",
     1
 )
-# Service has the same rawIndexes text later.
+# Service has the same rawIndexes text later. Anchor on the actual function
+# definition, not on an earlier reference to the function name.
 needle = "const rawIndexes = list.map((src, index) => isRawPhoto(src) ? index : -1).filter((index) => index >= 0);\n    photoSaveBusy += 1;"
-pos = index.find(needle, index.find("window.machineparkPersistServicePhotos"))
-if pos >= 0:
-    index = index[:pos] + "if(list.some(src=>window.machineparkIsRawVideoMedia?.(src))) return await window.machineparkPersistMediaList(SERVICE_PHOTO_URL,{storeName,entityId},list,'Verslagmedia opslaan mislukt');\n    " + index[pos:]
+service_start = index.find("window.machineparkPersistServicePhotos = async function")
+pos = index.find(needle, service_start if service_start >= 0 else 0)
+if service_start < 0 or pos < 0:
+    raise SystemExit("Buildvalidatie mislukt: service media-opslagfunctie niet gevonden")
+index = index[:pos] + "if(list.some(src=>window.machineparkIsRawVideoMedia?.(src))) return await window.machineparkPersistMediaList(SERVICE_PHOTO_URL,{storeName,entityId},list,'Verslagmedia opslaan mislukt');\n    " + index[pos:]
 
 # ToDo media uses the same sequential route when video is present.
 index = index.replace(
@@ -201,4 +204,10 @@ for needle in [
         raise SystemExit(f"Buildvalidatie mislukt: video/media-ondersteuning ontbreekt ({needle})")
 if 'accept="image/*"' in built or 'accept="image/*"' in SERVICE.read_text(encoding="utf-8"):
     raise SystemExit("Buildvalidatie mislukt: er staat nog een foto-only mediakiezer in de app")
+device_block = built[built.find("window.machineparkPersistDevicePhotoList = async function", built.find("/* photo-storage-optimization")):built.find("window.machineparkPersistPartPhoto = async function", built.find("/* photo-storage-optimization"))]
+service_block = built[built.find("window.machineparkPersistServicePhotos = async function"):built.find("function writeStoreDirect", built.find("window.machineparkPersistServicePhotos = async function"))]
+if "SERVICE_PHOTO_URL,{storeName,entityId}" in device_block:
+    raise SystemExit("Buildvalidatie mislukt: service-video uploadroute staat in toestelmediafunctie")
+if "SERVICE_PHOTO_URL,{storeName,entityId}" not in service_block:
+    raise SystemExit("Buildvalidatie mislukt: service-video uploadroute ontbreekt")
 print("[Machinepark] foto + video media actief · maximaal 10 items per bestaande fotolijst")

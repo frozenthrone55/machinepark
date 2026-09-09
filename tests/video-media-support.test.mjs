@@ -44,3 +44,11 @@ test('video builder draait na alle ToDo en dashboardlagen maar voor extractie',(
   assert.ok(cmd.indexOf('python3 build-video-media-support.py')>cmd.indexOf('python3 build-dashboard-kpi-navigation.py'));
   assert.ok(cmd.indexOf('python3 build-video-media-support.py')<cmd.indexOf('scripts/check-inline-scripts.py'));
 });
+
+
+test('service video uploadroute wordt op de echte servicefunctie geankerd',()=>{
+  assert.match(builder,/window\.machineparkPersistServicePhotos = async function/);
+  assert.match(builder,/service_start = index\.find\("window\.machineparkPersistServicePhotos = async function"\)/);
+  assert.match(builder,/service-video uploadroute staat in toestelmediafunctie/);
+  assert.match(builder,/service-video uploadroute ontbreekt/);
+});
