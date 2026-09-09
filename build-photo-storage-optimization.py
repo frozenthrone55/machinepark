@@ -175,13 +175,13 @@ if MARKER not in index:
   }
 
   window.machineparkPersistDevicePhotoList = async function(deviceId, photos, { force = false } = {}) {
-    const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 5);
+    const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 10);
     if (!force && !list.some(isRawPhoto)) return list;
     const rawIndexes = list.map((src, index) => isRawPhoto(src) ? index : -1).filter((index) => index >= 0);
     photoSaveBusy += 1;
     try {
       const body = await apiPost(DEVICE_PHOTO_URL, { deviceId, photos: list }, 'Toestelfoto’s opslaan mislukt');
-      const refs = Array.isArray(body.photos) ? body.photos.slice(0, 5) : list;
+      const refs = Array.isArray(body.photos) ? body.photos.slice(0, 10) : list;
       rawIndexes.forEach((index) => {
         const ref = refs[index];
         if (ref) afterUserWork(() => ensureStoredThumbnail('device', deviceId, ref), 1800 + index * 250);
@@ -209,12 +209,12 @@ if MARKER not in index:
   };
 
   window.machineparkPersistServicePhotos = async function(storeName, entityId, photos) {
-    const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 5);
+    const list = (Array.isArray(photos) ? photos : []).filter((src) => typeof src === 'string' && src.trim()).slice(0, 10);
     const rawIndexes = list.map((src, index) => isRawPhoto(src) ? index : -1).filter((index) => index >= 0);
     photoSaveBusy += 1;
     try {
       const body = await apiPost(SERVICE_PHOTO_URL, { storeName, entityId, photos: list }, 'Verslagfoto’s opslaan mislukt');
-      const refs = Array.isArray(body.photos) ? body.photos.slice(0, 5) : list;
+      const refs = Array.isArray(body.photos) ? body.photos.slice(0, 10) : list;
       rawIndexes.forEach((index) => {
         const ref = refs[index];
         if (ref) afterUserWork(() => ensureStoredThumbnail('service', entityId, ref, storeName), 1800 + index * 250);
@@ -288,7 +288,7 @@ if MARKER not in index:
     let migrated = 0;
     for (const record of list) {
       if (photoSaveBusy > 0) break;
-      const photos = Array.isArray(record?.photos) ? record.photos.filter(Boolean).slice(0, 5) : [];
+      const photos = Array.isArray(record?.photos) ? record.photos.filter(Boolean).slice(0, 10) : [];
       if (!photos.some(isRawPhoto)) continue;
       try {
         record.photos = await window.machineparkPersistServicePhotos(storeName, record.id, photos);
@@ -330,7 +330,7 @@ if MARKER not in index:
     if (shouldScanLegacy && photoSaveBusy === 0) {
       for (const device of (Array.isArray(state?.devices) ? state.devices : [])) {
         if (photoSaveBusy > 0) break;
-        for (const photo of (Array.isArray(device?.devicePhotos) ? device.devicePhotos : []).slice(0, 5)) {
+        for (const photo of (Array.isArray(device?.devicePhotos) ? device.devicePhotos : []).slice(0, 10)) {
           if (photoSaveBusy > 0) break;
           if (await ensureStoredThumbnail('device', device.id, photo)) optimized += 1;
           await new Promise((resolve) => setTimeout(resolve, 60));
@@ -344,7 +344,7 @@ if MARKER not in index:
       for (const storeName of ['maintenance', 'breakdowns']) {
         for (const record of (Array.isArray(state?.[storeName]) ? state[storeName] : [])) {
           if (photoSaveBusy > 0) break;
-          for (const photo of (Array.isArray(record?.photos) ? record.photos : []).slice(0, 5)) {
+          for (const photo of (Array.isArray(record?.photos) ? record.photos : []).slice(0, 10)) {
             if (photoSaveBusy > 0) break;
             if (await ensureStoredThumbnail('service', record.id, photo, storeName)) optimized += 1;
             await new Promise((resolve) => setTimeout(resolve, 60));
