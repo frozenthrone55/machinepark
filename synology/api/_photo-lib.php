@@ -123,16 +123,66 @@ function mp_photo_serve(string $basePath, bool $thumb, bool $headOnly): void {
     if (!is_file($file)) {
         http_response_code(404);
         header('Content-Type: text/plain; charset=utf-8');
-        echo 'Foto niet gevonden.';
+        echo 'Media niet gevonden.';
         exit;
     }
 
     $meta = $useThumb ? $basePath . '.thumb.meta.json' : $basePath . '.meta.json';
-    header('Content-Type: ' . mp_photo_content_type($meta));
+    $contentType = mp_photo_content_type($meta);
+    $size = (int)filesize($file);
+    $isVideo = !$useThumb && strpos($contentType, 'video/') === 0;
+
+    header('Content-Type: ' . $contentType);
     header('Cache-Control: private, max-age=' . ($useThumb ? '604800' : '86400'));
     header('X-Content-Type-Options: nosniff');
     header('X-Machinepark-Thumbnail: ' . ($useThumb ? 'exact' : ($thumb ? 'fallback' : 'full')));
-    header('Content-Length: ' . filesize($file));
+
+    if ($isVideo) {
+        // machinepark-video-byte-range-v1
+        // Mobiele browsers (o.a. Safari) verwachten byte ranges voor betrouwbaar
+        // afspelen en zoeken in MP4/MOV. Houd dit PHP 7.2-compatibel.
+        header('Accept-Ranges: bytes');
+        $range = trim((string)($_SERVER['HTTP_RANGE'] ?? ''));
+        if (!$headOnly && $range !== '' && preg_match('/^bytes=(\d*)-(\d*)$/', $range, $match)) {
+            $startText = (string)$match[1];
+            $endText = (string)$match[2];
+            if ($startText === '' && $endText !== '') {
+                $suffix = max(0, (int)$endText);
+                $start = max(0, $size - $suffix);
+                $end = max(0, $size - 1);
+            } else {
+                $start = $startText === '' ? 0 : (int)$startText;
+                $end = $endText === '' ? max(0, $size - 1) : min((int)$endText, max(0, $size - 1));
+            }
+            if ($size <= 0 || $start < 0 || $start >= $size || $end < $start) {
+                http_response_code(416);
+                header('Content-Range: bytes */' . $size);
+                header('Content-Length: 0');
+                exit;
+            }
+            $length = $end - $start + 1;
+            http_response_code(206);
+            header('Content-Range: bytes ' . $start . '-' . $end . '/' . $size);
+            header('Content-Length: ' . $length);
+            $handle = @fopen($file, 'rb');
+            if ($handle === false) {
+                http_response_code(500);
+                exit;
+            }
+            @fseek($handle, $start);
+            $remaining = $length;
+            while ($remaining > 0 && !feof($handle)) {
+                $chunk = fread($handle, min(1048576, $remaining));
+                if ($chunk === false || $chunk === '') break;
+                echo $chunk;
+                $remaining -= strlen($chunk);
+            }
+            fclose($handle);
+            exit;
+        }
+    }
+
+    header('Content-Length: ' . $size);
     if ($headOnly) exit;
     readfile($file);
     exit;

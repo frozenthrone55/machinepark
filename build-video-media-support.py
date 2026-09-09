@@ -156,6 +156,12 @@ if service_start < 0 or pos < 0:
     raise SystemExit("Buildvalidatie mislukt: service media-opslagfunctie niet gevonden")
 index = index[:pos] + "if(list.some(src=>window.machineparkIsRawVideoMedia?.(src))) return await window.machineparkPersistMediaList(SERVICE_PHOTO_URL,{storeName,entityId},list,'Verslagmedia opslaan mislukt');\n    " + index[pos:]
 
+# ToDo video previews must keep the full media ref instead of adding variant=thumb.
+index = index.replace(
+    "if(!value||value.startsWith('data:image/'))return value;",
+    "if(!value||value.startsWith('data:image/')||window.machineparkIsVideoMedia?.(value))return value;"
+)
+
 # ToDo media uses the same sequential route when video is present.
 index = index.replace(
     "const list=actionPhotoList(photos);\n    const body=await actionPhotoPost({actionId,photos:list,completeList:true});",
@@ -196,6 +202,19 @@ for old,new in [
     ("Conceptfoto ", "Conceptmedia "),
 ]:
     service = service.replace(old,new)
+
+# Remaining limit/error copy should not imply that video is excluded.
+for old,new in [
+    ("Maximaal ${REPORT_PHOTO_LIMIT} foto’s per onderhouds- of depannageverslag.", "Maximaal ${REPORT_PHOTO_LIMIT} foto’s en video’s samen per onderhouds- of depannageverslag."),
+    ("Een toestel kan maximaal ${DEVICE_PHOTO_LIMIT} foto’s bevatten.", "Een toestel kan maximaal ${DEVICE_PHOTO_LIMIT} foto’s en video’s samen bevatten."),
+    ("Foto’s worden verwerkt…", "Media wordt verwerkt…"),
+    ("Een van de foto’s kon niet worden verwerkt.", "Een van de media-items kon niet worden verwerkt."),
+    ("Maximaal 10 foto’s per verslag. Foto’s worden automatisch verkleind en apart opgeslagen.", "Maximaal 10 foto’s en video’s samen per verslag. Foto’s worden verkleind; video’s worden apart opgeslagen."),
+    ("Maximaal 10 foto’s per onderhouds- of depannageconcept.", "Maximaal 10 foto’s en video’s samen per onderhouds- of depannageconcept."),
+    ("Geen foto’s bij deze ToDo.", "Geen foto’s of video’s bij deze ToDo."),
+    ("<label>Foto’s</label>${actionPhotoGridHtml(item.photos||[],false)}", "<label>Foto’s / video’s</label>${actionPhotoGridHtml(item.photos||[],false)}"),
+]:
+    index = index.replace(old,new)
 
 # PDF/print image-only surfaces ignore video rather than rendering broken image boxes.
 service = service.replace(

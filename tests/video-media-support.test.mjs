@@ -64,3 +64,8 @@ test('PDF-fotolijsten slaan video volledig over',()=>{
   assert.match(builder,/model\.photos \|\| \[\]\)\.filter\(src=>!window\.machineparkIsVideoMedia/);
   assert.match(builder,/serviceModel\(context\)/);
 });
+
+
+test('ToDo video preview vraagt geen afbeeldings-thumbnail op',()=>{
+  assert.match(builder,/window\.machineparkIsVideoMedia\?\.\(value\)\)return value/);
+});

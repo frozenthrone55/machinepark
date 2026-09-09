@@ -70,3 +70,13 @@ test('servicefoto lijst geeft thumbnails nooit terug als aparte conceptfoto', ()
   const listBlock=service.slice(service.indexOf("if ($action === 'list')"), service.indexOf("if ($action === 'thumbnail')"));
   assert.ok(listBlock.indexOf(".thumb.bin") < listBlock.indexOf("basename($file, '.bin')"));
 });
+
+
+test('Synology video-opslag ondersteunt byte ranges voor mobiele spelers', () => {
+  assert.match(lib, /machinepark-video-byte-range-v1/);
+  assert.match(lib, /Accept-Ranges: bytes/);
+  assert.match(lib, /HTTP_RANGE/);
+  assert.match(lib, /http_response_code\(206\)/);
+  assert.match(lib, /Content-Range: bytes/);
+  assert.match(lib, /http_response_code\(416\)/);
+});
