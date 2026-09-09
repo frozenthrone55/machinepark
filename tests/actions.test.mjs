@@ -461,3 +461,28 @@ test('afdruk machinelogboek zet werkbon label en waarde onder elkaar', () => {
   assert.match(builder, /\.timeline-workorder-field span\{display:block;font-size:8pt/);
   assert.match(builder, /\.timeline-workorder-field strong\{display:block;font-size:9pt/);
 });
+
+
+test('ToDo ondersteunt maximaal 10 apart opgeslagen fotos', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  const api = readFileSync(new URL('../synology/api/action-photos.php', import.meta.url), 'utf8');
+  assert.match(actions, /ACTION_PHOTO_LIMIT = 10/);
+  assert.match(actions, /actionPhotoEditorHtml/);
+  assert.match(actions, /action-photo-files/);
+  assert.match(actions, /collectActionPhotos/);
+  assert.match(actions, /machineparkPersistActionPhotos/);
+  assert.match(actions, /Foto’s bij ToDo/);
+  assert.match(actions, /actionPhotoGridHtml\(item\.photos\|\|\[\],false\)/);
+  assert.match(api, /MP_ACTION_PHOTO_PREFIX/);
+  assert.match(api, /count\(\$photos\)>10/);
+  assert.match(api, /MP_PHOTO_ROOT \. '\/actions\/'/);
+  assert.match(api, /mp_photo_cleanup_bases/);
+});
+
+test('ToDo verwijderen ruimt alleen zijn eigen foto-opslag op', () => {
+  const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
+  const api = readFileSync(new URL('../synology/api/action-photos.php', import.meta.url), 'utf8');
+  assert.match(actions, /machineparkPersistActionPhotos\(item\.id,\[\]\)/);
+  assert.match(api, /\$prefix = MP_ACTION_PHOTO_PREFIX \. \$actionId \. '\/'/);
+  assert.match(api, /strpos\(\$existingKey,\$prefix\)!==0/);
+});

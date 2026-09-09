@@ -55,6 +55,7 @@ jobs:
           php -l synology/api/device-photos.php
           php -l synology/api/part-photos.php
           php -l synology/api/service-photos.php
+          php -l synology/api/action-photos.php
           php -l synology/api/purge-service-audit-photos.php
           php -l synology/migrate-data.php
           php -l synology/migrate-media.php

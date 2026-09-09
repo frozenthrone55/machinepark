@@ -82,6 +82,14 @@ if MARKER not in index:
 .action-card-meta{display:flex;gap:6px 12px;flex-wrap:wrap;margin-top:6px;color:var(--muted);font-size:11px}
 .action-card-note{margin-top:6px;font-size:11px;color:#586760;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
 .action-card-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.action-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:9px;margin-top:8px}
+.action-photo-item{border:1px solid #dbe5e1;border-radius:11px;background:#f8faf9;padding:7px;overflow:hidden}
+.action-photo-item img{display:block;width:100%;height:96px;object-fit:cover;border-radius:8px;background:#eef3f1;cursor:pointer}
+.action-photo-item label{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:10.5px;color:#52615b}
+.action-photo-item input[type="checkbox"]{width:auto}
+.action-photo-editor input[type="file"]{margin-top:9px}
+.action-photo-details{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:9px}
+.action-photo-details img{display:block;width:100%;height:105px;object-fit:cover;border-radius:10px;border:1px solid #dbe5e1;background:#eef3f1;cursor:pointer}
 .action-badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:850;background:#edf2f0;color:#50615a}
 .action-badge.urgent{background:#f9dfdf;color:#9d2929}
 .action-badge.late{background:#fff0d9;color:#92590c}
@@ -129,6 +137,8 @@ if MARKER not in index:
 <script data-machinepark-build-fix="actions-v1">
 (() => {
   const ACTION_USERS_CACHE = 'machinepark-action-users-v1';
+  const ACTION_PHOTO_URL = '/machinepark/synology/api/action-photos.php';
+  const ACTION_PHOTO_LIMIT = 10;
   let actionUsers = [];
   let actionScope = 'all';
   let showAllDone = false;
@@ -215,6 +225,64 @@ if MARKER not in index:
   }
   function actionDoneSort(a,b) { return String(b.completedAt||b.updatedAt||'').localeCompare(String(a.completedAt||a.updatedAt||'')); }
 
+  function actionPhotoList(value) {
+    const seen=new Set(),out=[];
+    for(const src of Array.isArray(value)?value:[]){
+      if(typeof src!=='string'||!src.trim())continue;
+      const clean=src.trim();
+      if(seen.has(clean))continue;
+      seen.add(clean);out.push(clean);
+      if(out.length>=ACTION_PHOTO_LIMIT)break;
+    }
+    return out;
+  }
+  function actionPhotoPreview(src) {
+    const value=String(src||'').trim();
+    if(!value||value.startsWith('data:image/'))return value;
+    try{
+      const url=new URL(value,location.origin);
+      url.searchParams.set('variant','thumb');
+      return url.pathname+'?'+url.searchParams.toString();
+    }catch(_){return value;}
+  }
+  function actionPhotoGridHtml(photos=[],editable=false) {
+    const list=actionPhotoList(photos);
+    if(!list.length)return editable?'<div class="muted">Nog geen foto’s toegevoegd.</div>':'<div class="muted">Geen foto’s bij deze ToDo.</div>';
+    if(!editable)return '<div class="action-photo-details">'+list.map((src,i)=>'<img src="'+esc(actionPhotoPreview(src))+'" data-full-src="'+esc(src)+'" data-photo-lightbox loading="lazy" decoding="async" alt="ToDo-foto '+(i+1)+'">').join('')+'</div>';
+    return '<div class="action-photo-grid">'+list.map((src,i)=>'<div class="action-photo-item"><img src="'+esc(actionPhotoPreview(src))+'" data-full-src="'+esc(src)+'" data-photo-lightbox loading="lazy" decoding="async" alt="ToDo-foto '+(i+1)+'"><label><input type="checkbox" class="action-photo-remove" value="'+i+'"> Verwijderen</label></div>').join('')+'</div>';
+  }
+  function actionPhotoEditorHtml(photos=[]) {
+    return '<div class="field full action-photo-editor"><label>Foto’s bij ToDo <span class="muted">(optioneel)</span></label>'+actionPhotoGridHtml(photos,true)+'<input class="action-photo-files" type="file" accept="image/*" multiple><div class="muted" style="font-size:11px;margin-top:4px">Maximaal '+ACTION_PHOTO_LIMIT+' foto’s per ToDo.</div></div>';
+  }
+  async function actionPhotoPost(body) {
+    const headers=typeof centralHeaders==='function'?await centralHeaders(true):{'Content-Type':'application/json'};
+    if(!headers['Content-Type'])headers['Content-Type']='application/json';
+    const response=await fetch(ACTION_PHOTO_URL,{method:'POST',headers,body:JSON.stringify(body),cache:'no-store',credentials:'same-origin'});
+    const text=await response.text();
+    let data={};try{data=text?JSON.parse(text):{};}catch(_){}
+    if(!response.ok)throw new Error(data.error||text||('ToDo-foto’s opslaan mislukt ('+response.status+')'));
+    return data;
+  }
+  window.machineparkPersistActionPhotos=async function(actionId,photos) {
+    const list=actionPhotoList(photos);
+    const body=await actionPhotoPost({actionId,photos:list,completeList:true});
+    return actionPhotoList(Array.isArray(body.photos)?body.photos:list);
+  };
+  async function collectActionPhotos(existing=[],actionId='') {
+    const editor=document.querySelector('#modal .action-photo-editor');
+    const current=actionPhotoList(existing);
+    if(!editor)return current;
+    const remove=new Set([...editor.querySelectorAll('.action-photo-remove:checked')].map(x=>Number(x.value)).filter(Number.isFinite));
+    const kept=current.filter((_,i)=>!remove.has(i));
+    const files=[...(editor.querySelector('.action-photo-files')?.files||[])].filter(file=>file&&file.size);
+    if(kept.length+files.length>ACTION_PHOTO_LIMIT)throw new Error('Maximaal '+ACTION_PHOTO_LIMIT+' foto’s per ToDo.');
+    if(!remove.size&&!files.length)return current;
+    if(navigator.onLine===false)throw new Error('Foto’s toevoegen of verwijderen bij een ToDo vereist tijdelijk een internetverbinding.');
+    const added=[];
+    for(const file of files)added.push(await compressImage(file));
+    return await window.machineparkPersistActionPhotos(String(actionId),[...kept,...added]);
+  }
+
   function actionCard(item,done=false) {
     const due=actionDueState(item),device=actionDeviceLabel(item),priority=item.priority||'normal';
     const badges=[
@@ -226,6 +294,7 @@ if MARKER not in index:
       item.assigneeName?`Toegewezen aan: ${esc(item.assigneeName)}`:'',
       item.dueDate?`Tegen: ${actionDate(item.dueDate)}`:'',
       device?esc(device):(item.location?esc(item.location):''),
+      actionPhotoList(item.photos).length?'📷 '+actionPhotoList(item.photos).length:'',
       done&&item.completedByName?`Uitgevoerd door: ${esc(item.completedByName)}`:'',
       done&&item.completedDate?`${actionDate(item.completedDate)}`:''
     ].filter(Boolean).map(x=>`<span>${x}</span>`).join('');
@@ -302,12 +371,13 @@ if MARKER not in index:
 
   async function openActionEditor(id='',context={}) {
     await loadActionUsers();
-    const old=(state.actions||[]).find(a=>a.id===id)||{},deviceId=context.deviceId!==undefined?context.deviceId:(old.deviceId||''),sourceLabel=context.sourceLabel||old.sourceLabel||'';
+    const old=(state.actions||[]).find(a=>a.id===id)||{},actionId=old.id||uid('action'),deviceId=context.deviceId!==undefined?context.deviceId:(old.deviceId||''),sourceLabel=context.sourceLabel||old.sourceLabel||'';
     const currentAssignee=String(old.assigneeId||old.assigneeEmail||'').toLowerCase();
-    const body=`<div class="action-form-grid"><div class="field full"><label>Actie *</label><input name="title" maxlength="180" required value="${esc(context.title||old.title||'')}"></div><div class="field"><label>Toewijzen aan</label>${assigneeSelect(currentAssignee)}</div><div class="field"><label>Prioriteit</label><select name="priority"><option value="low" ${old.priority==='low'?'selected':''}>Laag</option><option value="normal" ${!old.priority||old.priority==='normal'?'selected':''}>Normaal</option><option value="urgent" ${old.priority==='urgent'?'selected':''}>Dringend</option></select></div><div class="field"><label>Tegen wanneer <span class="muted">(optioneel)</span></label><input name="dueDate" type="date" value="${esc(old.dueDate||'')}"></div><div class="field"><label>Locatie <span class="muted">(optioneel)</span></label><input name="location" maxlength="160" value="${esc(context.location!==undefined?context.location:(old.location||''))}"></div>${actionDeviceSearchField(deviceId)}<div class="field full"><label>Opmerking <span class="muted">(optioneel)</span></label><textarea name="notes" maxlength="1500">${esc(old.notes||'')}</textarea></div>${sourceLabel?`<div class="field full"><div class="alert"><strong>Gekoppelde bron</strong>${esc(sourceLabel)}</div></div>`:''}</div>`;
+    const body=`<div class="action-form-grid"><div class="field full"><label>Actie *</label><input name="title" maxlength="180" required value="${esc(context.title||old.title||'')}"></div><div class="field"><label>Toewijzen aan</label>${assigneeSelect(currentAssignee)}</div><div class="field"><label>Prioriteit</label><select name="priority"><option value="low" ${old.priority==='low'?'selected':''}>Laag</option><option value="normal" ${!old.priority||old.priority==='normal'?'selected':''}>Normaal</option><option value="urgent" ${old.priority==='urgent'?'selected':''}>Dringend</option></select></div><div class="field"><label>Tegen wanneer <span class="muted">(optioneel)</span></label><input name="dueDate" type="date" value="${esc(old.dueDate||'')}"></div><div class="field"><label>Locatie <span class="muted">(optioneel)</span></label><input name="location" maxlength="160" value="${esc(context.location!==undefined?context.location:(old.location||''))}"></div>${actionDeviceSearchField(deviceId)}<div class="field full"><label>Opmerking <span class="muted">(optioneel)</span></label><textarea name="notes" maxlength="1500">${esc(old.notes||'')}</textarea></div>${actionPhotoEditorHtml(old.photos||[])}${sourceLabel?`<div class="field full"><div class="alert"><strong>Gekoppelde bron</strong>${esc(sourceLabel)}</div></div>`:''}</div>`;
     showModal(id?'Actie bewerken':'Nieuwe actie',body,'Actie opslaan',async fd=>{
       const title=val(fd,'title');if(!title)throw new Error('Vul een actie in.');
       const assignee=selectedAssignee(val(fd,'assigneeKey')),now=new Date().toISOString(),me=actionCurrentUser(),newDeviceId=val(fd,'deviceId'),device=(state.devices||[]).find(d=>d.id===newDeviceId),location=val(fd,'location')||(device?(deviceLocationAt(device)||device.location||''):'');
+      const photos=await collectActionPhotos(old.photos||[],actionId);
       let history=Array.isArray(old.history)?old.history:[];
       if(!id)history=appendActionHistory(old,historyEntry('created','Actie aangemaakt',`Toegewezen aan ${assignee.name}`));
       else {
@@ -317,7 +387,7 @@ if MARKER not in index:
         if(old.title!==title)changes.push('omschrijving gewijzigd');
         if(changes.length)history=appendActionHistory(old,historyEntry('edited','Actie gewijzigd',changes.join(' · ')));
       }
-      const obj={...old,id:old.id||uid('action'),title,notes:val(fd,'notes'),priority:val(fd,'priority')||'normal',dueDate:val(fd,'dueDate'),location,deviceId:newDeviceId,assigneeId:assignee.id,assigneeName:assignee.name,assigneeEmail:assignee.email,status:old.status||'open',sourceKind:context.sourceKind||old.sourceKind||'',sourceId:context.sourceId||old.sourceId||'',sourceLabel:sourceLabel,createdAt:old.createdAt||now,createdById:old.createdById||me.id,createdByName:old.createdByName||me.name,createdByEmail:old.createdByEmail||me.email,updatedAt:now,history};
+      const obj={...old,id:actionId,title,notes:val(fd,'notes'),priority:val(fd,'priority')||'normal',dueDate:val(fd,'dueDate'),location,deviceId:newDeviceId,assigneeId:assignee.id,assigneeName:assignee.name,assigneeEmail:assignee.email,photos,status:old.status||'open',sourceKind:context.sourceKind||old.sourceKind||'',sourceId:context.sourceId||old.sourceId||'',sourceLabel:sourceLabel,createdAt:old.createdAt||now,createdById:old.createdById||me.id,createdByName:old.createdByName||me.name,createdByEmail:old.createdByEmail||me.email,updatedAt:now,history};
       await put('actions',obj);closeModal();await refresh();toast(id?'Actie bijgewerkt':'Actie toegevoegd');
     });
     setTimeout(()=>{initActionDeviceSearch(deviceId);document.querySelector('#modal [name="title"]')?.focus();},0);
@@ -326,7 +396,7 @@ if MARKER not in index:
 
   async function quickAddAction() {
     const input=document.getElementById('actionQuickInput'),title=String(input?.value||'').trim();if(!title){input?.focus();return;}
-    const me=actionCurrentUser(),now=new Date().toISOString(),obj={id:uid('action'),title,notes:'',priority:'normal',dueDate:'',location:'',deviceId:'',assigneeId:me.id,assigneeName:me.name,assigneeEmail:me.email,status:'open',sourceKind:'',sourceId:'',sourceLabel:'',createdAt:now,createdById:me.id,createdByName:me.name,createdByEmail:me.email,updatedAt:now,history:[historyEntry('created','Actie snel aangemaakt',`Toegewezen aan ${me.name}`)]};
+    const me=actionCurrentUser(),now=new Date().toISOString(),obj={id:uid('action'),title,notes:'',priority:'normal',dueDate:'',location:'',deviceId:'',assigneeId:me.id,assigneeName:me.name,assigneeEmail:me.email,photos:[],status:'open',sourceKind:'',sourceId:'',sourceLabel:'',createdAt:now,createdById:me.id,createdByName:me.name,createdByEmail:me.email,updatedAt:now,history:[historyEntry('created','Actie snel aangemaakt',`Toegewezen aan ${me.name}`)]};
     await put('actions',obj);if(input)input.value='';await refresh();toast('Actie toegevoegd');
   }
 
@@ -355,6 +425,7 @@ if MARKER not in index:
     const message=`Actie “${item.title||'Actie'}” definitief verwijderen?${linked?`\n\nDe koppeling met ${linked} verdwijnt eveneens.`:''}\n\nDeze verwijdering wordt centraal gesynchroniseerd.`;
     if(!confirm(message))return;
     try{
+      if(navigator.onLine!==false&&typeof window.machineparkPersistActionPhotos==='function'&&actionPhotoList(item.photos).length){try{await window.machineparkPersistActionPhotos(item.id,[]);}catch(error){console.warn('ToDo-foto’s opruimen',error);}}
       await del('actions',item.id);
       closeModal();
       await refresh();
@@ -388,7 +459,7 @@ if MARKER not in index:
   }
   function openActionDetails(id) {
     const item=(state.actions||[]).find(a=>a.id===id);if(!item)return;const device=actionDeviceLabel(item);
-    const body=`<div class="action-form-grid"><div class="field full"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="action-badge ${item.priority==='urgent'?'urgent':''}">${esc(actionPriorityLabel(item.priority))}</span>${item.status==='done'?'<span class="action-badge done">✓ Uitgevoerd</span>':''}</div><h3 style="margin:9px 0 3px">${esc(item.title)}</h3>${item.notes?`<div class="muted" style="white-space:pre-wrap">${esc(item.notes)}</div>`:''}</div><div class="field"><label>Toegewezen aan</label><strong>${esc(item.assigneeName||'—')}</strong></div><div class="field"><label>Tegen wanneer</label><strong>${actionDate(item.dueDate)}</strong></div><div class="field"><label>Locatie</label><strong>${esc(item.location||'—')}</strong></div><div class="field"><label>Toestel</label><strong>${esc(device||'—')}</strong></div>${item.sourceLabel?`<div class="field full"><label>Bron</label><strong>${esc(item.sourceLabel)}</strong></div>`:''}${item.status==='done'?`<div class="field"><label>Uitgevoerd door</label><strong>${esc(item.completedByName||'—')}</strong></div><div class="field"><label>Uitgevoerd op</label><strong>${actionDate(item.completedDate)}</strong></div><div class="field full"><label>Opmerking uitvoering</label><div>${esc(item.completionNote||'—')}</div></div>`:''}<div class="field full"><label>Historiek</label>${actionHistoryHtml(item)}</div></div>`;
+    const body=`<div class="action-form-grid"><div class="field full"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="action-badge ${item.priority==='urgent'?'urgent':''}">${esc(actionPriorityLabel(item.priority))}</span>${item.status==='done'?'<span class="action-badge done">✓ Uitgevoerd</span>':''}</div><h3 style="margin:9px 0 3px">${esc(item.title)}</h3>${item.notes?`<div class="muted" style="white-space:pre-wrap">${esc(item.notes)}</div>`:''}</div><div class="field"><label>Toegewezen aan</label><strong>${esc(item.assigneeName||'—')}</strong></div><div class="field"><label>Tegen wanneer</label><strong>${actionDate(item.dueDate)}</strong></div><div class="field"><label>Locatie</label><strong>${esc(item.location||'—')}</strong></div><div class="field"><label>Toestel</label><strong>${esc(device||'—')}</strong></div>${item.sourceLabel?`<div class="field full"><label>Bron</label><strong>${esc(item.sourceLabel)}</strong></div>`:''}<div class="field full"><label>Foto’s</label>${actionPhotoGridHtml(item.photos||[],false)}</div>${item.status==='done'?`<div class="field"><label>Uitgevoerd door</label><strong>${esc(item.completedByName||'—')}</strong></div><div class="field"><label>Uitgevoerd op</label><strong>${actionDate(item.completedDate)}</strong></div><div class="field full"><label>Opmerking uitvoering</label><div>${esc(item.completionNote||'—')}</div></div>`:''}<div class="field full"><label>Historiek</label>${actionHistoryHtml(item)}</div></div>`;
     showModal('Actie',body,'Sluiten',async()=>closeModal());
     setTimeout(()=>{const form=document.getElementById('modalForm'),foot=form?.querySelector('.modal-foot'),cancel=document.getElementById('cancelModal'),submit=form?.querySelector('button[type="submit"]');if(!foot||!submit)return;if(cancel)cancel.style.display='none';submit.textContent='Sluiten';const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.textContent='Verwijderen';remove.onclick=()=>void deleteAction(item.id);foot.insertBefore(remove,foot.firstChild);const edit=document.createElement('button');edit.type='button';edit.className='btn';edit.textContent='Bewerken';edit.onclick=()=>{closeModal();void openActionEditor(item.id);};foot.insertBefore(edit,submit);if(item.status==='done'){const reopen=document.createElement('button');reopen.type='button';reopen.className='btn';reopen.textContent='Heropenen';reopen.onclick=()=>{closeModal();void reopenAction(item.id);};foot.insertBefore(reopen,submit);}else{const complete=document.createElement('button');complete.type='button';complete.className='btn primary';complete.textContent='✓ Afronden';complete.onclick=()=>{closeModal();void openCompleteAction(item.id);};submit.classList.remove('primary');foot.appendChild(complete);}},0);
   }
@@ -493,6 +564,10 @@ required = [
     "deleteAction",
     "Actie verwijderd",
     "'breakdowns','actions','faults'",
+    "ACTION_PHOTO_LIMIT = 10",
+    "actionPhotoEditorHtml",
+    "machineparkPersistActionPhotos",
+    "/machinepark/synology/api/action-photos.php",
 ]
 for needle in required:
     if needle not in built:
