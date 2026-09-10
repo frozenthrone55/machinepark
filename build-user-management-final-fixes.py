@@ -127,14 +127,6 @@ if MARKER not in index:
     new_access = "${u.isOwner ? 'De vaste hoofdbeheerder kan niet worden geblokkeerd of verwijderd.' : (u.needsPassword ? 'Dit geïmporteerde account heeft nog geen lokaal wachtwoord. Stel hieronder een nieuw wachtwoord in en sla op; daarna kan het account worden geactiveerd.' : (u.disabled ? 'Dit account is momenteel geblokkeerd en kan niet aanmelden.' : 'Dit account is actief.'))}"
     index = replace_once(index, old_access, new_access, 'toegangstekst geïmporteerde gebruiker')
 
-    # Een rol die alleen toegang tot ToDo, storingen of handleidingen heeft moet ook naar zo'n toegestane eerste pagina kunnen springen.
-    index = replace_once(
-        index,
-        "    return ['dashboard','devices','maintenance','breakdowns','parts','settings'].find((view) => hasPermission(viewPermission(view))) || 'dashboard';",
-        "    return ['dashboard','devices','maintenance','breakdowns','faults','manuals','actions','parts','settings'].find((view) => hasPermission(viewPermission(view))) || 'dashboard';",
-        'eerste toegestane rolweergave',
-    )
-
     index = index.replace('</head>', f'<meta {MARKER}>\n</head>', 1)
 
 INDEX.write_text(index, encoding='utf-8')
@@ -145,7 +137,6 @@ for needle in [
     MARKER,
     'Lokaal wachtwoord instellen',
     'Wachtwoord instellen',
-    "'faults','manuals','actions'",
 ]:
     if needle not in built:
         raise SystemExit(f'Buildvalidatie mislukt: finale gebruikersfix ontbreekt ({needle})')
