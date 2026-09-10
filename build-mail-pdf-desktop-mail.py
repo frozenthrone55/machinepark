@@ -6,7 +6,7 @@ setup_path = ROOT / "machinepark-outlook-classic-setup.cmd"
 index = index_path.read_text(encoding="utf-8")
 
 DIRECT_MARKER = 'data-machinepark-build-fix="mail-pdf-direct-v4"'
-MARKER = 'machinepark-outlook-classic-bridge-v2'
+MARKER = 'machinepark-outlook-classic-bridge-v3'
 
 if DIRECT_MARKER not in index:
     raise SystemExit("Buildvalidatie mislukt: directe Mail PDF ontbreekt voor Outlook Classic-koppeling")
@@ -64,7 +64,9 @@ try {
     $downloadDir = [string]$downloadNs.Self.Path
     $pdfPath = Join-Path $downloadDir $fileName
 
-    $deadline = [DateTime]::UtcNow.AddSeconds(25)
+    # Machinepark start deze helper direct vanuit de echte klik op Mail PDF.
+    # De PDF wordt daarna opgebouwd en gedownload; wacht dus tot het bestand er staat.
+    $deadline = [DateTime]::UtcNow.AddSeconds(60)
     while ((-not (Test-Path -LiteralPath $pdfPath -PathType Leaf)) -and [DateTime]::UtcNow -lt $deadline) {
         Start-Sleep -Milliseconds 250
     }
@@ -129,7 +131,7 @@ if MARKER not in index:
     if start < 0 or end < 0:
         raise SystemExit("Buildvalidatie mislukt: shareFile-route niet gevonden voor Outlook Classic-koppeling")
 
-    replacement = r'''  // machinepark-outlook-classic-bridge-v2
+    replacement = r'''  // machinepark-outlook-classic-bridge-v3
   function machineparkMailUsesNativeShare() {
     const ua = String(navigator.userAgent || '');
     const uaDataMobile = navigator.userAgentData?.mobile === true;
@@ -144,24 +146,39 @@ if MARKER not in index:
     return /Windows|Win32|Win64/i.test(platform);
   }
 
-  function machineparkOutlookAttachmentFile(file) {
-    const raw = String(file?.name || 'Machinepark.pdf');
-    const stem = raw.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'Machinepark';
+  function machineparkOutlookContextTitle(context) {
+    if (context?.title) return String(context.title);
+    if (context?.kind === 'serviceVisit') return 'Serviceverslag';
+    if (context?.kind === 'service') {
+      if (context.serviceKind === 'maintenance') return 'Onderhoudsverslag';
+      return 'Depannageverslag';
+    }
+    if (context?.kind === 'device') return 'Toesteldetails';
+    return 'Machinepark PDF';
+  }
+
+  function machineparkOutlookPendingRequest(context) {
+    const title = machineparkOutlookContextTitle(context);
     const now = new Date();
     const pad = value => String(value).padStart(2, '0');
     const stamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}-${String(now.getMilliseconds()).padStart(3,'0')}`;
-    const name = `${stem.startsWith('Machinepark_') ? stem : `Machinepark_${stem}`}_${stamp}.pdf`;
-    return new File([file], name, { type:'application/pdf', lastModified:Date.now() });
-  }
-
-  function machineparkOpenOutlookClassic(file, title) {
-    const attachment = machineparkOutlookAttachmentFile(file);
+    const fileName = `Machinepark_Outlook_${stamp}.pdf`;
     const subject = `Machinepark - ${title}`;
     const body = `In bijlage vind je de PDF uit Machinepark: ${title}.`;
-    const protocol = `machinepark-outlook://compose?file=${encodeURIComponent(attachment.name)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    downloadFile(attachment);
-    notify('PDF wordt klaargezet. Outlook Classic opent automatisch met de PDF als bijlage.');
-    setTimeout(() => { window.location.href = protocol; }, 700);
+    const protocol = `machinepark-outlook://compose?file=${encodeURIComponent(fileName)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    return { fileName, title, protocol };
+  }
+
+  function machineparkLaunchOutlookPending(request) {
+    const anchor = document.createElement('a');
+    anchor.href = request.protocol;
+    anchor.style.display = 'none';
+    anchor.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(anchor);
+    // Belangrijk: deze click gebeurt synchroon binnen de echte Mail PDF-gebruikersklik.
+    // Daardoor mag Chrome/Edge de geregistreerde Windows-protocolhandler starten.
+    anchor.click();
+    anchor.remove();
   }
 
   function machineparkDownloadOutlookClassicSetup() {
@@ -204,10 +221,11 @@ if MARKER not in index:
       }
     }
 
-    // Windows-pc: PDF downloaden en via de lokale Machinepark-koppeling rechtstreeks
-    // in een nieuw Outlook Classic-bericht plaatsen.
+    // De normale Windows-route wordt al vóór PDF-opbouw gestart in directMailPdf,
+    // zodat de browser de Outlook-protocolhandler niet kan blokkeren.
     if (machineparkIsWindowsDesktop()) {
-      machineparkOpenOutlookClassic(file, title);
+      downloadFile(file);
+      notify('PDF gedownload. Outlook Classic kon niet vooraf worden gestart; klik Mail PDF opnieuw.');
       return;
     }
 
@@ -230,17 +248,86 @@ if MARKER not in index:
     if index.count(old_busy) != 1:
         raise SystemExit(f"Buildvalidatie mislukt: verwacht 1 Mail PDF statusregel, gevonden {index.count(old_busy)}")
     index = index.replace(old_busy, new_busy, 1)
+
+    # De Outlook-protocolhandler moet vanuit de oorspronkelijke gebruikersklik starten.
+    # Daarom bepalen we vooraf een unieke bestandsnaam, starten we Windows direct en
+    # bouwen/downloaden we daarna de PDF onder exact die naam.
+    create_sig = "  async function createDirectPdf(context) {"
+    create_sig_new = "  async function createDirectPdf(context, forcedFilename = '') {"
+    if index.count(create_sig) != 1:
+        raise SystemExit(f"Buildvalidatie mislukt: createDirectPdf-signatuur verwacht 1x, gevonden {index.count(create_sig)}")
+    index = index.replace(create_sig, create_sig_new, 1)
+
+    filename_line = "    const filename = `${safeFilename(`Machinepark_${model.filenameTitle}_${stamp}`)}.pdf`;"
+    filename_new = "    const filename = forcedFilename || `${safeFilename(`Machinepark_${model.filenameTitle}_${stamp}`)}.pdf`;"
+    if index.count(filename_line) != 1:
+        raise SystemExit(f"Buildvalidatie mislukt: directe PDF-bestandsnaam verwacht 1x, gevonden {index.count(filename_line)}")
+    index = index.replace(filename_line, filename_new, 1)
+
+    direct_start = index.find("  async function directMailPdf(button) {")
+    direct_end = index.find("\n\n  document.addEventListener('click', (event) => {", direct_start)
+    if direct_start < 0 or direct_end < 0:
+        raise SystemExit("Buildvalidatie mislukt: directMailPdf-blok niet gevonden voor directe Outlook-start")
+
+    direct_replacement = r'''  async function directMailPdf(button) {
+    if (!button || button.dataset.directPdfBusy === '1') return;
+    const context = getContext(button);
+    if (!context) { notify('Er is geen afdrukbare inhoud gevonden.'); return; }
+
+    const original = button.textContent;
+    const outlookRequest = machineparkIsWindowsDesktop() ? machineparkOutlookPendingRequest(context) : null;
+
+    // Start Outlook/Windows NU, vóór de eerste await. Dit is nog dezelfde echte klik
+    // van de gebruiker en voorkomt dat Chrome/Edge het externe protocol blokkeert.
+    if (outlookRequest) {
+      try {
+        machineparkLaunchOutlookPending(outlookRequest);
+      } catch (error) {
+        console.error('[Machinepark] Outlook Classic protocol kon niet worden gestart', error);
+        notify('Outlook Classic kon niet worden gestart. Koppel Outlook Classic opnieuw via Beheer.');
+        return;
+      }
+    }
+
+    button.dataset.directPdfBusy = '1';
+    button.disabled = true;
+    button.textContent = 'PDF maken…';
+    try {
+      const file = await createDirectPdf(context, outlookRequest?.fileName || '');
+      if (outlookRequest) {
+        button.textContent = 'Outlook openen…';
+        downloadFile(file);
+        notify('PDF gemaakt. Outlook Classic opent met de PDF als bijlage.');
+      } else {
+        button.textContent = machineparkMailUsesNativeShare() ? 'Delen…' : 'Mail openen…';
+        await shareFile(file, context.title || context.kind);
+      }
+    } catch (error) {
+      console.error('[Machinepark] Directe Mail PDF mislukt', error);
+      notify(error?.message || 'De PDF kon niet worden gemaakt.');
+    } finally {
+      button.disabled = false;
+      button.dataset.directPdfBusy = '0';
+      button.textContent = original;
+    }
+  }'''
+    index = index[:direct_start] + direct_replacement + index[direct_end:]
     index_path.write_text(index, encoding="utf-8")
 
 required = [
     MARKER,
     'function machineparkMailUsesNativeShare()',
     'function machineparkIsWindowsDesktop()',
-    'function machineparkOpenOutlookClassic(file, title)',
+    'function machineparkOutlookPendingRequest(context)',
+    'function machineparkLaunchOutlookPending(request)',
     'machinepark-outlook://compose?file=',
     'machinepark-outlook-classic-setup.cmd',
     'Outlook Classic koppelen',
-    'if (machineparkIsWindowsDesktop())',
+    "async function createDirectPdf(context, forcedFilename = '')",
+    'forcedFilename || `${safeFilename(',
+    'const outlookRequest = machineparkIsWindowsDesktop() ? machineparkOutlookPendingRequest(context) : null;',
+    'machineparkLaunchOutlookPending(outlookRequest);',
+    "createDirectPdf(context, outlookRequest?.fileName || '')",
     'await navigator.share(shareData)',
     "'Outlook openen…'",
 ]
@@ -255,10 +342,11 @@ setup_required = [
     '$mail.Attachments.Add($pdf.FullName)',
     "StartsWith('Machinepark_'",
     "NameSpace('shell:Downloads')",
+    'AddSeconds(60)',
 ]
 setup_text = setup_path.read_text(encoding='utf-8')
 for needle in setup_required:
     if needle not in setup_text:
         raise SystemExit(f"Buildvalidatie mislukt: Outlook Classic setup ontbreekt ({needle})")
 
-print('[Machinepark] Mail PDF: mobiel blijft delen; Windows gebruikt Outlook Classic met PDF-bijlage')
+print('[Machinepark] Mail PDF: mobiel blijft delen; Windows start Outlook vanuit de gebruikersklik en voegt daarna de PDF toe')
