@@ -70,6 +70,59 @@ jobs:
           rm -rf /tmp/machinepark-synology
           python3 scripts/package-synology-runtime.py --output /tmp/machinepark-synology
 
+      - name: Outlook Classic runtime controleren
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          runtime = Path('/tmp/machinepark-synology')
+          js = (runtime / 'assets/machinepark-build.js').read_text(encoding='utf-8')
+          setup = (runtime / 'machinepark-outlook-classic-setup.cmd').read_text(encoding='utf-8')
+
+          required_js = [
+              'machinepark-outlook-classic-bridge-v3',
+              'function machineparkOutlookPendingRequest(context)',
+              'function machineparkLaunchOutlookPending(request)',
+              'machinepark-outlook://compose?file=',
+              "const outlookRequest = machineparkIsWindowsDesktop() ? machineparkOutlookPendingRequest(context) : null;",
+              'machineparkLaunchOutlookPending(outlookRequest);',
+              "await createDirectPdf(context, outlookRequest?.fileName || '');",
+              'navigator.share(shareData)',
+              'Outlook Classic koppelen',
+          ]
+          for token in required_js:
+              if token not in js:
+                  raise SystemExit('Outlook runtime-validatie mislukt: ontbreekt in runtime JS: ' + token)
+
+          direct_start = js.index('const outlookRequest = machineparkIsWindowsDesktop() ? machineparkOutlookPendingRequest(context) : null;')
+          launch_at = js.index('machineparkLaunchOutlookPending(outlookRequest);', direct_start)
+          pdf_await_at = js.index("await createDirectPdf(context, outlookRequest?.fileName || '');", direct_start)
+          if launch_at >= pdf_await_at:
+              raise SystemExit('Outlook runtime-validatie mislukt: protocolstart gebeurt niet vóór PDF-opbouw/await.')
+
+          launch_start = js.index('function machineparkLaunchOutlookPending(request)')
+          launch_end = js.index('function machineparkDownloadOutlookClassicSetup()', launch_start)
+          launch_block = js[launch_start:launch_end]
+          if 'anchor.click();' not in launch_block:
+              raise SystemExit('Outlook runtime-validatie mislukt: directe protocol-click ontbreekt.')
+          if 'setTimeout' in launch_block or 'await ' in launch_block:
+              raise SystemExit('Outlook runtime-validatie mislukt: protocolstart is opnieuw asynchroon gemaakt.')
+
+          required_setup = [
+              "HKCU:\\Software\\Classes\\machinepark-outlook",
+              "NameSpace('shell:Downloads')",
+              'AddSeconds(60)',
+              'New-Object -ComObject Outlook.Application',
+              '$mail.Attachments.Add($pdf.FullName)',
+              '$mail.Display()',
+          ]
+          for token in required_setup:
+              if token not in setup:
+                  raise SystemExit('Outlook runtime-validatie mislukt: ontbreekt in helper: ' + token)
+
+          print('Outlook Classic runtime-validatie OK: protocol vóór await, PDF-wachtlus en automatische bijlage aanwezig.')
+          PY
+
       - name: Versie-informatie schrijven
         env:
           SOURCE_SHA: ${{ github.sha }}
