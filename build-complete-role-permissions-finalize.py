@@ -71,3 +71,10 @@ for needle in [MARKER, "deny('actions.add'", "deny('actions.edit'", "deny('actio
 
 INDEX.write_text(index, encoding='utf-8')
 print('[Machinepark] finale rollen-UI blokkeert ToDo en mail zonder bestaande ToDo-runtime te wijzigen')
+
+# De Synology/Web Station-compatibiliteitslaag voor het daadwerkelijk opslaan van
+# nieuwe rollen draait als laatste onderdeel van de rollenbuild.
+reliability = ROOT / 'build-role-save-reliability.py'
+if not reliability.exists():
+    raise SystemExit('Buildvalidatie mislukt: build-role-save-reliability.py ontbreekt')
+exec(compile(reliability.read_text(encoding='utf-8'), str(reliability), 'exec'))
