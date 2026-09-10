@@ -16,6 +16,7 @@ manual = manual_path.read_text(encoding='utf-8')
 # Pas de mobiele serviceverslag-afdruk toe vóór de asset-hash wordt berekend.
 # Zo krijgt de aangepaste service-visits.js altijd een nieuwe cacheveilige URL.
 subprocess.run([sys.executable, str(ROOT / 'build-mobile-service-report-print.py')], check=True)
+subprocess.run([sys.executable, str(ROOT / 'build-mobile-service-report-print-parity.py')], check=True)
 
 MARKER = 'data-machinepark-service-visits="v1"'
 service_js = (ROOT / 'service-visits.js').read_text(encoding='utf-8')
@@ -104,6 +105,8 @@ for needle in [
     'service-part-qty',
     'machinepark-mobile-service-report-print-v1',
     'printServiceReportIsolated',
+    'machinepark-mobile-service-report-print-parity-v1',
+    'serviceReportPrintHeadStyles',
 ]:
     if needle not in (ROOT / 'service-visits.js').read_text(encoding='utf-8'):
         raise SystemExit(f'Buildvalidatie mislukt: servicebezoekfunctie ontbreekt ({needle})')
