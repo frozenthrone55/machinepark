@@ -346,9 +346,10 @@ if f'data-machinepark-build-fix="{MARKER}"' not in index:
 })();
 </script>
 '''
-    if '</body>' not in index:
-        raise SystemExit('Buildvalidatie mislukt: </body> ontbreekt voor complete rollenrechten')
-    index = index.replace('</body>', script + '</body>', 1)
+    body_pos = index.rfind('</body>')
+    if body_pos < 0:
+        raise SystemExit('Buildvalidatie mislukt: finale </body> ontbreekt voor complete rollenrechten')
+    index = index[:body_pos] + script + index[body_pos:]
     write(path, index)
 
 
