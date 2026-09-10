@@ -152,7 +152,7 @@ if MARKER not in index:
       .service-print-footer{{margin-top:10mm;padding-top:4mm;border-top:1px solid #bbb;font-size:8.5pt;color:#555}}
       @media(max-width:700px){{body{{padding:7mm}}.service-print-header{{gap:8px}}.service-print-grid{{grid-template-columns:1fr}}.service-print-field.full,.service-print-section{{grid-column:1}}}}
       @media print{{body{{padding:0}}.service-isolated-print-actions{{display:none!important}}}}
-    </style></head><body><div class="service-isolated-print-actions"><button type="button" id="servicePrintNow">Afdrukken / PDF</button></div><main class="service-print-sheet">${{servicePrintHtml(kind, record)}}</main></body></html>`;
+    </style></he${{'ad'}}><body><div class="service-isolated-print-actions"><button type="button" id="servicePrintNow">Afdrukken / PDF</button></div><main class="service-print-sheet">${{servicePrintHtml(kind, record)}}</main></bo${{'dy'}}></html>`;
   }}
 
   function printServiceRecordIsolated(kind, record) {{
