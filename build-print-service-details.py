@@ -129,16 +129,38 @@ if MARKER not in index:
     const label = kind === 'maintenance' ? 'Onderhoud' : 'Depannage';
     document.title = `Machinepark - ${{label}} - ${{serviceRecordDevice(record)}}`;
     document.body.classList.add('service-record-printing');
+
+    // Mobiele browsers bouwen de printpreview asynchroon op. De detailmodus mag
+    // daarom niet na een vaste timer worden verwijderd; anders valt de preview
+    // terug naar het actieve Werkzaamheden-overzicht.
+    let restored = false;
+    const printMedia = typeof window.matchMedia === 'function' ? window.matchMedia('print') : null;
+    let printMediaStarted = Boolean(printMedia?.matches);
+    let onPrintMediaChange = null;
     const restore = () => {{
+      if (restored) return;
+      restored = true;
       document.body.classList.remove('service-record-printing');
       document.title = oldTitle;
       window.removeEventListener('afterprint', restore);
+      if (printMedia && onPrintMediaChange) {{
+        if (typeof printMedia.removeEventListener === 'function') printMedia.removeEventListener('change', onPrintMediaChange);
+        else if (typeof printMedia.removeListener === 'function') printMedia.removeListener(onPrintMediaChange);
+      }}
+    }};
+    onPrintMediaChange = event => {{
+      if (event.matches) {{
+        printMediaStarted = true;
+        return;
+      }}
+      if (printMediaStarted) restore();
     }};
     window.addEventListener('afterprint', restore);
+    if (printMedia) {{
+      if (typeof printMedia.addEventListener === 'function') printMedia.addEventListener('change', onPrintMediaChange);
+      else if (typeof printMedia.addListener === 'function') printMedia.addListener(onPrintMediaChange);
+    }}
     window.print();
-    setTimeout(() => {{
-      if (document.body.classList.contains('service-record-printing')) restore();
-    }}, 1800);
   }}
 
   function addServicePrintButton(kind, id) {{
@@ -196,9 +218,18 @@ required = [
     'btn.dataset.servicePrintKind = kind',
     'btn.dataset.servicePrintId = id',
     'window.machineparkServicePrintHtml = servicePrintHtml',
+    "window.matchMedia('print')",
+    "printMediaStarted",
+    "printMedia.addEventListener('change', onPrintMediaChange)",
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f"Buildvalidatie mislukt: individuele verslagafdruk ontbreekt ({needle})")
 
-print("[Machinepark] individuele onderhouds- en depannageverslagen afdrukbaar; context gedeeld met Mail PDF")
+obsolete_mobile_timeout = """setTimeout(() => {
+      if (document.body.classList.contains('service-record-printing')) restore();
+    }, 1800);"""
+if obsolete_mobile_timeout in index:
+    raise SystemExit("Buildvalidatie mislukt: individuele afdruk valt nog terug via vaste 1,8s timer")
+
+print("[Machinepark] individuele onderhouds- en depannageverslagen afdrukbaar; mobiele preview blijft op detailblad")
