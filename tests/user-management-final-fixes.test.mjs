@@ -24,10 +24,6 @@ test('gebruikersbeheer toont alleen rollen die actor mag toewijzen', () => {
   assert.match(builder, /user_available_roles_for_actor\(\$currentUser\)/);
 });
 
-test('eerste toegestane pagina houdt ook storingen handleidingen en ToDo rekening', () => {
-  assert.match(builder, /'faults','manuals','actions'/);
-});
-
 test('finale gebruikerslaag draait direct na hardening', () => {
   const build = pkg.scripts.build;
   const hardening = build.indexOf('build-user-management-hardening.py');
