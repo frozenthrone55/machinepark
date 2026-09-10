@@ -66,7 +66,7 @@ if MARKER not in index:
 
   function serviceRecordPhotos(record) {{
     return Array.isArray(record?.photos)
-      ? record.photos.filter(x => typeof x === 'string' && x.trim()).slice(0,10)
+      ? record.photos.filter(x => typeof x === 'string' && x.trim() && !window.machineparkIsVideoMedia?.(x)).slice(0,10)
       : [];
   }}
 
@@ -119,10 +119,95 @@ if MARKER not in index:
     return sheet;
   }}
 
+  function serviceShouldUseIsolatedPrint() {{
+    const ua = String(navigator.userAgent || '');
+    const narrow = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches;
+    const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    return narrow || coarse || /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  }}
+
+  function serviceIsolatedPrintDocument(kind, record) {{
+    const label = kind === 'maintenance' ? 'Onderhoud' : 'Depannage';
+    const title = `Machinepark - ${{label}} - ${{serviceRecordDevice(record)}}`;
+    const base = new URL('.', location.href).href;
+    return `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="${{servicePrintEsc(base)}}"><title>${{servicePrintEsc(title)}}</title><style>
+      @page{{margin:12mm}}
+      html,body{{margin:0;background:#fff;color:#000;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}}
+      body{{padding:12mm;box-sizing:border-box}}
+      .service-isolated-print-actions{{display:flex;justify-content:flex-end;margin:0 0 8mm}}
+      .service-isolated-print-actions button{{font:inherit;padding:10px 16px;border:1px solid #777;border-radius:8px;background:#fff;color:#111}}
+      .service-print-header{{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;border-bottom:2px solid #222;padding-bottom:8mm;margin-bottom:7mm}}
+      .service-print-header h1{{margin:0 0 2mm;font-size:20pt}}
+      .service-print-subtitle{{font-size:10pt;color:#444}}
+      .service-print-grid{{display:grid;grid-template-columns:1fr 1fr;gap:5mm 8mm}}
+      .service-print-field{{break-inside:avoid}}
+      .service-print-field.full{{grid-column:1/-1}}
+      .service-print-label{{font-size:8.5pt;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#555;margin-bottom:1.5mm}}
+      .service-print-value{{font-size:10.5pt;line-height:1.45;white-space:pre-wrap}}
+      .service-print-section{{grid-column:1/-1;border-top:1px solid #bbb;padding-top:5mm;margin-top:1mm}}
+      .service-print-section h2{{font-size:12pt;margin:0 0 3mm}}
+      .service-print-photo-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:5mm}}
+      .service-print-photo{{break-inside:avoid;border:1px solid #bbb;padding:2mm}}
+      .service-print-photo img{{display:block;width:100%;max-height:105mm;object-fit:contain}}
+      .service-print-footer{{margin-top:10mm;padding-top:4mm;border-top:1px solid #bbb;font-size:8.5pt;color:#555}}
+      @media(max-width:700px){{body{{padding:7mm}}.service-print-header{{gap:8px}}.service-print-grid{{grid-template-columns:1fr}}.service-print-field.full,.service-print-section{{grid-column:1}}}}
+      @media print{{body{{padding:0}}.service-isolated-print-actions{{display:none!important}}}}
+    </style></head><body><div class="service-isolated-print-actions"><button type="button" id="servicePrintNow">Afdrukken / PDF</button></div><main class="service-print-sheet">${{servicePrintHtml(kind, record)}}</main></body></html>`;
+  }}
+
+  function printServiceRecordIsolated(kind, record) {{
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return false;
+    try {{
+      printWindow.document.open();
+      printWindow.document.write(serviceIsolatedPrintDocument(kind, record));
+      printWindow.document.close();
+      const manualButton = printWindow.document.getElementById('servicePrintNow');
+      if (manualButton) manualButton.addEventListener('click', () => {{
+        try {{ printWindow.focus(); printWindow.print(); }} catch (_) {{}}
+      }});
+      const images = [...printWindow.document.images];
+      let printed = false;
+      const triggerPrint = () => {{
+        if (printed || printWindow.closed) return;
+        printed = true;
+        try {{ printWindow.focus(); printWindow.print(); }} catch (_) {{}}
+      }};
+      if (!images.length || images.every(img => img.complete)) {{
+        setTimeout(triggerPrint, 80);
+      }} else {{
+        let pending = images.filter(img => !img.complete).length;
+        const done = () => {{
+          pending = Math.max(0, pending - 1);
+          if (!pending) setTimeout(triggerPrint, 80);
+        }};
+        images.filter(img => !img.complete).forEach(img => {{
+          img.addEventListener('load', done, {{ once: true }});
+          img.addEventListener('error', done, {{ once: true }});
+        }});
+        setTimeout(triggerPrint, 1500);
+      }}
+      return true;
+    }} catch (_) {{
+      try {{ printWindow.close(); }} catch (_) {{}}
+      return false;
+    }}
+  }}
+
   function printServiceRecord(kind, id) {{
     const list = kind === 'maintenance' ? state.maintenance : state.breakdowns;
     const record = list.find(x => x.id === id);
     if (!record) {{ toast('Verslag niet gevonden'); return; }}
+
+    // Voorkom dat een mobiele/touch click na de detailafdruk nog de algemene
+    // pagina-afdruk activeert. Die zou anders het Machinepark-overzicht openen.
+    window.machineparkSuppressOverviewPrintUntil = Date.now() + 10000;
+
+    // Op gsm staat de individuele werkzaamheid in een volledig zelfstandig
+    // document. Daardoor kan de hoofdapp de reeds geopende PDF/printpreview
+    // nooit meer vervangen door het actieve Machinepark-overzicht.
+    if (serviceShouldUseIsolatedPrint() && printServiceRecordIsolated(kind, record)) return;
+
     const sheet = ensureServicePrintSheet();
     sheet.innerHTML = servicePrintHtml(kind, record);
     const oldTitle = document.title;
@@ -130,9 +215,8 @@ if MARKER not in index:
     document.title = `Machinepark - ${{label}} - ${{serviceRecordDevice(record)}}`;
     document.body.classList.add('service-record-printing');
 
-    // Mobiele browsers bouwen de printpreview asynchroon op. De detailmodus mag
-    // daarom niet na een vaste timer worden verwijderd; anders valt de preview
-    // terug naar het actieve Werkzaamheden-overzicht.
+    // Desktop en popup-blocker fallback: herstel pas als de echte printmodus
+    // eindigt; nooit via een vaste korte timer.
     let restored = false;
     const printMedia = typeof window.matchMedia === 'function' ? window.matchMedia('print') : null;
     let printMediaStarted = Boolean(printMedia?.matches);
@@ -172,7 +256,12 @@ if MARKER not in index:
     btn.dataset.servicePrintKind = kind;
     btn.dataset.servicePrintId = id;
     btn.textContent = '🖨 Afdrukken';
-    btn.onclick = () => printServiceRecord(kind, id);
+    btn.addEventListener('click', event => {{
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      printServiceRecord(kind, id);
+    }});
     foot.insertBefore(btn, foot.querySelector('.btn.primary') || null);
   }}
 
@@ -221,6 +310,12 @@ required = [
     "window.matchMedia('print')",
     "printMediaStarted",
     "printMedia.addEventListener('change', onPrintMediaChange)",
+    "serviceShouldUseIsolatedPrint",
+    "printServiceRecordIsolated",
+    "window.open('', '_blank')",
+    "machineparkSuppressOverviewPrintUntil",
+    "event.stopImmediatePropagation()",
+    "servicePrintNow",
 ]
 for needle in required:
     if needle not in index:
@@ -232,4 +327,4 @@ obsolete_mobile_timeout = """setTimeout(() => {
 if obsolete_mobile_timeout in index:
     raise SystemExit("Buildvalidatie mislukt: individuele afdruk valt nog terug via vaste 1,8s timer")
 
-print("[Machinepark] individuele onderhouds- en depannageverslagen afdrukbaar; mobiele preview blijft op detailblad")
+print("[Machinepark] individuele onderhouds- en depannageverslagen afdrukbaar; gsm gebruikt geïsoleerd printdocument")
