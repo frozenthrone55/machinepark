@@ -55,7 +55,10 @@ if MARKER not in index:
     if index.count(old) != 1:
         raise SystemExit(f'Buildvalidatie mislukt: capture-handler complete rollen niet uniek ({index.count(old)})')
     index = index.replace(old, new, 1)
-    index = index.replace('</body>', f'<meta {MARKER}>\n</body>', 1)
+    body_pos = index.rfind('</body>')
+    if body_pos < 0:
+        raise SystemExit('Buildvalidatie mislukt: finale </body> ontbreekt voor rollenmarker')
+    index = index[:body_pos] + f'<meta {MARKER}>\n' + index[body_pos:]
 
 # Functionele eindcontrole: serverrechten blijven in de build, ToDo-script bevat
 # geen actionCan-injecties meer, en UI-capture dekt alle veranderhandelingen.
