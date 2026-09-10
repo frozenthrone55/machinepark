@@ -41,21 +41,37 @@ function role_usage_count(string $roleId): int {
     return $count;
 }
 
-try {
-    mp_auth_require_request_access();
-} catch (Throwable $e) {
-    role_json(mp_auth_access_error_payload($e), 403);
+function role_actor_permissions(array $user): array {
+    if (!empty($user['isOwner'])) return mp_role_permission_set('all');
+    return mp_role_permissions((string)($user['role'] ?? 'gebruiker'));
 }
 
-try {
-    $currentUser = mp_auth_require_user();
-} catch (Throwable $e) {
-    role_json(['error'=>'Niet aangemeld.'], 401);
+function role_permissions_subset(array $candidate, array $allowed): bool {
+    foreach ($candidate as $key => $enabled) if ($enabled && empty($allowed[$key])) return false;
+    return true;
 }
 
-if (!role_can_manage($currentUser)) {
-    role_json(['error'=>'Deze rol mag rollen en rechten niet beheren.'], 403);
+function role_assert_editable_by(array $actor, ?array $existing, array $incomingPermissions): void {
+    if (!empty($actor['isOwner'])) return;
+    $allowed = role_actor_permissions($actor);
+    if ($existing && (string)($existing['id'] ?? '') === 'beheerder') {
+        throw new RuntimeException('Alleen de hoofdbeheerder kan de rol Beheerder aanpassen.');
+    }
+    if ($existing && !role_permissions_subset((array)($existing['permissions'] ?? []), $allowed)) {
+        throw new RuntimeException('Je kunt geen rol aanpassen die meer rechten heeft dan je eigen rol.');
+    }
+    if (!role_permissions_subset($incomingPermissions, $allowed)) {
+        throw new RuntimeException('Je kunt een rol geen rechten geven die je zelf niet hebt.');
+    }
 }
+
+try { mp_auth_require_request_access(); }
+catch (Throwable $e) { role_json(mp_auth_access_error_payload($e), 403); }
+
+try { $currentUser = mp_auth_require_user(); }
+catch (Throwable $e) { role_json(['error'=>'Niet aangemeld.'], 401); }
+
+if (!role_can_manage($currentUser)) role_json(['error'=>'Deze rol mag rollen en rechten niet beheren.'], 403);
 
 $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $config = mp_role_read_config();
@@ -101,6 +117,8 @@ try {
         $sourcePermissions = isset($incoming['permissions']) && is_array($incoming['permissions']) ? $incoming['permissions'] : [];
         foreach ($permissions as $key => $_) $permissions[$key] = !empty($sourcePermissions[$key]);
 
+        role_assert_editable_by($currentUser, $existing, $permissions);
+
         $nextRole = [
             'id'=>$requestedId,
             'label'=>$existing && !empty($existing['builtIn']) ? $existing['label'] : $label,
@@ -113,18 +131,14 @@ try {
         $newEtag = mp_role_write_config($config, $etag === null ? null : $expected);
         $saved = mp_role_read_config();
 
-        try {
-            mp_audit_append($currentUser, [[
-                'entityType'=>'Rollenbeheer',
-                'entityId'=>$nextRole['id'],
-                'entityLabel'=>$nextRole['label'],
-                'action'=>$existing ? 'aangepast' : 'toegevoegd',
-                'fields'=>[
-                    ['field'=>'Rol','before'=>$existing ? $existing['label'] : '—','after'=>$nextRole['label']],
-                    ['field'=>'Toegestane handelingen','before'=>$existing ? (string)count(array_filter($existing['permissions'])) : '0','after'=>(string)count(array_filter($nextRole['permissions']))],
-                ],
-            ]]);
-        } catch (Throwable $e) {}
+        try { mp_audit_append($currentUser, [[
+            'entityType'=>'Rollenbeheer','entityId'=>$nextRole['id'],'entityLabel'=>$nextRole['label'],
+            'action'=>$existing ? 'aangepast' : 'toegevoegd',
+            'fields'=>[
+                ['field'=>'Rol','before'=>$existing ? $existing['label'] : '—','after'=>$nextRole['label']],
+                ['field'=>'Toegestane handelingen','before'=>$existing ? (string)count(array_filter($existing['permissions'])) : '0','after'=>(string)count(array_filter($nextRole['permissions']))],
+            ],
+        ]]); } catch (Throwable $e) {}
 
         role_json(['ok'=>true,'roles'=>role_public_config($saved),'etag'=>$newEtag], 200, ['ETag'=>$newEtag]);
     }
@@ -135,6 +149,7 @@ try {
         foreach ($config['roles'] as $role) if ($role['id'] === $roleId) { $target = $role; break; }
         if (!$target) role_json(['error'=>'Rol niet gevonden.'], 404);
         if (!empty($target['builtIn'])) throw new RuntimeException('Een standaardrol kan niet worden verwijderd; de rechten ervan kunnen wel worden aangepast.');
+        role_assert_editable_by($currentUser, $target, (array)$target['permissions']);
         $inUse = role_usage_count($roleId);
         if ($inUse > 0) role_json(['error'=>'Deze rol is nog toegewezen aan ' . $inUse . ' gebruiker(s). Wijs eerst een andere rol toe.'], 409);
 
@@ -142,15 +157,10 @@ try {
         $newEtag = mp_role_write_config($config, $etag === null ? null : $expected);
         $saved = mp_role_read_config();
 
-        try {
-            mp_audit_append($currentUser, [[
-                'entityType'=>'Rollenbeheer',
-                'entityId'=>$roleId,
-                'entityLabel'=>$target['label'],
-                'action'=>'verwijderd',
-                'fields'=>[['field'=>'Rol','before'=>$target['label'],'after'=>'—']],
-            ]]);
-        } catch (Throwable $e) {}
+        try { mp_audit_append($currentUser, [[
+            'entityType'=>'Rollenbeheer','entityId'=>$roleId,'entityLabel'=>$target['label'],'action'=>'verwijderd',
+            'fields'=>[['field'=>'Rol','before'=>$target['label'],'after'=>'—']],
+        ]]); } catch (Throwable $e) {}
 
         role_json(['ok'=>true,'roles'=>role_public_config($saved),'etag'=>$newEtag], 200, ['ETag'=>$newEtag]);
     }
