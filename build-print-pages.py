@@ -66,7 +66,14 @@ if MARKER not in index:
     const row = document.createElement('div');
     row.className = 'page-print-row';
     row.innerHTML = `<div class="page-print-heading">Machinepark · ${{viewName(view)}}</div><button type="button" class="btn page-print-btn" aria-label="Deze pagina afdrukken">🖨 Afdrukken</button>`;
-    row.querySelector('.page-print-btn').addEventListener('click', () => printMachineparkView(view));
+    row.querySelector('.page-print-btn').addEventListener('click', event => {{
+      if (Date.now() < Number(window.machineparkSuppressOverviewPrintUntil || 0)) {{
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }}
+      printMachineparkView(view);
+    }});
     view.insertAdjacentElement('afterbegin', row);
   }}
 
@@ -96,6 +103,9 @@ if MARKER not in index:
   }}
 
   function printMachineparkView(view = activeView()) {{
+    // Een detailafdruk zet tijdelijk een lock. Zo kan een doorgeschoten touch/click
+    // op gsm nooit meteen daarna een tweede PDF van het actieve overzicht openen.
+    if (Date.now() < Number(window.machineparkSuppressOverviewPrintUntil || 0)) return;
     if (!view) return;
     const name = viewName(view);
     const heading = view.querySelector(':scope > .page-print-row .page-print-heading');
@@ -143,9 +153,11 @@ required = [
     "breakdowns: 'Depannages'",
     "parts: 'Onderdelen'",
     "settings: 'Beheer'",
+    "machineparkSuppressOverviewPrintUntil",
+    "Date.now() < Number(window.machineparkSuppressOverviewPrintUntil || 0)",
 ]
 for needle in required:
     if needle not in index:
         raise SystemExit(f"Buildvalidatie mislukt: afdrukfunctie ontbreekt ({needle})")
 
-print("[Machinepark] afdrukoptie op elke pagina actief; onderdeelafbeeldingen 50% groter op print")
+print("[Machinepark] afdrukoptie op elke pagina actief; overzichtsafdruk geblokkeerd tijdens detailprint")
