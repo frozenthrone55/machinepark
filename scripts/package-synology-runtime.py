@@ -19,6 +19,7 @@ RUNTIME_FILES = [
     "manifest.webmanifest",
     "machinepark-logo.svg",
     "machinepark-coffee-device-icon.png",
+    "machinepark-outlook-classic-setup.cmd",
 ]
 
 
