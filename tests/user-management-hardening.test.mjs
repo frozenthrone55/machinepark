@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const php = fs.readFileSync('synology/api/user-management.php', 'utf8');
+const rolesPhp = fs.readFileSync('synology/api/role-management.php', 'utf8');
 const builder = fs.readFileSync('build-user-management-hardening.py', 'utf8');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 
@@ -24,7 +25,31 @@ test('Synology user editor supports identity, role and password changes', () => 
   assert.match(php, /\$target\['email'\] = \$newEmail/);
   assert.match(php, /\$target\['username'\] = \$newUsername/);
   assert.match(php, /password_hash\(\$newPassword, PASSWORD_DEFAULT\)/);
-  assert.match(php, /mp_role_exists\(\$role\)/);
+  assert.match(php, /user_assert_role_assignable\(\$currentUser, \$role\)/);
+});
+
+test('cloud users become visible as safe disabled local references', () => {
+  assert.match(php, /MP_CLOUD_USERS_FILE/);
+  assert.match(php, /function user_sync_cloud_references/);
+  assert.match(php, /'passwordHash'=>''/);
+  assert.match(php, /'disabled'=>true/);
+  assert.match(php, /'importedReference'=>true/);
+  assert.match(php, /importedReferencesAdded/);
+  assert.match(php, /Stel eerst via Bewerken een lokaal wachtwoord in/);
+});
+
+test('user managers cannot elevate themselves or manage broader roles', () => {
+  assert.match(php, /function user_permissions_subset/);
+  assert.match(php, /meer rechten dan je eigen rol/);
+  assert.match(php, /Je kunt je eigen rol niet wijzigen/);
+  assert.match(php, /user_assert_target_manageable/);
+});
+
+test('role managers cannot grant permissions they do not have', () => {
+  assert.match(rolesPhp, /function role_permissions_subset/);
+  assert.match(rolesPhp, /function role_assert_editable_by/);
+  assert.match(rolesPhp, /Je kunt een rol geen rechten geven die je zelf niet hebt/);
+  assert.match(rolesPhp, /Alleen de hoofdbeheerder kan de rol Beheerder aanpassen/);
 });
 
 test('generated user management has all account actions', () => {
