@@ -83,7 +83,9 @@ if MARKER not in index:
 .user-password-setup-btn{font-weight:800}
 </style>
 '''
-    index = replace_once(index, '</head>', style + '</head>', 'Gebruikersbeheer statusstijl')
+    if '</head>' not in index:
+        raise SystemExit('Buildvalidatie mislukt: HTML-head ontbreekt voor finale gebruikersfix')
+    index = index.replace('</head>', style + '</head>', 1)
 
     old_badge = '''  function userStatusBadge(user) {
     if (user.isOwner) return '<span class="badge success">Hoofdbeheerder</span>';
