@@ -27,6 +27,7 @@ function user_public_admin(array $user): array {
     $public['role'] = !empty($user['isOwner']) ? 'beheerder' : (string)($user['role'] ?? 'gebruiker');
     $public['lastSignInAt'] = $user['lastSignInAt'] ?? null;
     $public['createdAt'] = $user['createdAt'] ?? null;
+    $public['disabled'] = !empty($user['disabled']);
     return $public;
 }
 
@@ -41,6 +42,8 @@ function user_find_index(array $users, string $id): int {
 }
 
 function user_lock() {
+    $dir = dirname(MP_USERS_LOCK_FILE);
+    if (!is_dir($dir) || !is_writable($dir)) throw new RuntimeException('Machinepark gebruikersmap is niet schrijfbaar.');
     $lock = @fopen(MP_USERS_LOCK_FILE, 'c+');
     if ($lock === false) throw new RuntimeException('Gebruikerslock kon niet worden geopend.');
     if (!flock($lock, LOCK_EX)) {
@@ -48,6 +51,38 @@ function user_lock() {
         throw new RuntimeException('Gebruikerslock kon niet worden verkregen.');
     }
     return $lock;
+}
+
+function user_normalize_username($value): string {
+    return strtolower(trim((string)$value));
+}
+
+function user_validate_username(string $username): void {
+    if ($username === '') return;
+    if (strlen($username) < 3 || strlen($username) > 60) throw new RuntimeException('Een gebruikersnaam moet tussen 3 en 60 tekens bevatten.');
+    if (!preg_match('/^[a-z0-9._-]+$/', $username)) throw new RuntimeException('Gebruik in de gebruikersnaam alleen letters, cijfers, punt, streepje of underscore.');
+    if ($username === 'admin') throw new RuntimeException('De gebruikersnaam admin is voorbehouden voor de vaste hoofdbeheerder.');
+}
+
+function user_assert_unique(array $users, string $email, string $username, string $exceptId = ''): void {
+    foreach ($users as $user) {
+        if ($exceptId !== '' && (string)($user['id'] ?? '') === $exceptId) continue;
+        $existingEmail = strtolower(trim((string)($user['email'] ?? '')));
+        $existingUsername = user_normalize_username($user['username'] ?? '');
+        if ($email !== '' && $existingEmail !== '' && hash_equals($existingEmail, $email)) {
+            throw new RuntimeException('Er bestaat al een gebruiker met dit e-mailadres.');
+        }
+        if ($username !== '' && $existingUsername !== '' && hash_equals($existingUsername, $username)) {
+            throw new RuntimeException('Er bestaat al een gebruiker met deze gebruikersnaam.');
+        }
+    }
+}
+
+function user_unlock($lock): void {
+    if (is_resource($lock)) {
+        @flock($lock, LOCK_UN);
+        @fclose($lock);
+    }
 }
 
 try {
@@ -72,6 +107,10 @@ if ($method === 'GET') {
     $users = mp_auth_read_users();
     usort($users, function ($a, $b) {
         if (!empty($a['isOwner']) !== !empty($b['isOwner'])) return !empty($a['isOwner']) ? -1 : 1;
+        $aName = trim(((string)($a['firstName'] ?? '')) . ' ' . ((string)($a['lastName'] ?? '')));
+        $bName = trim(((string)($b['firstName'] ?? '')) . ' ' . ((string)($b['lastName'] ?? '')));
+        $cmp = strcasecmp($aName, $bName);
+        if ($cmp !== 0) return $cmp;
         return strcasecmp((string)($a['email'] ?? ''), (string)($b['email'] ?? ''));
     });
     user_json([
@@ -106,14 +145,14 @@ try {
 
         array_splice($users, $index, 1);
         mp_auth_write_users($users);
-        flock($lock, LOCK_UN);
-        fclose($lock);
+        user_unlock($lock);
+        unset($lock);
 
         try {
             mp_audit_append($currentUser, [[
                 'entityType'=>'Gebruikersbeheer',
                 'entityId'=>$userId,
-                'entityLabel'=>(string)($target['email'] ?? 'Gebruiker'),
+                'entityLabel'=>(string)($target['email'] ?? ($target['username'] ?? 'Gebruiker')),
                 'action'=>'verwijderd',
                 'fields'=>[['field'=>'Rol','before'=>mp_role_label((string)($target['role'] ?? 'gebruiker')),'after'=>'—']],
             ]]);
@@ -125,21 +164,22 @@ try {
 
     if ($action === 'create-user') {
         $email = strtolower(trim((string)($body['email'] ?? '')));
+        $username = user_normalize_username($body['username'] ?? '');
         $password = (string)($body['password'] ?? '');
         $role = mp_role_sanitize_id($body['role'] ?? 'gebruiker');
         $firstName = trim((string)($body['firstName'] ?? ''));
         $lastName = trim((string)($body['lastName'] ?? ''));
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('Vul een geldig e-mailadres in.');
+        user_validate_username($username);
         if (strlen($password) < 10) throw new RuntimeException('Gebruik een eerste wachtwoord van minstens 10 tekens.');
+        if (strlen($firstName) > 100 || strlen($lastName) > 100) throw new RuntimeException('Naam is te lang.');
         if (!mp_role_exists($role)) throw new RuntimeException('De gekozen rol bestaat niet.');
-
-        foreach ($users as $user) {
-            if (strtolower((string)($user['email'] ?? '')) === $email) throw new RuntimeException('Er bestaat al een gebruiker met dit e-mailadres.');
-        }
+        user_assert_unique($users, $email, $username);
 
         $newUser = [
             'id'=>'usr_' . bin2hex(random_bytes(10)),
+            'username'=>$username,
             'email'=>$email,
             'firstName'=>$firstName,
             'lastName'=>$lastName,
@@ -152,8 +192,8 @@ try {
         ];
         $users[] = $newUser;
         mp_auth_write_users($users);
-        flock($lock, LOCK_UN);
-        fclose($lock);
+        user_unlock($lock);
+        unset($lock);
 
         try {
             mp_audit_append($currentUser, [[
@@ -161,7 +201,10 @@ try {
                 'entityId'=>$newUser['id'],
                 'entityLabel'=>$email,
                 'action'=>'toegevoegd',
-                'fields'=>[['field'=>'Rol','before'=>'—','after'=>mp_role_label($role)]],
+                'fields'=>[
+                    ['field'=>'Rol','before'=>'—','after'=>mp_role_label($role)],
+                    ['field'=>'Gebruikersnaam','before'=>'—','after'=>$username !== '' ? $username : 'e-mailadres'],
+                ],
             ]]);
         } catch (Throwable $e) {}
         user_json(['ok'=>true,'user'=>user_public_admin($newUser)]);
@@ -176,9 +219,22 @@ try {
 
         $target['firstName'] = trim((string)($body['firstName'] ?? ($target['firstName'] ?? '')));
         $target['lastName'] = trim((string)($body['lastName'] ?? ($target['lastName'] ?? '')));
+        if (strlen((string)$target['firstName']) > 100 || strlen((string)$target['lastName']) > 100) throw new RuntimeException('Naam is te lang.');
+
+        $newEmail = strtolower(trim((string)($body['email'] ?? ($target['email'] ?? ''))));
+        if ($newEmail !== '' && !filter_var($newEmail, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('Vul een geldig e-mailadres in.');
+        if (empty($target['isOwner']) && $newEmail === '') throw new RuntimeException('Een gewone gebruiker moet een e-mailadres hebben.');
+
+        $newUsername = user_normalize_username($body['username'] ?? ($target['username'] ?? ''));
+        if (!empty($target['isOwner'])) $newUsername = 'admin';
+        else user_validate_username($newUsername);
+        user_assert_unique($users, $newEmail, $newUsername, $userId);
+        $target['email'] = $newEmail;
+        $target['username'] = $newUsername;
 
         if (!empty($target['isOwner'])) {
             $target['role'] = 'beheerder';
+            $target['disabled'] = false;
         } else {
             $role = mp_role_sanitize_id($body['role'] ?? ($target['role'] ?? 'gebruiker'));
             if (!mp_role_exists($role)) throw new RuntimeException('De gekozen rol bestaat niet.');
@@ -193,12 +249,14 @@ try {
 
         $users[$index] = $target;
         mp_auth_write_users($users);
-        flock($lock, LOCK_UN);
-        fclose($lock);
+        user_unlock($lock);
+        unset($lock);
 
         $fields = [];
         if ((string)($before['firstName'] ?? '') !== (string)$target['firstName']) $fields[] = ['field'=>'Voornaam','before'=>(string)($before['firstName'] ?? '—'),'after'=>(string)$target['firstName']];
         if ((string)($before['lastName'] ?? '') !== (string)$target['lastName']) $fields[] = ['field'=>'Achternaam','before'=>(string)($before['lastName'] ?? '—'),'after'=>(string)$target['lastName']];
+        if ((string)($before['email'] ?? '') !== (string)$target['email']) $fields[] = ['field'=>'E-mailadres','before'=>(string)($before['email'] ?? '—'),'after'=>(string)($target['email'] ?: '—')];
+        if ((string)($before['username'] ?? '') !== (string)$target['username']) $fields[] = ['field'=>'Gebruikersnaam','before'=>(string)($before['username'] ?? '—'),'after'=>(string)($target['username'] ?: '—')];
         if ((string)($before['role'] ?? '') !== (string)$target['role']) $fields[] = ['field'=>'Rol','before'=>mp_role_label((string)($before['role'] ?? 'gebruiker')),'after'=>mp_role_label((string)$target['role'])];
         if ($newPassword !== '') $fields[] = ['field'=>'Wachtwoord','before'=>'••••••••••','after'=>'gewijzigd'];
         if (!$fields) $fields[] = ['field'=>'Gebruiker','before'=>'ongewijzigd','after'=>'opgeslagen'];
@@ -206,7 +264,7 @@ try {
             mp_audit_append($currentUser, [[
                 'entityType'=>'Gebruikersbeheer',
                 'entityId'=>$userId,
-                'entityLabel'=>(string)($target['email'] ?? 'Gebruiker'),
+                'entityLabel'=>(string)($target['email'] ?: ($target['username'] ?? 'Gebruiker')),
                 'action'=>'aangepast',
                 'fields'=>$fields,
             ]]);
@@ -214,14 +272,40 @@ try {
         user_json(['ok'=>true,'user'=>user_public_admin($target)]);
     }
 
-    flock($lock, LOCK_UN);
-    fclose($lock);
+    if ($action === 'toggle-user') {
+        $userId = trim((string)($body['userId'] ?? ''));
+        $disabled = !empty($body['disabled']);
+        $index = user_find_index($users, $userId);
+        if ($index < 0) throw new RuntimeException('Gebruiker niet gevonden.');
+        $target = $users[$index];
+        if (!empty($target['isOwner'])) throw new RuntimeException('De vaste hoofdbeheerder kan niet worden geblokkeerd.');
+        if ($disabled && (string)($target['id'] ?? '') === (string)($currentUser['id'] ?? '')) throw new RuntimeException('Je kunt je eigen actieve account niet blokkeren.');
+        $beforeDisabled = !empty($target['disabled']);
+        $target['disabled'] = $disabled;
+        $users[$index] = $target;
+        mp_auth_write_users($users);
+        user_unlock($lock);
+        unset($lock);
+
+        if ($beforeDisabled !== $disabled) {
+            try {
+                mp_audit_append($currentUser, [[
+                    'entityType'=>'Gebruikersbeheer',
+                    'entityId'=>$userId,
+                    'entityLabel'=>(string)($target['email'] ?: ($target['username'] ?? 'Gebruiker')),
+                    'action'=>$disabled ? 'geblokkeerd' : 'geactiveerd',
+                    'fields'=>[['field'=>'Toegang','before'=>$beforeDisabled ? 'Geblokkeerd' : 'Actief','after'=>$disabled ? 'Geblokkeerd' : 'Actief']],
+                ]]);
+            } catch (Throwable $e) {}
+        }
+        user_json(['ok'=>true,'user'=>user_public_admin($target)]);
+    }
+
+    user_unlock($lock);
+    unset($lock);
     user_json(['error'=>'Onbekende gebruikersactie.'], 400);
 } catch (Throwable $e) {
-    if (isset($lock) && is_resource($lock)) {
-        @flock($lock, LOCK_UN);
-        @fclose($lock);
-    }
+    if (isset($lock)) user_unlock($lock);
     $message = $e->getMessage();
     $status = strpos($message, 'niet gevonden') !== false ? 404 : 400;
     user_json(['error'=>$message], $status);
