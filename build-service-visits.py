@@ -1,6 +1,8 @@
 from pathlib import Path
 import hashlib
 import re
+import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / 'index.html'
@@ -10,6 +12,10 @@ manual_path = ROOT / 'manual-library.js'
 index = index_path.read_text(encoding='utf-8')
 sw = sw_path.read_text(encoding='utf-8')
 manual = manual_path.read_text(encoding='utf-8')
+
+# Pas de mobiele serviceverslag-afdruk toe vóór de asset-hash wordt berekend.
+# Zo krijgt de aangepaste service-visits.js altijd een nieuwe cacheveilige URL.
+subprocess.run([sys.executable, str(ROOT / 'build-mobile-service-report-print.py')], check=True)
 
 MARKER = 'data-machinepark-service-visits="v1"'
 service_js = (ROOT / 'service-visits.js').read_text(encoding='utf-8')
@@ -96,6 +102,8 @@ for needle in [
     'svOneOffPartFields',
     'service-part-description',
     'service-part-qty',
+    'machinepark-mobile-service-report-print-v1',
+    'printServiceReportIsolated',
 ]:
     if needle not in (ROOT / 'service-visits.js').read_text(encoding='utf-8'):
         raise SystemExit(f'Buildvalidatie mislukt: servicebezoekfunctie ontbreekt ({needle})')
