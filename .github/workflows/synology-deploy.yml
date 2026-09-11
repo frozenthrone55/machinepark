@@ -38,6 +38,12 @@ jobs:
       - name: Machinepark bouwen
         run: npm run build
 
+      - name: Volledige app-kwaliteitscontrole
+        run: |
+          npm run check:functions
+          npm run audit
+          node --test tests/*.test.mjs
+
       - name: Lokale Synology-data en login controleren
         run: |
           php -l synology/api/_role-lib.php
