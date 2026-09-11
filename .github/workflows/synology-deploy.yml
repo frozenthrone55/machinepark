@@ -47,9 +47,17 @@ jobs:
       - name: Outlook installer regressietest
         run: node --test tests/outlook-classic-installer.test.mjs
 
-      - name: Bestaande regressietests
+      - name: Bestaande regressietests A-M
         run: |
-          find tests -maxdepth 1 -name '*.test.mjs' ! -name 'outlook-classic-installer.test.mjs' -print0 | sort -z | xargs -0 node --test
+          mapfile -t files < <(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'outlook-classic-installer.test.mjs' -printf '%f\n' | sort | awk 'tolower(substr($0,1,1)) >= "a" && tolower(substr($0,1,1)) <= "m" { print "tests/" $0 }')
+          printf 'Tests A-M: %s\n' "${files[@]}"
+          node --test "${files[@]}"
+
+      - name: Bestaande regressietests N-Z
+        run: |
+          mapfile -t files < <(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'outlook-classic-installer.test.mjs' -printf '%f\n' | sort | awk 'tolower(substr($0,1,1)) >= "n" && tolower(substr($0,1,1)) <= "z" { print "tests/" $0 }')
+          printf 'Tests N-Z: %s\n' "${files[@]}"
+          node --test "${files[@]}"
 
       - name: Lokale Synology-data en login controleren
         run: |
