@@ -90,15 +90,20 @@ for dependency in sorted(PACKAGE.get('dependencies', {})):
     if dependency not in source_text:
         error(f'Ongebruikte package dependency: {dependency}')
 
-# 5. Centrale foto-instellingen en opslagarchitectuur.
-if 'const REPORT_PHOTO_LIMIT = 5;' not in APP_SOURCE:
-    error('Verslagfoto-limiet is niet 5 in de gebouwde app.')
-if 'const REPORT_PHOTO_LIMIT = 4;' in APP_SOURCE:
-    error('Oude verslagfoto-limiet 4 is nog aanwezig.')
-if 'const DEVICE_PHOTO_LIMIT = 5;' not in APP_SOURCE:
-    error('Toestelfoto-limiet is niet centraal op 5 ingesteld.')
-if 'Een toestel kan maximaal 3 foto’s bevatten.' in APP_SOURCE or 'van maximaal 3 foto’s' in APP_SOURCE:
-    error('Oude toestelfoto-limiet 3 is nog aanwezig.')
+# 5. Centrale foto/video-instellingen en opslagarchitectuur.
+if 'const REPORT_PHOTO_LIMIT = 10;' not in APP_SOURCE:
+    error('Verslagmedia-limiet is niet 10 in de gebouwde app.')
+if 'const REPORT_PHOTO_LIMIT = 4;' in APP_SOURCE or 'const REPORT_PHOTO_LIMIT = 5;' in APP_SOURCE:
+    error('Oude verslagmedia-limiet 4/5 is nog aanwezig.')
+if 'const DEVICE_PHOTO_LIMIT = 10;' not in APP_SOURCE:
+    error('Toestelmedia-limiet is niet centraal op 10 ingesteld.')
+if any(text in APP_SOURCE for text in [
+    'Een toestel kan maximaal 3 foto’s bevatten.',
+    'van maximaal 3 foto’s',
+    'Een toestel kan maximaal 5 foto’s bevatten.',
+    'van maximaal 5 foto’s',
+]):
+    error('Oude toestelfoto-limiet 3/5 is nog zichtbaar aanwezig.')
 if 'machineparkPersistServicePhotos' not in APP_SOURCE or '/.netlify/functions/service-photos' not in APP_SOURCE:
     error('Verslagfoto’s gebruiken de aparte Blob-opslag niet.')
 if 'const baseLocalSnapshotForPartPhotos = localSnapshot;' in APP_SOURCE:
