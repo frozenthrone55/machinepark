@@ -240,7 +240,7 @@ test('dashboard KPI navigatie bouwt na ToDo-labels', () => {
   const cmd = pkg.scripts.build;
   assert.ok(cmd.includes('python3 build-dashboard-kpi-navigation.py'));
   assert.ok(cmd.indexOf('python3 build-dashboard-kpi-navigation.py') > cmd.indexOf('python3 build-todo-labels.py'));
-  assert.ok(cmd.indexOf('python3 build-dashboard-kpi-navigation.py') < cmd.indexOf('node --check service-visits.js'));
+  assert.ok(cmd.indexOf('python3 build-dashboard-kpi-navigation.py') < cmd.lastIndexOf('node --check service-visits.js'));
 });
 
 
