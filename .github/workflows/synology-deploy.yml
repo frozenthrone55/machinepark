@@ -47,17 +47,39 @@ jobs:
       - name: Outlook installer regressietest
         run: node --test tests/outlook-classic-installer.test.mjs
 
-      - name: Bestaande regressietests A-M
+      - name: Bestaande regressietests diagnosticeren
+        id: existing-regressions
+        shell: bash
         run: |
-          mapfile -t files < <(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'outlook-classic-installer.test.mjs' -printf '%f\n' | sort | awk 'tolower(substr($0,1,1)) >= "a" && tolower(substr($0,1,1)) <= "m" { print "tests/" $0 }')
-          printf 'Tests A-M: %s\n' "${files[@]}"
-          node --test "${files[@]}"
+          set +e
+          failed=''
+          while IFS= read -r -d '' testfile; do
+            echo "==> $testfile"
+            node --test "$testfile"
+            rc=$?
+            if [ "$rc" -ne 0 ] && [ -z "$failed" ]; then
+              failed="$(basename "$testfile")"
+            fi
+          done < <(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'outlook-classic-installer.test.mjs' -print0 | sort -z)
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          if [ -n "$failed" ]; then
+            printf '%s\n' "$failed" > /tmp/machinepark-failing-regression.txt
+          fi
+          exit 0
 
-      - name: Bestaande regressietests N-Z
+      - name: Foutende regressietest vastleggen
+        if: steps.existing-regressions.outputs.failed != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: failing-regression-${{ steps.existing-regressions.outputs.failed }}
+          path: /tmp/machinepark-failing-regression.txt
+          retention-days: 1
+
+      - name: Bestaande regressietests bewaken
+        if: steps.existing-regressions.outputs.failed != ''
         run: |
-          mapfile -t files < <(find tests -maxdepth 1 -name '*.test.mjs' ! -name 'outlook-classic-installer.test.mjs' -printf '%f\n' | sort | awk 'tolower(substr($0,1,1)) >= "n" && tolower(substr($0,1,1)) <= "z" { print "tests/" $0 }')
-          printf 'Tests N-Z: %s\n' "${files[@]}"
-          node --test "${files[@]}"
+          echo "Falende regressietest: ${{ steps.existing-regressions.outputs.failed }}"
+          exit 1
 
       - name: Lokale Synology-data en login controleren
         run: |
