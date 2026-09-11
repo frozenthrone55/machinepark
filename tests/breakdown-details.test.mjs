@@ -21,7 +21,7 @@ test('depannagedetails hebben een aparte bewerkknop met rechtencontrole', () => 
 });
 
 test('depannagedetails tonen de operationele verslaginformatie', () => {
-  for (const needle of ['Werkdagen en tijd','Probleem / melding','Diagnose','Oplossing / uitgevoerde werken','Gebruikte onderdelen','Foto’s bij verslag']) {
+  for (const needle of ['Werkdagen en tijd','Probleem / melding','Diagnose','Oplossing / uitgevoerde werken','Gebruikte onderdelen','Foto’s / video’s bij verslag']) {
     assert.ok(js.includes(needle), `ontbreekt: ${needle}`);
   }
   assert.ok(js.includes('machineparkServiceWorkSessionsText'));
