@@ -72,7 +72,7 @@ test('Actiegebruikers-API deelt alleen minimale gebruikersinfo met aangemelde ge
 
 test('Acties heeft een expliciet Synology-weergaverecht en blijft zichtbaar voor bestaande ingebouwde rollen', () => {
   assert.match(roleLib, /view\.actions/);
-  assert.match(roleLib, /Acties bekijken/);
+  assert.match(roleLib, /ToDo bekijken/);
   assert.match(roleLib, /view\.manuals','view\.actions','view\.parts/);
   assert.match(roleLib, /view\.dashboard','view\.actions','view\.parts/);
   assert.match(builder, /breakdowns','actions','faults/);
