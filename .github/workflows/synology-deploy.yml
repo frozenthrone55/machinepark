@@ -38,11 +38,14 @@ jobs:
       - name: Machinepark bouwen
         run: npm run build
 
-      - name: Volledige app-kwaliteitscontrole
-        run: |
-          npm run check:functions
-          npm run audit
-          node --test tests/*.test.mjs
+      - name: Netlify-functies controleren
+        run: npm run check:functions
+
+      - name: Code-audit
+        run: npm run audit
+
+      - name: Regressietests
+        run: node --test tests/*.test.mjs
 
       - name: Lokale Synology-data en login controleren
         run: |
@@ -121,12 +124,14 @@ jobs:
               'New-Object -ComObject Outlook.Application',
               '$mail.Attachments.Add($pdf.FullName)',
               '$mail.Display()',
+              'machinepark-outlook-installer-loader-v2',
+              "[regex]::Match($raw,'(?m)^###MACHINEPARK_POWERSHELL###\\r?$')",
           ]
           for token in required_setup:
               if token not in setup:
                   raise SystemExit('Outlook runtime-validatie mislukt: ontbreekt in helper: ' + token)
 
-          print('Outlook Classic runtime-validatie OK: protocol vóór await, PDF-wachtlus en automatische bijlage aanwezig.')
+          print('Outlook Classic runtime-validatie OK: veilige payload-marker, protocol vóór await, PDF-wachtlus en automatische bijlage aanwezig.')
           PY
 
       - name: Versie-informatie schrijven
