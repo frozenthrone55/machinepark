@@ -44,8 +44,12 @@ jobs:
       - name: Code-audit
         run: npm run audit
 
-      - name: Regressietests
-        run: node --test tests/*.test.mjs
+      - name: Outlook installer regressietest
+        run: node --test tests/outlook-classic-installer.test.mjs
+
+      - name: Bestaande regressietests
+        run: |
+          find tests -maxdepth 1 -name '*.test.mjs' ! -name 'outlook-classic-installer.test.mjs' -print0 | sort -z | xargs -0 node --test
 
       - name: Lokale Synology-data en login controleren
         run: |
