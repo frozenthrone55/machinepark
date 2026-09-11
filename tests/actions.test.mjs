@@ -15,8 +15,8 @@ const roleLib = readFileSync(new URL('../synology/api/_role-lib.php', import.met
 test('Acties is een eigen offline datastore met DB-migratie', () => {
   assert.match(builder, /DB_VERSION=2/);
   assert.match(builder, /breakdowns','actions/);
-  assert.match(builder, /actions:\\[\\]/);
-  assert.match(builder, /put\\('actions'/);
+  assert.match(builder, /actions:\[\]/);
+  assert.match(builder, /put\('actions'/);
 });
 
 test('Acties heeft twee lijsten, snel toevoegen en afronden', () => {
@@ -26,25 +26,25 @@ test('Acties heeft twee lijsten, snel toevoegen en afronden', () => {
   assert.match(builder, /quickAddAction/);
   assert.match(builder, /openCompleteAction/);
   assert.match(builder, /completedByName/);
-  assert.match(builder, /30\\*86400000/);
+  assert.match(builder, /30\*86400000/);
   assert.match(builder, /reopenAction/);
 });
 
 test('Acties ondersteunt gebruiker toestel context en historiek', () => {
-  assert.match(builder, /action-users\\.php/);
+  assert.match(builder, /action-users\.php/);
   assert.match(builder, /assigneeName/);
   assert.match(builder, /actionDeviceSearchField/);
   assert.match(builder, /historyEntry/);
   assert.match(builder, /decorateDeviceModal/);
-  assert.match(builder, /decorateContextModal\\('maintenance'/);
-  assert.match(builder, /decorateContextModal\\('breakdown'/);
+  assert.match(builder, /decorateContextModal\('maintenance'/);
+  assert.match(builder, /decorateContextModal\('breakdown'/);
   assert.match(service, /machineparkDecorateServiceReportActions/);
 });
 
 test('Acties verschijnt op dashboard en navigatie', () => {
   assert.match(builder, /kpiActions/);
   assert.match(builder, /actionNavCount/);
-  assert.match(nav, /actions: \\['Acties'/);
+  assert.match(nav, /actions: \['Acties'/);
   assert.match(nav, /machineparkRenderActions/);
 });
 
@@ -57,7 +57,7 @@ test('Acties bouwt als laatste feature voor assetextractie', () => {
 
 test('Synology beschermt acties tegen oude clients en audit kan acties herstellen', () => {
   assert.match(dataApi, /Oudere clients kennen de Acties-store/);
-  assert.match(dataApi, /\\$data\\['actions'\\]/);
+  assert.match(dataApi, /\$data\['actions'\]/);
   assert.match(auditLib, /'actions' => 'Acties'/);
   assert.match(auditLib, /breakdowns','actions/);
   assert.match(auditLog, /breakdowns','actions/);
