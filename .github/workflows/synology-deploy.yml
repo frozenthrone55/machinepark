@@ -67,6 +67,56 @@ jobs:
           fi
           exit 0
 
+      - name: Acties-regressie exact diagnosticeren
+        id: actions-regression
+        if: steps.existing-regressions.outputs.failed == 'actions.test.mjs'
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          path = Path('tests/actions.test.mjs')
+          source = path.read_text(encoding='utf-8')
+          titles = re.findall(r"test\('([^']+)'", source)
+          failed_title = ''
+          failed_line = ''
+          failed_output = ''
+
+          for title in titles:
+              pattern = '^' + re.escape(title) + '$'
+              result = subprocess.run(
+                  ['node', '--test', '--test-name-pattern', pattern, str(path)],
+                  text=True,
+                  capture_output=True,
+              )
+              if result.returncode != 0:
+                  failed_title = title
+                  failed_output = (result.stdout or '') + '\n' + (result.stderr or '')
+                  match = re.search(r'actions\.test\.mjs:(\d+):', failed_output)
+                  if match:
+                      failed_line = match.group(1)
+                  break
+
+          if not failed_title:
+              raise SystemExit('actions.test.mjs faalde als geheel, maar geen afzonderlijke subtest kon worden geïsoleerd.')
+
+          slug = re.sub(r'[^A-Za-z0-9]+', '-', failed_title).strip('-').lower()[:80]
+          if failed_line:
+              slug = f'line-{failed_line}-{slug}'
+          Path('/tmp/machinepark-failing-actions-subtest.txt').write_text(
+              f'{failed_title}\nline={failed_line}\n\n{failed_output}',
+              encoding='utf-8',
+          )
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'slug={slug}\n')
+              output.write(f'title={failed_title}\n')
+              output.write(f'line={failed_line}\n')
+          print('Falende actions-subtest:', failed_title)
+          print('Regel:', failed_line or 'onbekend')
+          PY
+
       - name: Foutende regressietest vastleggen
         if: steps.existing-regressions.outputs.failed != ''
         uses: actions/upload-artifact@v4
@@ -75,10 +125,19 @@ jobs:
           path: /tmp/machinepark-failing-regression.txt
           retention-days: 1
 
+      - name: Foutende Actions-subtest vastleggen
+        if: steps.actions-regression.outputs.slug != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: failing-actions-subtest-${{ steps.actions-regression.outputs.slug }}
+          path: /tmp/machinepark-failing-actions-subtest.txt
+          retention-days: 1
+
       - name: Bestaande regressietests bewaken
         if: steps.existing-regressions.outputs.failed != ''
         run: |
           echo "Falende regressietest: ${{ steps.existing-regressions.outputs.failed }}"
+          echo "Falende Actions-subtest: ${{ steps.actions-regression.outputs.title }}"
           exit 1
 
       - name: Lokale Synology-data en login controleren
