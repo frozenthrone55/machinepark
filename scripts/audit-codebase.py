@@ -32,7 +32,9 @@ def note(message):
     notes.append(message)
 
 
-# 1. Buildketen: elk root build-*.py-bestand moet exact één keer actief zijn.
+# 1. Buildketen: elk root build-*.py-bestand moet exact één keer bereikbaar zijn.
+# Sommige root-builders zijn bewust helpers en worden vanuit een andere actieve
+# builder uitgevoerd (subprocess/exec), in plaats van rechtstreeks uit package.json.
 active_build_files = []
 for step in BUILD_COMMAND.split('&&'):
     step = step.strip()
@@ -42,31 +44,48 @@ for step in BUILD_COMMAND.split('&&'):
 
 root_build_files = sorted(path.name for path in ROOT.glob('build-*.py'))
 active_root_builds = [Path(path).name for path in active_build_files if Path(path).parent == Path('.')]
+delegated_root_builds = set()
 
-for path in sorted(set(root_build_files) - set(active_root_builds)):
-    error(f'Ongebruikt root-buildbestand: {path}')
-for path in sorted(set(active_root_builds) - set(root_build_files)):
-    error(f'Buildketen verwijst naar ontbrekend bestand: {path}')
-for path in sorted(set(active_root_builds)):
-    if active_root_builds.count(path) > 1:
-        error(f'Dubbele buildstap: {path}')
-
-if 'scripts/extract-build-assets.py' not in active_build_files:
-    error('De build wordt niet afgesloten met de frontend-assetextractie.')
-
-# 2. Buildmarkers mogen niet door verschillende patches gedeeld worden.
-marker_owners = {}
-marker_pattern = re.compile(r'data-machinepark-build-fix=\\?"([^"\\]+)\\?"')
 for relative in active_build_files:
     path = ROOT / relative
     if not path.exists() or path.suffix != '.py':
         continue
     text = path.read_text(encoding='utf-8')
-    for marker in set(marker_pattern.findall(text)):
+    for candidate in root_build_files:
+        if candidate != Path(relative).name and candidate in text:
+            delegated_root_builds.add(candidate)
+
+reachable_root_builds = set(active_root_builds) | delegated_root_builds
+
+for path in sorted(set(root_build_files) - reachable_root_builds):
+    error(f'Ongebruikt root-buildbestand: {path}')
+for path in sorted(set(active_root_builds) - set(root_build_files)):
+    error(f'Buildketen verwijst naar ontbrekend bestand: {path}')
+for path in sorted(set(active_root_builds)):
+    if active_root_builds.count(path) > 1:
+        error(f'Dubbele directe buildstap: {path}')
+
+if 'scripts/extract-build-assets.py' not in active_build_files:
+    error('De build wordt niet afgesloten met de frontend-assetextractie.')
+
+# 2. Buildmarkers mogen maar één eigenaar hebben. Alleen een echte MARKER-
+# declaratie telt als eigendom; BASE_MARKER/DIRECT_MARKER zijn afhankelijkheden
+# van een eerdere buildlaag en mogen dezelfde marker dus veilig refereren.
+marker_owners = {}
+owned_marker_pattern = re.compile(
+    r"\bMARKER\s*=\s*['\"]data-machinepark-build-fix=\\?\"([^\"\\]+)\\?\"['\"]"
+)
+marker_scan_files = [*active_build_files, *sorted(delegated_root_builds)]
+for relative in marker_scan_files:
+    path = ROOT / relative
+    if not path.exists() or path.suffix != '.py':
+        continue
+    text = path.read_text(encoding='utf-8')
+    for marker in set(owned_marker_pattern.findall(text)):
         marker_owners.setdefault(marker, []).append(relative)
 for marker, owners in sorted(marker_owners.items()):
     if len(set(owners)) > 1:
-        error(f'Buildmarker {marker!r} zit in meerdere bestanden: {", ".join(sorted(set(owners)))}')
+        error(f'Buildmarker {marker!r} heeft meerdere eigenaars: {", ".join(sorted(set(owners)))}')
 
 # 3. Alle Netlify JavaScript-modules, inclusief _shared, moeten syntactisch gecontroleerd worden.
 function_files = sorted(
@@ -104,8 +123,13 @@ if any(text in APP_SOURCE for text in [
     'van maximaal 5 foto’s',
 ]):
     error('Oude toestelfoto-limiet 3/5 is nog zichtbaar aanwezig.')
-if 'machineparkPersistServicePhotos' not in APP_SOURCE or '/.netlify/functions/service-photos' not in APP_SOURCE:
-    error('Verslagfoto’s gebruiken de aparte Blob-opslag niet.')
+service_photo_backends = [
+    '/.netlify/functions/service-photos',
+    '/machinepark/synology/api/service-photos.php',
+    './synology/api/service-photos.php',
+]
+if 'machineparkPersistServicePhotos' not in APP_SOURCE or not any(endpoint in APP_SOURCE for endpoint in service_photo_backends):
+    error('Verslagmedia gebruikt geen herkende aparte foto/video-opslagroute.')
 if 'const baseLocalSnapshotForPartPhotos = localSnapshot;' in APP_SOURCE:
     error('Achtergrondfotomigratie blokkeert nog de centrale snapshot.')
 
@@ -152,7 +176,8 @@ css_kb = round(len(BUILD_CSS.encode('utf-8')) / 1024, 1)
 note(f'index.html: {index_kb} KB')
 note(f'Feature-JavaScript: {js_kb} KB')
 note(f'Feature-CSS: {css_kb} KB')
-note(f'Actieve root-buildpatches: {len(active_root_builds)}')
+note(f'Directe root-buildpatches: {len(set(active_root_builds))}')
+note(f'Gedelegeerde root-buildhelpers: {len(delegated_root_builds)}')
 note(f'Netlify-modules: {len(function_files)}')
 
 if index_kb > 350:
