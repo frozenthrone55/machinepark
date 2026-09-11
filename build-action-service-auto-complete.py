@@ -9,11 +9,17 @@ index = INDEX.read_text(encoding="utf-8")
 service = SERVICE.read_text(encoding="utf-8")
 
 if MARKER not in index:
-    history_old = "history:appendActionHistory(item,historyEntry('completed','Actie uitgevoerd',detail))"
-    history_new = "history:appendActionHistory(item,historyEntry('completed',ctx.automatic?'Automatisch afgesloten met serviceverslag':'Actie uitgevoerd',detail))"
-    if history_old not in index:
-        raise SystemExit("Buildvalidatie mislukt: historiek voor gekoppelde ToDo afronden ontbreekt")
-    index = index.replace(history_old, history_new, 1)
+    # Pas uitsluitend de service-specifieke afrondhelper aan. Een losse tekstvervanging
+    # op 'Actie uitgevoerd' kan ook de gewone handmatige ToDo-afronding raken.
+    helper_history_old = """    const updated={...item,status:'done',deviceId,location:item.location||(device?(deviceLocationAt(device)||device.location||''):''),completedDate:todayISO(),completedAt:now,completedById:me.id,completedByName:me.name,completedByEmail:me.email,updatedAt:now,history:appendActionHistory(item,historyEntry('completed','Actie uitgevoerd',detail))};
+    await put('actions',updated);
+    state.actions=await getAll('actions');"""
+    helper_history_new = """    const updated={...item,status:'done',deviceId,location:item.location||(device?(deviceLocationAt(device)||device.location||''):''),completedDate:todayISO(),completedAt:now,completedById:me.id,completedByName:me.name,completedByEmail:me.email,updatedAt:now,history:appendActionHistory(item,historyEntry('completed',ctx.automatic?'Automatisch afgesloten met serviceverslag':'Actie uitgevoerd',detail))};
+    await put('actions',updated);
+    state.actions=await getAll('actions');"""
+    if helper_history_old not in index:
+        raise SystemExit("Buildvalidatie mislukt: service-specifieke historiek voor gekoppelde ToDo afronden ontbreekt")
+    index = index.replace(helper_history_old, helper_history_new, 1)
 
     toast_old = "    toast('Actie afgerond');\n    return true;"
     toast_new = "    if(!ctx.silent)toast('Actie afgerond');\n    return true;"
@@ -69,13 +75,17 @@ if service_finalize_new not in service:
 
 required_index = [
     MARKER,
+    "completeLinkedActionFromService(actionId,{deviceIds,label,automatic:true,silent:true})",
     "ctx.automatic?'Automatisch afgesloten met serviceverslag':'Actie uitgevoerd'",
-    "automatic:true,silent:true",
     "Gekoppelde ToDo automatisch afgesloten met het serviceverslag.",
 ]
 for needle in required_index:
     if needle not in index:
         raise SystemExit("Buildvalidatie mislukt: automatische ToDo-afsluiting ontbreekt (" + needle + ")")
+
+# De automatische historiekexpressie mag alleen in de service-specifieke helper voorkomen.
+if index.count("ctx.automatic?'Automatisch afgesloten met serviceverslag':'Actie uitgevoerd'") != 1:
+    raise SystemExit("Buildvalidatie mislukt: automatische servicehistoriek staat op een verkeerde of dubbele plaats")
 
 if "deviceIds:[...new Set((result.finals||[]).map(item=>item&&item.deviceId).filter(Boolean))]" not in service:
     raise SystemExit("Buildvalidatie mislukt: toestelcontext ontbreekt bij automatische ToDo-afsluiting")
