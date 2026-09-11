@@ -278,8 +278,8 @@ test('open service heeft eigen dashboardvenster en staat niet meer in Werkzaamhe
   assert.match(dashboard, /Open service/);
   assert.match(dashboard, /Alle serviceverslagen/);
   assert.match(dashboard, /Afgesloten/);
-  assert.match(dashboard, /panel\.parentNode!==view/);
-  assert.match(dashboard, /view\.appendChild\(panel\)/);
+  assert.match(dashboard, /panel\.parentNode!==serviceView/);
+  assert.match(dashboard, /serviceView\.appendChild\(panel\)/);
   assert.match(dashboard, /machineparkOpenServiceOverview/);
 });
 
