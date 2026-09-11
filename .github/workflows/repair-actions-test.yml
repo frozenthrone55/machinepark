@@ -1,0 +1,58 @@
+name: Herstel Actions regressietest
+
+on:
+  push:
+    branches:
+      - synology-selfhost
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Synology-bron
+        uses: actions/checkout@v5
+        with:
+          ref: synology-selfhost
+
+      - name: Herstel alleen dubbel ge-escapete regexen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('tests/actions.test.mjs')
+          text = path.read_text(encoding='utf-8')
+          replacements = [
+              (r"/actions:\\[\\]/", r"/actions:\[\]/"),
+              (r"/put\\('actions'/", r"/put\('actions'/"),
+              (r"/30\\*86400000/", r"/30\*86400000/"),
+              (r"/action-users\\.php/", r"/action-users\.php/"),
+              (r"/decorateContextModal\\('maintenance'/", r"/decorateContextModal\('maintenance'/"),
+              (r"/decorateContextModal\\('breakdown'/", r"/decorateContextModal\('breakdown'/"),
+              (r"/actions: \\['Acties'/", r"/actions: \['Acties'/"),
+              (r"/\\$data\\['actions'\\]/", r"/\$data\['actions'\]/"),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Verwacht exact 1x {old!r}, gevonden {count}x')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+          node --check tests/actions.test.mjs
+
+      - name: Commit herstel indien nodig
+        run: |
+          if git diff --quiet -- tests/actions.test.mjs; then
+            echo "Geen herstel meer nodig."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/actions.test.mjs
+          git commit -m "Fix malformed regex escapes in actions regression test"
+          git push origin HEAD:synology-selfhost
