@@ -248,7 +248,7 @@ test('dashboard onderhoud en depannages gebruiken Werkzaamheden in plaats van le
   const dashboard = readFileSync(new URL('../build-dashboard-kpi-navigation.py', import.meta.url), 'utf8');
   assert.match(dashboard, /route="work"/);
   assert.match(dashboard, /workKindFilter/);
-  assert.match(dashboard, /target==="maintenance" \? "maintenance" : "breakdowns"/);
+  assert.match(dashboard, /target==="maintenance" \? "maintenance-attention" : "breakdowns"/);
   assert.match(dashboard, /machineparkInlineNavigate/);
   assert.match(dashboard, /machineparkEarlyNavigate/);
   assert.match(dashboard, /machineparkRenderCombinedWork/);
