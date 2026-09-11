@@ -17,16 +17,28 @@ script = index[start:end]
 
 # build-composed-documents-v1 gebruikte historisch de eerste </body>-match. In
 # Machinepark komt </body> ook voor als tekst in de ToDo-afdruk-HTML. Haal het
-# volledige feature-script daarom uit zijn huidige positie en plaats het vlak
-# voor de echte, laatste afsluitende body-tag.
+# volledige feature-script daarom uit zijn huidige positie.
 index = index[:start] + index[end:]
+
+# Het ingevoegde script begon op een nieuwe regel. Na verwijderen blijven die
+# regeleindes midden in de JavaScript-string van de ToDo-afdruk staan. Zet alleen
+# deze gekende afdrukstaart opnieuw exact aaneen.
+prefix = "photoHtml+'<section><h2>Historiek</h2>'+history+'</section>"
+tail = "</body></html>';"
+prefix_pos = index.find(prefix)
+tail_pos = index.find(tail, prefix_pos + len(prefix) if prefix_pos >= 0 else 0)
+if prefix_pos < 0 or tail_pos < 0 or tail_pos - (prefix_pos + len(prefix)) > 200:
+    raise SystemExit('Buildvalidatie mislukt: onderbroken ToDo-afdrukstaart niet veilig gevonden')
+index = index[:prefix_pos] + prefix + tail + index[tail_pos + len(tail):]
+
+# Plaats het samengestelde-overzichtscript vlak voor de echte, laatste body-tag.
 body_pos = index.rfind('</body>')
 if body_pos < 0:
     raise SystemExit('Buildvalidatie mislukt: finale </body> ontbreekt')
 index = index[:body_pos] + '\n' + script + '\n<meta ' + MARKER + '>\n' + index[body_pos:]
 
-# De ToDo-afdrukstring moet na het verplaatsen opnieuw één geldige JS-string zijn.
-needle = "photoHtml+'<section><h2>Historiek</h2>'+history+'</section></body></html>';"
+# Eindcontrole: de ToDo-afdrukstring is weer geldig en de feature staat één keer.
+needle = prefix + tail
 if needle not in index:
     raise SystemExit('Buildvalidatie mislukt: ToDo-afdrukstring bleef onderbroken')
 if index.count(SCRIPT_START) != 1:
