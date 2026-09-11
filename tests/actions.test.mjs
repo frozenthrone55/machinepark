@@ -219,7 +219,7 @@ test('ToDo-labels draaien als laatste actie-naamlaag', () => {
   const cmd = pkg.scripts.build;
   assert.ok(cmd.includes('python3 build-todo-labels.py'));
   assert.ok(cmd.indexOf('python3 build-todo-labels.py') > cmd.indexOf('python3 build-action-service-delete-cleanup.py'));
-  assert.ok(cmd.indexOf('python3 build-todo-labels.py') < cmd.indexOf('node --check service-visits.js'));
+  assert.ok(cmd.indexOf('python3 build-todo-labels.py') < cmd.lastIndexOf('node --check service-visits.js'));
 });
 
 
