@@ -416,10 +416,10 @@ test('verwijderd serviceconcept laat geen ToDo spookhistoriek achter', () => {
 
 test('oude verweesde serviceconceptregels worden niet meer getoond in ToDo historiek', () => {
   const actions = readFileSync(new URL('../build-actions.py', import.meta.url), 'utf8');
-  assert.match(actions, /const activeServiceIds=new Set/);
+  assert.match(actions, /const activeDraftServiceIds=new Set/);
   assert.match(actions, /label\.includes\('serviceconcept'\)/);
   assert.match(actions, /entry&&entry\.serviceReportId/);
-  assert.match(actions, /return activeServiceIds\.size>0/);
+  assert.match(actions, /return activeDraftServiceIds\.size>0/);
 });
 
 
