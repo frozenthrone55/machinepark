@@ -1,4 +1,4 @@
-name: Diagnose serviceverslag regressie
+name: Diagnose video media regressie
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  diagnose-service-visits:
+  diagnose-video-media:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -33,8 +33,8 @@ jobs:
       - name: Machinepark bouwen
         run: npm run build
 
-      - name: Serviceverslag subtest exact diagnosticeren
-        id: service_diag
+      - name: Video media subtest exact diagnosticeren
+        id: video_diag
         shell: bash
         run: |
           python3 - <<'PY'
@@ -43,7 +43,7 @@ jobs:
           import subprocess
           from pathlib import Path
 
-          path = Path('tests/service-visits.test.mjs')
+          path = Path('tests/video-media-support.test.mjs')
           source = path.read_text(encoding='utf-8')
           titles = re.findall(r"test\('([^']+)'", source)
           failed_title = ''
@@ -61,31 +61,31 @@ jobs:
                   failed_output = (result.stdout or '') + '\n' + (result.stderr or '')
                   break
 
-          report = Path('/tmp/service-visits-diagnostic.txt')
+          report = Path('/tmp/video-media-diagnostic.txt')
           if failed_title:
               slug = re.sub(r'[^A-Za-z0-9]+', '-', failed_title).strip('-').lower()[:120]
               report.write_text(f'{failed_title}\n\n{failed_output}', encoding='utf-8')
           else:
               slug = ''
-              report.write_text('Alle serviceverslag-subtests slagen.\n', encoding='utf-8')
+              report.write_text('Alle video-media-subtests slagen.\n', encoding='utf-8')
 
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
               output.write(f'slug={slug}\n')
               output.write(f'title={failed_title}\n')
 
-          print('Falende serviceverslag-subtest:', failed_title or 'geen')
+          print('Falende video-media-subtest:', failed_title or 'geen')
           PY
 
-      - name: Serviceverslag diagnose vastleggen
-        if: steps.service_diag.outputs.slug != ''
+      - name: Video media diagnose vastleggen
+        if: steps.video_diag.outputs.slug != ''
         uses: actions/upload-artifact@v4
         with:
-          name: failing-service-visits-${{ steps.service_diag.outputs.slug }}
-          path: /tmp/service-visits-diagnostic.txt
+          name: failing-video-media-${{ steps.video_diag.outputs.slug }}
+          path: /tmp/video-media-diagnostic.txt
           retention-days: 1
 
       - name: Diagnose bewaken
-        if: steps.service_diag.outputs.slug != ''
+        if: steps.video_diag.outputs.slug != ''
         run: |
-          echo "Falende serviceverslag-subtest: ${{ steps.service_diag.outputs.title }}"
+          echo "Falende video-media-subtest: ${{ steps.video_diag.outputs.title }}"
           exit 1
