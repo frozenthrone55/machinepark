@@ -16,16 +16,15 @@ if MARKER not in index:
     old_create = '''        <div class="composed-create-grid"><div class="field"><label>Naam / firma van het document</label><input id="composedDocumentName" maxlength="140" placeholder="Bijv. Firma X · volledig toesteldossier"></div><div class="field"><label>Zoek firma, locatie of toestel</label><input id="composedDeviceSearch" type="search" autocomplete="off" placeholder="Typ locatie, WCL-nummer, merk, model of serienummer…"></div></div>
         <div class="composed-toolbar"><div class="composed-toolbar-left"><button class="btn small" id="composedSelectVisible" type="button">Alles zichtbaar aanvinken</button><button class="btn small" id="composedClearSelection" type="button">Selectie wissen</button></div><div class="composed-toolbar-right"><button class="btn primary" id="composedSaveDocument" type="button">Opslaan in samengestelde documenten</button></div></div>
         <div class="table-wrap"><table class="table composed-device-table">'''
-    new_create = '''        <div class="composed-create-grid composed-create-grid-single"><div class="field"><label>Naam / firma van het document</label><input id="composedDocumentName" maxlength="140" placeholder="Bijv. Firma X · volledig toesteldossier"></div></div>
+    new_create = '''        <div class="composed-create-grid composed-create-grid-single"><div class="field"><label>Naam toestel / firma voor nieuw document</label><input id="composedDocumentName" maxlength="140" placeholder="Bijv. Firma X · volledig toesteldossier"></div></div>
         <div class="composed-toolbar"><div class="composed-toolbar-left"><button class="btn small" id="composedSelectVisible" type="button">Alles zichtbaar aanvinken</button><button class="btn small" id="composedClearSelection" type="button">Selectie wissen</button></div><div class="composed-toolbar-right"><button class="btn primary" id="composedSaveDocument" type="button">Opslaan in samengestelde documenten</button></div></div>
-        <div class="composed-table-search"><label for="composedDeviceSearch">Zoek firma, locatie of toestel</label><input id="composedDeviceSearch" type="search" autocomplete="off" placeholder="Typ locatie, WCL-nummer, merk, model of serienummer…"></div>
         <div class="table-wrap composed-device-list-wrap"><table class="table composed-device-table">'''
 
     old_saved = '''      <section class="composed-section"><div class="composed-section-head"><h3>Samengestelde documenten</h3><input class="composed-saved-search" id="composedSavedSearch" type="search" autocomplete="off" placeholder="Zoek in opgeslagen documenten…"></div><div class="composed-section-body"><div class="table-wrap"><table class="table" style="min-width:900px">'''
     new_saved = '''      <section class="composed-section"><div class="composed-section-head"><h3>Samengestelde documenten</h3></div><div class="composed-section-body"><div class="composed-table-search composed-table-search-saved"><label for="composedSavedSearch">Zoek in opgeslagen documenten</label><input class="composed-saved-search" id="composedSavedSearch" type="search" autocomplete="off" placeholder="Typ naam, firma of toestel…"></div><div class="table-wrap"><table class="table" style="min-width:900px">'''
 
     for old, new, label in [
-        (old_create, new_create, 'zoekbalk en scrollzone nieuwe documenten'),
+        (old_create, new_create, 'één invoerveld en scrollzone nieuwe documenten'),
         (old_saved, new_saved, 'zoekbalk opgeslagen documenten'),
     ]:
         count = index.count(old)
@@ -55,7 +54,8 @@ built = INDEX.read_text(encoding='utf-8')
 required = [
     MARKER,
     'composed-create-grid composed-create-grid-single',
-    '<label for="composedDeviceSearch">Zoek firma, locatie of toestel</label>',
+    '<label>Naam toestel / firma voor nieuw document</label>',
+    'id="composedDocumentName"',
     'table-wrap composed-device-list-wrap',
     '<label for="composedSavedSearch">Zoek in opgeslagen documenten</label>',
     'max-height:min(52vh,520px)',
@@ -64,5 +64,7 @@ required = [
 for needle in required:
     if needle not in built:
         raise SystemExit(f'Buildvalidatie mislukt: layout-token ontbreekt: {needle}')
+if 'id="composedDeviceSearch"' in built:
+    raise SystemExit('Buildvalidatie mislukt: extra toestelzoekbalk mag niet meer aanwezig zijn')
 
-print('[Machinepark] samengestelde documentlijst is scrollbaar en zoekvelden staan boven hun tabel')
+print('[Machinepark] één zoekveld voor nieuw samengesteld document, aparte zoekbalk voor bestaande documenten en scrollbare toestellenlijst')
