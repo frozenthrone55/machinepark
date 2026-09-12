@@ -16,6 +16,18 @@ test('samengestelde documenten staan alleen via Beheer in een apart overzichtsve
   assert.match(builtUiSource, /data-composed-device/);
 });
 
+test('zoeken in samengesteld overzicht filtert beide tabellen live op de actuele invoer', () => {
+  for (const needle of [
+    'composed-search-filter-v1',
+    "composedDeviceSearch?.addEventListener('input',syncComposedDeviceSearch)",
+    "composedDeviceSearch?.addEventListener('search',syncComposedDeviceSearch)",
+    "composedSavedSearch?.addEventListener('input',syncComposedSavedSearch)",
+    "composedSavedSearch?.addEventListener('search',syncComposedSavedSearch)",
+    "composedDeviceQuery=String(search?.value??composedDeviceQuery??'')",
+    "composedSavedQuery=String(search?.value??composedSavedQuery??'')",
+  ]) assert.ok(builtUiSource.includes(needle), `${needle} ontbreekt`);
+});
+
 test('opgeslagen samengestelde documenten hebben alle gevraagde acties', () => {
   for (const action of ['view', 'mail', 'print', 'pdf', 'delete']) {
     assert.match(builtUiSource, new RegExp(`data-composed-action="${action}"`));
