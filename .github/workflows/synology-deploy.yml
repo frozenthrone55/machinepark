@@ -235,11 +235,18 @@ jobs:
           import json, os
           from datetime import datetime, timezone
           from pathlib import Path
+
+          package = json.loads(Path("package.json").read_text(encoding="utf-8"))
+          app_version = str(package.get("version") or "").strip()
+          if not app_version:
+              raise SystemExit("Versie-informatie schrijven mislukt: package.json bevat geen versie")
+
           Path("/tmp/machinepark-synology/deploy-meta.json").write_text(
               json.dumps({
                   "source_sha": os.environ["SOURCE_SHA"],
                   "built_at": datetime.now(timezone.utc).isoformat(),
-                  "source_branch": "synology-selfhost"
+                  "source_branch": "synology-selfhost",
+                  "app_version": app_version
               }, indent=2) + "\n",
               encoding="utf-8",
           )
