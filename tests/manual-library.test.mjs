@@ -53,7 +53,7 @@ test('PDF kan bewust offline beschikbaar worden gemaakt zonder alle handleidinge
 });
 
 test('handleidingen doen mee met build service worker en functiecontrole', () => {
-  assert.equal(packageJson.version, '1.68.9');
+  assert.equal(packageJson.version, '1.68.10');
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-manual-library\.py/);
   assert.ok(chain.indexOf('build-fault-cache-online-refresh.py') < chain.indexOf('build-manual-library.py'));
