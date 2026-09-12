@@ -28,7 +28,7 @@ test('serviceverslagen groeperen gekoppelde onderhouds depannage en andere regis
 test('alle verslagfotos staan bij de juiste gebeurtenis zonder limiet van vijf of tien', () => {
   assert.match(patch, /row\?\.item\?\.photos/);
   assert.match(patch, /data-photo-lightbox/);
-  assert.match(patch, /class=\\"composed-history-photo\\"/);
+  assert.match(patch, /class="composed-history-photo"/);
   assert.doesNotMatch(patch, /composedHistoryPhotoList[\s\S]{0,700}\.slice\(0,\s*(5|10)\)/);
   assert.ok(built.includes('Foto’s staan bij het bijbehorende verslag.'));
 });
