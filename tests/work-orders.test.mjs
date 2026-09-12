@@ -6,10 +6,10 @@ const build = readFileSync(new URL('../build-work-orders.py', import.meta.url), 
 const endpoint = readFileSync(new URL('../netlify/functions/work-order-templates.mjs', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-test('werkbontemplates zijn centraal en alleen door beheerder wijzigbaar', () => {
+test('werkbontemplates zijn centraal en alleen met werkbonbeheerrecht wijzigbaar', () => {
   assert.ok(endpoint.includes("const CONFIG_KEY = 'work-order-templates-v1'"));
-  assert.ok(endpoint.includes("access?.role === 'beheerder'"));
-  assert.ok(endpoint.includes("Alleen een beheerder kan werkbonnen configureren."));
+  assert.ok(endpoint.includes("permissions?.['workorders.manage']"));
+  assert.equal(endpoint.includes("access?.role === 'beheerder'"), false);
   assert.ok(endpoint.includes("onlyIfMatch"));
   assert.ok(endpoint.includes("templateVersion") === false, 'template endpoint bewaart templates, geen ingevulde records');
 });
