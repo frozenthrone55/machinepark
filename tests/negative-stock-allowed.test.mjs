@@ -13,13 +13,13 @@ test('onderhoud en depannage worden niet geblokkeerd door onvoldoende voorraad',
   assert.doesNotMatch(builtSource, /const usage=collectUsage\(\),err=checkUsage\(usage,old\.usedParts\|\|\[\]\);if\(err\)\{alert\(err\);return\}/);
   assert.doesNotMatch(builtSource, /const err=checkMaintenanceBatchUsage\(items\);if\(err\)\{alert\(err\);return\}/);
   assert.doesNotMatch(builtSource, /const err=checkBreakdownBatchUsage\(items\);if\(err\)\{alert\(err\);return\}/);
-  assert.match(builtSource, /stock:Number\(p\.stock\|\|0\)-q/);
-  assert.match(builtSource, /stock:Number\(p\.stock\|\|0\)-qty/);
+  assert.match(builtSource, /stock:normalizePartQuantity\(Number\(p\.stock\|\|0\)-q\)/);
+  assert.match(builtSource, /stock:normalizePartQuantity\(Number\(p\.stock\|\|0\)-qty\)/);
 });
 
 test('serviceconcepten mogen onderdelen onder nul brengen', () => {
   assert.doesNotMatch(builtSource, /if \(Number\(part\.stock \|\| 0\) < qty\) throw new Error\(`Onvoldoende voorraad/);
-  assert.match(builtSource, /stock:Number\((?:part|p)\.stock\s*\|\|\s*0\)\s*-\s*qty/);
+  assert.match(builtSource, /stock:normalizePartQuantity\(Number\((?:part|p)\.stock\s*\|\|\s*0\)-qty\)/);
   assert.doesNotMatch(serviceVisits, /if\(Number\(p\.stock\|\|0\)<qty\)throw new Error/);
 });
 
