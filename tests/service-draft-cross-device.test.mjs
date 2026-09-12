@@ -27,5 +27,5 @@ test('cross-device conceptsync bouwt direct na serviceconcepten en vóór offlin
   const chain = packageJson.scripts.build;
   assert.ok(chain.indexOf('build-service-drafts.py') < chain.indexOf('build-service-draft-cross-device.py'));
   assert.ok(chain.indexOf('build-service-draft-cross-device.py') < chain.indexOf('build-offline-first.py'));
-  assert.equal(packageJson.version, '1.68.9');
+  assert.equal(packageJson.version, '1.68.10');
 });
