@@ -1,4 +1,5 @@
 from pathlib import Path
+import runpy
 
 ROOT = Path(__file__).resolve().parent
 INDEX = ROOT / 'index.html'
@@ -64,3 +65,4 @@ for needle in required:
         raise SystemExit(f'Buildvalidatie mislukt: zoekfilter-token ontbreekt: {needle}')
 
 print('[Machinepark] zoeken in samengesteld overzicht filtert de zichtbare tabellen live')
+runpy.run_path(str(ROOT / 'build-composed-layout.py'), run_name='__main__')
