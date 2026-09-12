@@ -37,6 +37,22 @@ test('alleen toestel links selecteren blijft voldoende om samengesteld document 
   assert.match(saveFix, /saveButton\.onclick=\(\)=>saveComposedDocument\(\)/);
 });
 
+test('ToDos van gekozen toestellen en gekoppelde serviceverslagen gaan mee in samengesteld document', () => {
+  assert.match(saveFix, /composed-todos-v1/);
+  assert.match(saveFix, /const actions=\(state\.actions\|\|\[\]\)\.filter/);
+  assert.match(saveFix, /fullDeviceIds\.has\(String\(item\.deviceId\|\|''\)\)/);
+  assert.match(saveFix, /selectedReportIds/);
+  assert.match(saveFix, /composedTodoServiceIds\(item\)\.some\(id=>selectedReportIds\.has\(id\)\)/);
+});
+
+test('ToDos staan chronologisch per locatie in het verslag en houden hun fotos', () => {
+  assert.match(saveFix, /composedHistoryRows=function\(snapshot\)/);
+  assert.match(saveFix, /kind:'ToDo'/);
+  assert.match(saveFix, /composedHistoryEventHtml=function\(snapshot,event\)/);
+  assert.match(saveFix, /composedHistoryPhotosHtml\(event\.rows,'ToDo'\)/);
+  assert.match(saveFix, /serviceverslagen, ToDo’s/);
+});
+
 test('verslagtabel en toestel-opslagfix worden rechtstreeks door npm build uitgevoerd', () => {
   assert.ok(pkg.scripts.build.includes('python3 build-composed-source-reports.py'));
   assert.ok(pkg.scripts.build.indexOf('build-composed-source-reports.py') > pkg.scripts.build.indexOf('build-composed-history-device-photos.py'));
