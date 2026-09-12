@@ -49,7 +49,7 @@ test('Werkzaamheden respecteert bestaande afzonderlijke rechten', () => {
 
 test('Werkzaamheden bouwt na cross-device concepten en vóór offline-first', () => {
   const chain = packageJson.scripts.build;
-  assert.equal(packageJson.version, '1.68.9');
+  assert.equal(packageJson.version, '1.68.10');
   assert.ok(chain.indexOf('build-service-draft-cross-device.py') < chain.indexOf('build-work-activities.py'));
   assert.ok(chain.indexOf('build-work-activities.py') < chain.indexOf('build-offline-first.py'));
 });
