@@ -51,7 +51,7 @@ test('serviceverslag telt en toont Andere werken apart van depannages', () => {
 test('serviceverslag verwijderen verwijdert Andere werken mee en reset dezelfde voorraad', () => {
   assert.match(js, /otherWorks:rows\.breakdowns\.filter\(item=>svIsOtherWork\(item\)\)\.length/);
   assert.match(js, /impact\.otherWorks/);
-  assert.match(js, /stock:Number\(part\.stock\|\|0\)\+Number\(qty\|\|0\)/);
+  assert.match(js, /stock:normalizePartQuantity\(Number\(part\.stock\|\|0\)\+Number\(qty\|\|0\)\)/);
   assert.match(js, /impact\.rows\.breakdowns\.forEach\(record=>bs\.delete\(record\.id\)\)/);
 });
 
