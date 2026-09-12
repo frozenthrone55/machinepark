@@ -41,8 +41,12 @@ test('ToDos van gekozen toestellen en gekoppelde serviceverslagen gaan mee in sa
   assert.match(saveFix, /composed-todos-v1/);
   assert.match(saveFix, /const actions=\(state\.actions\|\|\[\]\)\.filter/);
   assert.match(saveFix, /fullDeviceIds\.has\(String\(item\.deviceId\|\|''\)\)/);
-  assert.match(saveFix, /selectedReportIds/);
-  assert.match(saveFix, /composedTodoServiceIds\(item\)\.some\(id=>selectedReportIds\.has\(id\)\)/);
+  assert.match(saveFix, /includedReportIds/);
+  assert.match(saveFix, /snapshot\?\.maintenance/);
+  assert.match(saveFix, /snapshot\?\.breakdowns/);
+  assert.match(saveFix, /record\?\.serviceReportId/);
+  assert.match(saveFix, /record\?\.serviceVisitId/);
+  assert.match(saveFix, /composedTodoServiceIds\(item\)\.some\(id=>includedReportIds\.has\(id\)\)/);
 });
 
 test('ToDos staan chronologisch per locatie in het verslag en houden hun fotos', () => {
