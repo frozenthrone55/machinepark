@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const read = path => fs.readFileSync(path, 'utf8');
 const patch = read('build-composed-source-reports.py');
+const saveFix = read('build-composed-device-selection-save-fix.py');
 const pkg = JSON.parse(read('package.json'));
 
 test('verslagtabel staat naast toestellen en gebruikt hetzelfde zoekvak', () => {
@@ -14,8 +15,8 @@ test('verslagtabel staat naast toestellen en gebruikt hetzelfde zoekvak', () => 
 });
 
 test('verslagtabel heeft dezelfde selectieknoppen als toestellentabel', () => {
-  assert.match(patch, /<button[^>]*composedSelectVisibleReports[^>]*button[^>]*>Alles zichtbaar aanvinken<\/button>/);
-  assert.match(patch, /<button[^>]*composedClearReportSelection[^>]*button[^>]*>Selectie wissen<\/button>/);
+  assert.match(patch, /<button[^>]*composedSelectVisibleReports[^>]*>Alles zichtbaar aanvinken<\/button>/);
+  assert.match(patch, /<button[^>]*composedClearReportSelection[^>]*>Selectie wissen<\/button>/);
   assert.doesNotMatch(patch, /<input[^>]*composedSelectVisibleReports/);
   assert.doesNotMatch(patch, /<input[^>]*composedClearReportSelection/);
 });
@@ -28,7 +29,17 @@ test('specifiek geselecteerde verslagen worden werkelijk in snapshot opgenomen',
   assert.match(patch, /Vink minstens één toestel of verslag aan/);
 });
 
-test('verslagtabel wordt rechtstreeks door npm build uitgevoerd', () => {
+test('alleen toestel links selecteren blijft voldoende om samengesteld document op te slaan', () => {
+  assert.match(patch, /if\(!keys\.size\)return composedBaseSnapshot\(\[\.\.\.fullDeviceIds\]\)/);
+  assert.match(patch, /if\(!selectedComposedDevices\.size&&!selectedComposedReports\.size\)/);
+  assert.match(saveFix, /composedSyncVisibleDeviceSelection/);
+  assert.match(saveFix, /if\(cb\.checked\)selectedComposedDevices\.add\(id\)/);
+  assert.match(saveFix, /saveButton\.onclick=\(\)=>saveComposedDocument\(\)/);
+});
+
+test('verslagtabel en toestel-opslagfix worden rechtstreeks door npm build uitgevoerd', () => {
   assert.ok(pkg.scripts.build.includes('python3 build-composed-source-reports.py'));
   assert.ok(pkg.scripts.build.indexOf('build-composed-source-reports.py') > pkg.scripts.build.indexOf('build-composed-history-device-photos.py'));
+  assert.ok(pkg.scripts.build.includes('python3 build-composed-device-selection-save-fix.py'));
+  assert.ok(pkg.scripts.build.indexOf('build-composed-device-selection-save-fix.py') > pkg.scripts.build.indexOf('build-composed-source-reports.py'));
 });
