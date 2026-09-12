@@ -1,4 +1,4 @@
-name: Diagnose werkbon regressie
+name: Diagnose Outlook Classic runtime
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  diagnose-work-orders:
+  diagnose-outlook-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -33,51 +33,109 @@ jobs:
       - name: Machinepark bouwen
         run: npm run build
 
-      - name: Werkbon subtest exact diagnosticeren
-        id: workorder_diag
+      - name: Synology runtime samenstellen
+        run: |
+          rm -rf /tmp/machinepark-synology
+          python3 scripts/package-synology-runtime.py --output /tmp/machinepark-synology
+
+      - name: Outlook runtime exact diagnosticeren
+        id: outlook_diag
         shell: bash
         run: |
           python3 - <<'PY'
           import os
-          import re
-          import subprocess
           from pathlib import Path
 
-          path = Path('tests/work-orders.test.mjs')
-          source = path.read_text(encoding='utf-8')
-          titles = re.findall(r"test\('([^']+)'", source)
-          failed_title = ''
-          failed_output = ''
-          for title in titles:
-              pattern = '^' + re.escape(title) + '$'
-              result = subprocess.run(['node','--test','--test-name-pattern',pattern,str(path)], text=True, capture_output=True)
-              if result.returncode != 0:
-                  failed_title = title
-                  failed_output = (result.stdout or '') + '\n' + (result.stderr or '')
-                  break
-          report = Path('/tmp/work-orders-diagnostic.txt')
-          if failed_title:
-              slug = re.sub(r'[^A-Za-z0-9]+','-',failed_title).strip('-').lower()[:120]
-              report.write_text(f'{failed_title}\n\n{failed_output}',encoding='utf-8')
+          runtime = Path('/tmp/machinepark-synology')
+          report = []
+          failures = []
+
+          js_path = runtime / 'assets/machinepark-build.js'
+          setup_path = runtime / 'machinepark-outlook-classic-setup.cmd'
+
+          def record(label, ok, detail=''):
+              status = 'PASS' if ok else 'FAIL'
+              line = f'{status} | {label}'
+              if detail:
+                  line += f' | {detail}'
+              print(line)
+              report.append(line)
+              if not ok:
+                  failures.append(label)
+
+          record('runtime JS bestaat', js_path.exists(), str(js_path))
+          record('Outlook setup bestaat', setup_path.exists(), str(setup_path))
+
+          js = js_path.read_text(encoding='utf-8') if js_path.exists() else ''
+          setup = setup_path.read_text(encoding='utf-8') if setup_path.exists() else ''
+
+          required_js = [
+              'machinepark-outlook-classic-bridge-v3',
+              'function machineparkOutlookPendingRequest(context)',
+              'function machineparkLaunchOutlookPending(request)',
+              'machinepark-outlook://compose?file=',
+              "const outlookRequest = machineparkIsWindowsDesktop() ? machineparkOutlookPendingRequest(context) : null;",
+              'machineparkLaunchOutlookPending(outlookRequest);',
+              "await createDirectPdf(context, outlookRequest?.fileName || '');",
+              'navigator.share(shareData)',
+              'Outlook Classic koppelen',
+          ]
+          for i, token in enumerate(required_js, 1):
+              record(f'JS token {i}', token in js, token)
+
+          direct_token = "const outlookRequest = machineparkIsWindowsDesktop() ? machineparkOutlookPendingRequest(context) : null;"
+          launch_token = 'machineparkLaunchOutlookPending(outlookRequest);'
+          pdf_token = "await createDirectPdf(context, outlookRequest?.fileName || '');"
+          if all(token in js for token in (direct_token, launch_token, pdf_token)):
+              direct_start = js.index(direct_token)
+              launch_at = js.index(launch_token, direct_start)
+              pdf_await_at = js.index(pdf_token, direct_start)
+              record('protocolstart vóór PDF-await', launch_at < pdf_await_at, f'launch={launch_at}, pdf={pdf_await_at}')
           else:
-              slug = ''
-              report.write_text('Alle werkbon-subtests slagen.\n',encoding='utf-8')
-          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as output:
-              output.write(f'slug={slug}\n')
-              output.write(f'title={failed_title}\n')
-          print('Falende werkbon-subtest:',failed_title or 'geen')
+              record('protocolstart vóór PDF-await', False, 'één of meer vereiste tokens ontbreken')
+
+          launch_start_token = 'function machineparkLaunchOutlookPending(request)'
+          launch_end_token = 'function machineparkDownloadOutlookClassicSetup()'
+          if launch_start_token in js and launch_end_token in js:
+              launch_start = js.index(launch_start_token)
+              launch_end = js.index(launch_end_token, launch_start)
+              launch_block = js[launch_start:launch_end]
+              record('directe protocol-click aanwezig', 'anchor.click();' in launch_block)
+              record('protocolstart zonder setTimeout', 'setTimeout' not in launch_block)
+              record('protocolstart zonder await', 'await ' not in launch_block)
+          else:
+              record('launch-functie afbakenen', False, 'start- of eindfunctie ontbreekt')
+
+          required_setup = [
+              "HKCU:\\Software\\Classes\\machinepark-outlook",
+              "NameSpace('shell:Downloads')",
+              'AddSeconds(60)',
+              'New-Object -ComObject Outlook.Application',
+              '$mail.Attachments.Add($pdf.FullName)',
+              '$mail.Display()',
+              'machinepark-outlook-installer-loader-v2',
+              "[regex]::Match($raw,'(?m)^###MACHINEPARK_POWERSHELL###\\r?$')",
+          ]
+          for i, token in enumerate(required_setup, 1):
+              record(f'SETUP token {i}', token in setup, token)
+
+          report_path = Path('/tmp/outlook-runtime-diagnostic.txt')
+          report_path.write_text('\n'.join(report) + '\n', encoding='utf-8')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'failures={len(failures)}\n')
+          print(f'Totaal fouten: {len(failures)}')
           PY
 
-      - name: Werkbon diagnose vastleggen
-        if: steps.workorder_diag.outputs.slug != ''
+      - name: Outlook diagnose vastleggen
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: failing-work-orders-${{ steps.workorder_diag.outputs.slug }}
-          path: /tmp/work-orders-diagnostic.txt
+          name: outlook-runtime-diagnostic
+          path: /tmp/outlook-runtime-diagnostic.txt
           retention-days: 1
 
       - name: Diagnose bewaken
-        if: steps.workorder_diag.outputs.slug != ''
+        if: steps.outlook_diag.outputs.failures != '0'
         run: |
-          echo "Falende werkbon-subtest: ${{ steps.workorder_diag.outputs.title }}"
+          echo "Outlook runtime bevat ${{ steps.outlook_diag.outputs.failures }} falende controles."
           exit 1
