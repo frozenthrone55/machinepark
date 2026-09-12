@@ -3,29 +3,29 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = path => fs.readFileSync(path, 'utf8');
+const html = read('index.html');
+const buildJs = read('assets/machinepark-build.js');
+const builtUiSource = `${html}\n${buildJs}`;
 
 test('samengestelde documenten staan alleen via Beheer in een apart overzichtsvenster', () => {
-  const html = read('index.html');
-  assert.match(html, /id="openComposedDocuments"[^>]*>Samengesteld overzicht maken</);
-  assert.match(html, /id="composedDocumentsWindow"/);
-  assert.match(html, />Samengestelde documenten</);
-  assert.match(html, /Naam \/ firma van het document/);
-  assert.match(html, /Zoek firma, locatie of toestel/);
-  assert.match(html, /data-composed-device/);
+  assert.match(builtUiSource, /id="openComposedDocuments"[^>]*>Samengesteld overzicht maken</);
+  assert.match(builtUiSource, /id=['"]composedDocumentsWindow['"]/);
+  assert.match(builtUiSource, />Samengestelde documenten</);
+  assert.match(builtUiSource, /Naam \/ firma van het document/);
+  assert.match(builtUiSource, /Zoek firma, locatie of toestel/);
+  assert.match(builtUiSource, /data-composed-device/);
 });
 
 test('opgeslagen samengestelde documenten hebben alle gevraagde acties', () => {
-  const html = read('index.html');
   for (const action of ['view', 'mail', 'print', 'pdf', 'delete']) {
-    assert.match(html, new RegExp(`data-composed-action="${action}"`));
+    assert.match(builtUiSource, new RegExp(`data-composed-action="${action}"`));
   }
   for (const label of ['Bekijken', 'E-mailen', 'Afdrukken', 'PDF opslaan', 'Wissen']) {
-    assert.ok(html.includes(label), `${label} ontbreekt`);
+    assert.ok(builtUiSource.includes(label), `${label} ontbreekt`);
   }
 });
 
 test('samengesteld document bewaart een momentopname met historiek en onderdelen', () => {
-  const html = read('index.html');
   for (const needle of [
     'composedSnapshot',
     'locationHistory',
@@ -35,7 +35,7 @@ test('samengesteld document bewaart een momentopname met historiek en onderdelen
     'Totaal gebruikte onderdelen',
     'usedParts',
     'oneOffParts',
-  ]) assert.ok(html.includes(needle), `${needle} ontbreekt`);
+  ]) assert.ok(builtUiSource.includes(needle), `${needle} ontbreekt`);
 });
 
 test('samengestelde documenten synchroniseren veilig en oudere clients wissen ze niet', () => {
@@ -50,7 +50,6 @@ test('samengestelde documenten synchroniseren veilig en oudere clients wissen ze
 });
 
 test('Synology gebruikt voor samengestelde PDF een lokale jsPDF-library', () => {
-  const html = read('index.html');
   assert.ok(html.includes('./vendor/jspdf.umd.min.js'));
   assert.ok(!html.includes('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'));
 });
