@@ -20,9 +20,9 @@ test('serviceverslag verwijdert gekoppelde onderhouds- en depannageregistraties 
   assert.match(js, /impact\.rows\.breakdowns\.forEach\(record=>bs\.delete\(record\.id\)\)/);
 });
 
-test('gebruikte voorraadonderdelen worden exact terug op voorraad gezet', () => {
-  assert.match(js, /totals\[id\]=\(totals\[id\]\|\|0\)\+qty/);
-  assert.match(js, /stock:Number\(part\.stock\|\|0\)\+Number\(qty\|\|0\)/);
+test('gebruikte voorraadonderdelen worden exact en decimaal terug op voorraad gezet', () => {
+  assert.match(js, /totals\[id\]=normalizePartQuantity\(\(totals\[id\]\|\|0\)\+qty\)/);
+  assert.match(js, /stock:normalizePartQuantity\(Number\(part\.stock\|\|0\)\+Number\(qty\|\|0\)\)/);
   assert.match(js, /terug op voorraad gezet/);
 });
 
