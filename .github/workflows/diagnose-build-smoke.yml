@@ -1,4 +1,4 @@
-name: Diagnose video media regressie
+name: Diagnose werkbon regressie
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  diagnose-video-media:
+  diagnose-work-orders:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -33,8 +33,8 @@ jobs:
       - name: Machinepark bouwen
         run: npm run build
 
-      - name: Video media subtest exact diagnosticeren
-        id: video_diag
+      - name: Werkbon subtest exact diagnosticeren
+        id: workorder_diag
         shell: bash
         run: |
           python3 - <<'PY'
@@ -43,49 +43,41 @@ jobs:
           import subprocess
           from pathlib import Path
 
-          path = Path('tests/video-media-support.test.mjs')
+          path = Path('tests/work-orders.test.mjs')
           source = path.read_text(encoding='utf-8')
           titles = re.findall(r"test\('([^']+)'", source)
           failed_title = ''
           failed_output = ''
-
           for title in titles:
               pattern = '^' + re.escape(title) + '$'
-              result = subprocess.run(
-                  ['node', '--test', '--test-name-pattern', pattern, str(path)],
-                  text=True,
-                  capture_output=True,
-              )
+              result = subprocess.run(['node','--test','--test-name-pattern',pattern,str(path)], text=True, capture_output=True)
               if result.returncode != 0:
                   failed_title = title
                   failed_output = (result.stdout or '') + '\n' + (result.stderr or '')
                   break
-
-          report = Path('/tmp/video-media-diagnostic.txt')
+          report = Path('/tmp/work-orders-diagnostic.txt')
           if failed_title:
-              slug = re.sub(r'[^A-Za-z0-9]+', '-', failed_title).strip('-').lower()[:120]
-              report.write_text(f'{failed_title}\n\n{failed_output}', encoding='utf-8')
+              slug = re.sub(r'[^A-Za-z0-9]+','-',failed_title).strip('-').lower()[:120]
+              report.write_text(f'{failed_title}\n\n{failed_output}',encoding='utf-8')
           else:
               slug = ''
-              report.write_text('Alle video-media-subtests slagen.\n', encoding='utf-8')
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              report.write_text('Alle werkbon-subtests slagen.\n',encoding='utf-8')
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as output:
               output.write(f'slug={slug}\n')
               output.write(f'title={failed_title}\n')
-
-          print('Falende video-media-subtest:', failed_title or 'geen')
+          print('Falende werkbon-subtest:',failed_title or 'geen')
           PY
 
-      - name: Video media diagnose vastleggen
-        if: steps.video_diag.outputs.slug != ''
+      - name: Werkbon diagnose vastleggen
+        if: steps.workorder_diag.outputs.slug != ''
         uses: actions/upload-artifact@v4
         with:
-          name: failing-video-media-${{ steps.video_diag.outputs.slug }}
-          path: /tmp/video-media-diagnostic.txt
+          name: failing-work-orders-${{ steps.workorder_diag.outputs.slug }}
+          path: /tmp/work-orders-diagnostic.txt
           retention-days: 1
 
       - name: Diagnose bewaken
-        if: steps.video_diag.outputs.slug != ''
+        if: steps.workorder_diag.outputs.slug != ''
         run: |
-          echo "Falende video-media-subtest: ${{ steps.video_diag.outputs.title }}"
+          echo "Falende werkbon-subtest: ${{ steps.workorder_diag.outputs.title }}"
           exit 1
