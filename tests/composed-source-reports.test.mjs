@@ -14,10 +14,10 @@ test('verslagtabel staat naast toestellen en gebruikt hetzelfde zoekvak', () => 
 });
 
 test('verslagtabel heeft dezelfde selectieknoppen als toestellentabel', () => {
-  assert.match(patch, /id=\\"composedSelectVisibleReports\\" type=\\"button\\">Alles zichtbaar aanvinken/);
-  assert.match(patch, /id=\\"composedClearReportSelection\\" type=\\"button\\">Selectie wissen/);
-  assert.doesNotMatch(patch, /id=\\"composedSelectVisibleReports\\"[^>]*type=\\"checkbox\\"/);
-  assert.doesNotMatch(patch, /id=\\"composedClearReportSelection\\"[^>]*type=\\"checkbox\\"/);
+  assert.match(patch, /<button[^>]*composedSelectVisibleReports[^>]*button[^>]*>Alles zichtbaar aanvinken<\/button>/);
+  assert.match(patch, /<button[^>]*composedClearReportSelection[^>]*button[^>]*>Selectie wissen<\/button>/);
+  assert.doesNotMatch(patch, /<input[^>]*composedSelectVisibleReports/);
+  assert.doesNotMatch(patch, /<input[^>]*composedClearReportSelection/);
 });
 
 test('specifiek geselecteerde verslagen worden werkelijk in snapshot opgenomen', () => {
