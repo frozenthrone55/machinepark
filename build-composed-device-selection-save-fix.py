@@ -124,7 +124,7 @@ if TODO_MARKER not in index:
     index = index.replace(anchor, todo_script + '\n' + anchor, 1)
 
     history_intro = 'Onderhoud, depannages, serviceverslagen en andere relevante registraties · nieuwste gebeurtenis eerst. Foto’s staan bij het bijbehorende verslag.'
-    todo_intro = 'Onderhoud, depannages, serviceverslagen, ToDo’s en andere relevante registraties · nieuwste gebeurtenis eerst. Foto’s blijven bij het bijbehorende verslag of de bijbehorende ToDo.'
+    todo_intro = 'Onderhoud, depannages, serviceverslagen, ToDo’s en andere relevante registraties · nieuwste gebeurtenis eerst. Foto’s staan bij het bijbehorende verslag. ToDo-foto’s blijven bij de bijbehorende ToDo.'
     if index.count(history_intro) != 1:
         raise SystemExit(f'Buildvalidatie mislukt: verwacht 1x geschiedenisintro voor ToDo-opname, gevonden {index.count(history_intro)}x')
     index = index.replace(history_intro, todo_intro, 1)
@@ -155,6 +155,7 @@ required = [
     'composedHistoryEventHtml=function(snapshot,event)',
     "composedHistoryPhotosHtml(event.rows,'ToDo')",
     'serviceverslagen, ToDo’s',
+    'Foto’s staan bij het bijbehorende verslag.',
 ]
 for needle in required:
     if needle not in built:
