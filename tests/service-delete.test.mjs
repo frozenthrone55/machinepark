@@ -17,7 +17,7 @@ test('depannagedetails hebben net als onderhoud een verwijderknop', () => {
 test('verwijderen van onderhoud of depannage herstelt voorraad atomair', () => {
   assert.match(builtSource, /if\(!\['maintenance','breakdowns'\]\.includes\(storeName\)\)/);
   assert.match(builtSource, /db\.transaction\(\[storeName,'parts'\],'readwrite'\)/);
-  assert.match(builtSource, /stock:Number\(part\.stock\|\|0\)\+qty/);
+  assert.match(builtSource, /stock:normalizePartQuantity\(Number\(part\.stock\|\|0\)\+qty\)/);
   assert.match(builtSource, /records\.delete\(record\.id\)/);
 });
 
