@@ -51,5 +51,5 @@ test('centrale seed draait na de eerdere leegmaak en vóór handleidingen/offlin
   assert.ok(clearAll >= 0 && seed > clearAll && manuals > seed && offline > seed);
   assert.equal(build.split('build-fault-excel-fields-seed.py').length - 1, 1);
   assert.match(pkg.scripts['check:functions'], /lattiz2-fault-seed\.mjs/);
-  assert.equal(pkg.version, '1.68.9');
+  assert.equal(pkg.version, '1.68.10');
 });
