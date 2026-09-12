@@ -23,7 +23,8 @@ test('automatische service-ToDo koppeling blijft over onbeperkte open-afgewerkt 
   assert.match(repeatCycle, /Servicestatus automatisch gevolgd/);
   assert.match(repeatCycle, /serviceActionLinkedWorkState/);
   assert.match(repeatCycle, /persistServiceManagedActionState/);
-  assert.doesNotMatch(repeatCycle, /if\(entry\.type==='reopened'\)return false;/);
+  assert.match(repeatCycle, /if "if\(entry\.type==='reopened'\)return false;" in index:/);
+  assert.match(repeatCycle, /oude eenmalige service\/ToDo-historyheuristiek is nog actief/);
 });
 
 test('meerdere gekoppelde serviceverslagen worden samen beoordeeld', () => {
