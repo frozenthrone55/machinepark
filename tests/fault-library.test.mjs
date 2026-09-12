@@ -47,10 +47,10 @@ test('storingsbibliotheek is offline leesbaar en runtimebestanden zitten versieg
   assert.match(builtSource, /MachineparkFaultLibraryDB/);
   assert.match(builtSource, /navigator\.onLine === false/);
   assert.match(builtSource, /offline opgeslagen bibliotheek/);
-  assert.match(html, /\.\/fault-library\.js\?v=1\.68\.9-[a-f0-9]{12}/);
-  assert.match(html, /\.\/fault-library\.css\?v=1\.68\.9-[a-f0-9]{12}/);
-  assert.match(sw, /["']\.\/fault-library\.js\?v=1\.68\.9-[a-f0-9]{12}["']/);
-  assert.match(sw, /["']\.\/fault-library\.css\?v=1\.68\.9-[a-f0-9]{12}["']/);
+  assert.match(html, /\.\/fault-library\.js\?v=1\.68\.10-[a-f0-9]{12}/);
+  assert.match(html, /\.\/fault-library\.css\?v=1\.68\.10-[a-f0-9]{12}/);
+  assert.match(sw, /["']\.\/fault-library\.js\?v=1\.68\.10-[a-f0-9]{12}["']/);
+  assert.match(sw, /["']\.\/fault-library\.css\?v=1\.68\.10-[a-f0-9]{12}["']/);
 });
 
 test('rollen hebben aparte rechten voor storingen en bestaande ingebouwde rollen migreren veilig', () => {
@@ -88,7 +88,7 @@ test('eenmalige Lattiz-opschoning bewaart exact één 00005 en raakt andere merk
 });
 
 test('build en functiecontrole nemen storingsbibliotheek Excel-import undo en volledige leegmaak mee', () => {
-  assert.equal(packageJson.version, '1.68.9');
+  assert.equal(packageJson.version, '1.68.10');
   assert.match(packageJson.scripts.build, /build-fault-library\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-matching\.py/);
   assert.match(packageJson.scripts.build, /build-fault-picker-refresh-search\.py/);
