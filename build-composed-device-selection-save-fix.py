@@ -79,15 +79,18 @@ if TODO_MARKER not in index:
 
   const composedSnapshotWithReportsAndTodosBase=composedSnapshot;
   composedSnapshot=function(deviceIds,reportKeys=[...selectedComposedReports]){
-    const snapshot=composedSnapshotWithReportsAndTodosBase(deviceIds,reportKeys),fullDeviceIds=new Set((deviceIds||[]).map(String)),keys=new Set(reportKeys||[]),selectedReportIds=new Set();
+    const snapshot=composedSnapshotWithReportsAndTodosBase(deviceIds,reportKeys),fullDeviceIds=new Set((deviceIds||[]).map(String)),keys=new Set(reportKeys||[]),includedReportIds=new Set();
+    [...(snapshot?.maintenance||[]),...(snapshot?.breakdowns||[])].forEach(record=>{
+      [record?.serviceReportId,record?.serviceVisitId].filter(Boolean).forEach(id=>includedReportIds.add(String(id)));
+    });
     composedSourceReportRows().filter(entry=>keys.has(entry.key)).flatMap(entry=>entry.rows).forEach(row=>{
       const record=row?.item||{};
-      [record.serviceReportId,record.serviceVisitId].filter(Boolean).forEach(id=>selectedReportIds.add(String(id)));
+      [record.serviceReportId,record.serviceVisitId].filter(Boolean).forEach(id=>includedReportIds.add(String(id)));
     });
     const actions=(state.actions||[]).filter(item=>{
       if(!item)return false;
       if(fullDeviceIds.has(String(item.deviceId||'')))return true;
-      return selectedReportIds.size>0&&composedTodoServiceIds(item).some(id=>selectedReportIds.has(id));
+      return includedReportIds.size>0&&composedTodoServiceIds(item).some(id=>includedReportIds.has(id));
     }).map(composedClone);
     return {...snapshot,actions};
   };
@@ -149,7 +152,8 @@ required = [
     'function composedTodoServiceIds(item)',
     'const actions=(state.actions||[]).filter',
     "fullDeviceIds.has(String(item.deviceId||''))",
-    'selectedReportIds',
+    'includedReportIds',
+    "[...(snapshot?.maintenance||[]),...(snapshot?.breakdowns||[])]",
     "kind:'ToDo'",
     'todo:item',
     'composedHistoryEventHtml=function(snapshot,event)',
