@@ -111,8 +111,9 @@ test('frontend-assets gebruiken inhoudsgebonden cache-busting', () => {
   assert.ok(sw.includes(`/assets/machinepark-build.css?v=${version}-${jsMatch[1]}`));
 });
 
-test('Clerk profielknop is uniek en gevaarlijke alles-wissen actie is weg', () => {
-  assert.equal((html.match(/id="clerkUserButton"/g) || []).length, 1);
+test('Synology lokale afmeldknop is uniek en gevaarlijke alles-wissen actie is weg', () => {
+  assert.equal((html.match(/id="clerkUserButton"/g) || []).length, 0);
+  assert.equal((html.match(/id="localLogoutBtn"/g) || []).length, 1);
   assert.equal(html.includes('id="clearAll"'), false);
 });
 
