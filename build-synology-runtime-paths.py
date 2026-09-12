@@ -130,14 +130,14 @@ if remaining_sw_roots:
 
 SW.write_text(sw, encoding="utf-8")
 
-# Toon bovenaan het Synology-dashboard wanneer de gepubliceerde runtime gebouwd is.
+# Toon bovenaan het Synology-dashboard welke appversie gepubliceerd is en wanneer.
 # De bron is deploy-meta.json uit synology-deploy; daardoor verandert dit automatisch
-# bij elke geslaagde publicatie en blijft de tijd los van browser-/serviceworkercache.
+# bij elke geslaagde publicatie en blijft de informatie los van browser-/serviceworkercache.
 DASHBOARD_VERSION_MARKER = 'data-machinepark-synology-version="v3"'
 index = INDEX.read_text(encoding="utf-8")
 if DASHBOARD_VERSION_MARKER not in index:
     account_anchor = '<div class="account-summary" id="accountSummary">'
-    account_stamp = account_anchor + '<div id="dashboardVersionStamp" class="dashboard-version-stamp" data-machinepark-synology-version="v3" role="status" aria-live="polite">Laatste versie: laden…</div>'
+    account_stamp = account_anchor + '<div id="dashboardVersionStamp" class="dashboard-version-stamp" data-machinepark-synology-version="v3" role="status" aria-live="polite">Versie laden…</div>'
     if account_anchor not in index:
         raise SystemExit("Buildvalidatie mislukt: aangemelde gebruiker ontbreekt voor versiedatum")
     index = index.replace(account_anchor, account_stamp, 1)
@@ -167,6 +167,7 @@ if DASHBOARD_VERSION_MARKER not in index:
       });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const meta = await response.json();
+      const appVersion = String(meta && meta.app_version ? meta.app_version : '').trim();
       const date = new Date(meta && meta.built_at ? meta.built_at : '');
       if (!Number.isFinite(date.getTime())) throw new Error('Ongeldige buildtijd');
       const formatted = new Intl.DateTimeFormat('nl-BE', {
@@ -178,9 +179,9 @@ if DASHBOARD_VERSION_MARKER not in index:
         minute: '2-digit',
         hour12: false
       }).format(date).replace(',', '');
-      node.textContent = 'Laatste versie: ' + formatted;
+      node.textContent = appVersion ? ('Versie ' + appVersion + ' · ' + formatted) : ('Laatste versie: ' + formatted);
     } catch (_) {
-      node.textContent = 'Laatste versie: niet beschikbaar';
+      node.textContent = 'Versie: niet beschikbaar';
     }
   }
   window.machineparkRefreshDashboardVersion = machineparkLoadDashboardVersion;
