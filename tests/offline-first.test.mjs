@@ -42,11 +42,11 @@ test('gebouwde app laadt de offline runtime met actuele inhoudshash om oude PWA-
   assert.match(sw, new RegExp(`["']\\.\\/offline-first\\.js\\?v=${offlineHash}["']`));
 });
 
-test('service worker cachet offline runtime en cachebare API-data', () => {
+test('service worker cachet offline runtime maar geen Synology API-responses', () => {
   assert.match(sw, /offline-first\.js/);
-  assert.match(sw, /work-order-templates/);
-  assert.match(sw, /device-photos/);
-  assert.match(sw, /service-photos/);
+  assert.match(sw, /const CACHEABLE_API=new Set\(\[\]\);/);
+  assert.match(sw, /machinepark-synology-api-network-only-v1/);
+  assert.doesNotMatch(sw, /\/\.netlify\/functions\//);
 });
 
 
