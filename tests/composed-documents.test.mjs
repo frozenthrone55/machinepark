@@ -50,6 +50,6 @@ test('samengestelde documenten synchroniseren veilig en oudere clients wissen ze
 });
 
 test('Synology gebruikt voor samengestelde PDF een lokale jsPDF-library', () => {
-  assert.ok(html.includes('./vendor/jspdf.umd.min.js'));
-  assert.ok(!html.includes('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'));
+  assert.ok(builtUiSource.includes('./vendor/jspdf.umd.min.js'));
+  assert.ok(!builtUiSource.includes('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'));
 });
