@@ -12,14 +12,15 @@ test('lange toestellenlijst bij nieuw samengesteld document is verticaal scrollb
   assert.match(layoutPatch, /@media\(max-width:760px\)\{\.composed-device-list-wrap\{max-height:55vh\}/);
 });
 
-test('nieuw samengesteld document gebruikt één veld voor naam en toestelfilter', () => {
-  const search = layoutPatch.indexOf('<label>Naam toestel / firma voor nieuw document</label>');
-  const table = layoutPatch.indexOf('<div class="table-wrap composed-device-list-wrap">', search);
-  assert.ok(search >= 0, 'veld voor naam toestel / firma ontbreekt');
-  assert.ok(table > search, 'veld staat niet vóór de toestellentabel');
-  assert.match(layoutPatch, /if 'id="composedDeviceSearch"' in built:/);
-  assert.match(searchPatch, /const composedDocumentName=document\.getElementById\('composedDocumentName'\)/);
-  assert.match(searchPatch, /composedDocumentName\?\.addEventListener\('input',syncComposedDocumentFilter\)/);
+test('nieuw samengesteld document heeft apart zoekveld en apart naamveld naast elkaar', () => {
+  const search = layoutPatch.indexOf('<label for="composedDeviceSearch">Naam toestel / firma voor nieuw document</label>');
+  const name = layoutPatch.indexOf('<label for="composedDocumentName">Naam nieuw document</label>', search);
+  const table = layoutPatch.indexOf('<div class="table-wrap composed-device-list-wrap">', name);
+  assert.ok(search >= 0, 'zoekveld voor toestel / firma ontbreekt');
+  assert.ok(name > search, 'naamveld voor nieuw document staat niet naast/na het zoekveld');
+  assert.ok(table > name, 'toestellentabel staat niet onder beide velden');
+  assert.match(searchPatch, /const composedDeviceSearch=document\.getElementById\('composedDeviceSearch'\)/);
+  assert.match(searchPatch, /composedDeviceSearch\?\.addEventListener\('input',syncComposedDeviceSearch\)/);
 });
 
 test('zoekbalk voor opgeslagen documenten staat boven de tabel met samengestelde documenten', () => {
