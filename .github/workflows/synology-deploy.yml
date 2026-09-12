@@ -217,7 +217,7 @@ jobs:
               'New-Object -ComObject Outlook.Application',
               '$mail.Attachments.Add($pdf.FullName)',
               '$mail.Display()',
-              'machinepark-outlook-installer-loader-v2',
+              'machinepark-outlook-installer-temp-ps1-v3',
               "[regex]::Match($raw,'(?m)^###MACHINEPARK_POWERSHELL###\\r?$')",
           ]
           for token in required_setup:
