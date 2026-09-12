@@ -19,7 +19,7 @@ test('onderdelenaantal telt voorraadonderdelen en eenmalige onderdelen samen', (
 
 test('compact onderdelenaantal bouwt direct na Werkzaamheden', () => {
   const chain = packageJson.scripts.build;
-  assert.equal(packageJson.version, '1.68.9');
+  assert.equal(packageJson.version, '1.68.10');
   assert.ok(chain.indexOf('build-work-activities.py') < chain.indexOf('build-work-activity-parts-count.py'));
   assert.ok(chain.indexOf('build-work-activity-parts-count.py') < chain.indexOf('build-offline-first.py'));
 });
