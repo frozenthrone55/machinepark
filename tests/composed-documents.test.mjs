@@ -11,18 +11,20 @@ test('samengestelde documenten staan alleen via Beheer in een apart overzichtsve
   assert.match(builtUiSource, /id="openComposedDocuments"[^>]*>Samengesteld overzicht maken</);
   assert.match(builtUiSource, /windowEl\.id=['"]composedDocumentsWindow['"]/);
   assert.match(builtUiSource, />Samengestelde documenten</);
-  assert.match(builtUiSource, /Naam \/ firma van het document/);
-  assert.match(builtUiSource, /Zoek firma, locatie of toestel/);
+  assert.match(builtUiSource, /Naam toestel \/ firma voor nieuw document/);
+  assert.doesNotMatch(builtUiSource, /id="composedDeviceSearch"/);
   assert.match(builtUiSource, /data-composed-device/);
 });
 
 test('zoeken in samengesteld overzicht filtert beide tabellen live op de actuele invoer', () => {
   for (const needle of [
     'composed-search-filter-v1',
-    "composedDeviceSearch?.addEventListener('input',syncComposedDeviceSearch)",
-    "composedDeviceSearch?.addEventListener('search',syncComposedDeviceSearch)",
+    "const composedDocumentName=document.getElementById('composedDocumentName')",
+    "composedDocumentName?.addEventListener('input',syncComposedDocumentFilter)",
+    "composedDocumentName?.addEventListener('search',syncComposedDocumentFilter)",
     "composedSavedSearch?.addEventListener('input',syncComposedSavedSearch)",
     "composedSavedSearch?.addEventListener('search',syncComposedSavedSearch)",
+    "const search=document.getElementById('composedDocumentName')",
     "composedDeviceQuery=String(search?.value??composedDeviceQuery??'')",
     "composedSavedQuery=String(search?.value??composedSavedQuery??'')",
   ]) assert.ok(builtUiSource.includes(needle), `${needle} ontbreekt`);
