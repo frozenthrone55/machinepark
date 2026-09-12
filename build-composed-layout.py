@@ -1,4 +1,5 @@
 from pathlib import Path
+import runpy
 
 ROOT = Path(__file__).resolve().parent
 INDEX = ROOT / 'index.html'
@@ -66,3 +67,4 @@ for needle in required:
         raise SystemExit(f'Buildvalidatie mislukt: layout-token ontbreekt: {needle}')
 
 print('[Machinepark] zoekveld en naam nieuw document staan naast elkaar, met scrollbare toestellenlijst en aparte zoekbalk voor bestaande documenten')
+runpy.run_path(str(ROOT / 'build-composed-history-photos.py'), run_name='__main__')
