@@ -101,7 +101,7 @@ test('concept naar definitieve registratie mag gebruikte voorraad in dezelfde sy
 
 test('serviceconcept patch bouwt na alle servicefuncties en vóór offline-first', () => {
   const chain = packageJson.scripts.build;
-  assert.equal(packageJson.version, '1.68.9');
+  assert.equal(packageJson.version, '1.68.10');
   assert.ok(chain.includes('build-service-drafts.py'));
   assert.ok(chain.indexOf('build-manual-native-sync.py') < chain.indexOf('build-service-drafts.py'));
   assert.ok(chain.indexOf('build-service-drafts.py') < chain.indexOf('build-offline-first.py'));
