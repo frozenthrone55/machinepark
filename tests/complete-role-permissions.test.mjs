@@ -11,6 +11,8 @@ const actionPhotos = readFileSync(new URL('../synology/api/action-photos.php', i
 const synWorkorders = readFileSync(new URL('../synology/api/work-order-templates.php', import.meta.url), 'utf8');
 const netWorkorders = readFileSync(new URL('../netlify/functions/work-order-templates.mjs', import.meta.url), 'utf8');
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const buildJs = readFileSync(new URL('../assets/machinepark-build.js', import.meta.url), 'utf8');
+const builtUiSource = `${index}\n${buildJs}`;
 
 const newKeys = [
   'view.manuals','manuals.manage','view.actions',
@@ -65,13 +67,13 @@ test('werkbontemplates hebben een configureerbaar recht op beide platformen', ()
 });
 
 test('ToDo en mail knoppen volgen de nieuwe rechten in de finale UI', () => {
-  assert.match(index, /machinepark-complete-role-permissions-v1/);
-  assert.match(index, /machineparkApplyCompleteRolePermissions/);
-  assert.match(index, /#actionQuickAdd,#actionNewFull/);
-  assert.match(index, /\[data-action-link\]/);
-  assert.match(index, /\[data-action-complete\]/);
-  assert.match(index, /MAIL_SELECTOR/);
-  assert.match(index, /Deze rol mag geen PDF-verslagen mailen of delen/);
+  assert.match(builtUiSource, /machinepark-complete-role-permissions-v1/);
+  assert.match(builtUiSource, /machineparkApplyCompleteRolePermissions/);
+  assert.match(builtUiSource, /#actionQuickAdd,#actionNewFull/);
+  assert.match(builtUiSource, /\[data-action-link\]/);
+  assert.match(builtUiSource, /\[data-action-complete\]/);
+  assert.match(builtUiSource, /MAIL_SELECTOR/);
+  assert.match(builtUiSource, /Deze rol mag geen PDF-verslagen mailen of delen/);
 });
 
 test('complete rollenlaag draait na ToDo en video maar voor assetextractie', () => {
