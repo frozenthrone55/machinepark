@@ -11,6 +11,18 @@ index = index_path.read_text(encoding='utf-8')
 MARKER = 'data-machinepark-build-fix="offline-first-loader-v1"'
 loader = f'<script src="/offline-first.js?v={version}" data-machinepark-offline-first="1"></script>'
 
+# Houd het zichtbare versienummer in de desktop-zijbalk automatisch gelijk aan
+# package.json. Zo toont elke gepubliceerde Synology-build meteen zijn echte versie.
+dashboard_pattern = r'(<div class="side-foot">[^<]*<br><br>)v[0-9]+(?:\.[0-9]+){1,2}(\s*•)'
+index, dashboard_count = re.subn(
+    dashboard_pattern,
+    rf'\g<1>v{version}\g<2>',
+    index,
+    count=1,
+)
+if dashboard_count != 1:
+    raise SystemExit('Buildvalidatie mislukt: zichtbaar dashboard-versienummer niet uniek gevonden')
+
 if MARKER not in index:
     if '</head>' not in index or '</body>' not in index:
         raise SystemExit('Buildvalidatie mislukt: HTML-afsluiters ontbreken voor offline-first loader')
@@ -42,10 +54,10 @@ sw_path.write_text(sw, encoding='utf-8')
 
 built_index = index_path.read_text(encoding='utf-8')
 built_sw = sw_path.read_text(encoding='utf-8')
-for needle in [MARKER, f'/offline-first.js?v={version}', 'data-machinepark-offline-first="1"']:
+for needle in [MARKER, f'/offline-first.js?v={version}', 'data-machinepark-offline-first="1"', f'v{version} • Export inclusief afbeeldingen']:
     if needle not in built_index:
-        raise SystemExit(f'Buildvalidatie mislukt: offline-first loader ontbreekt ({needle})')
+        raise SystemExit(f'Buildvalidatie mislukt: offline-first/dashboard versie ontbreekt ({needle})')
 if f"'/offline-first.js?v={version}'" not in built_sw:
     raise SystemExit('Buildvalidatie mislukt: service worker cachet niet de actuele offline runtime')
 
-print(f'[Machinepark] offline-first runtime wordt versiegebonden geladen ({version})')
+print(f'[Machinepark] offline-first runtime en dashboard worden versiegebonden geladen ({version})')
