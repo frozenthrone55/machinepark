@@ -21,7 +21,8 @@ test('serviceverslagen groeperen gekoppelde onderhouds depannage en andere regis
   assert.match(patch, /record\.serviceVisitId\|\|record\.serviceReportId/);
   assert.match(patch, /kind:'Serviceverslag'/);
   assert.match(patch, /event\.rows\.push\(row\)/);
-  assert.match(patch, /serviceKind===['"]other['"]/);
+  assert.match(built, /serviceKind===['"]other['"]/);
+  assert.match(patch, /row\.kind/);
 });
 
 test('alle verslagfotos staan bij de juiste gebeurtenis zonder limiet van vijf of tien', () => {
