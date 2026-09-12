@@ -5,6 +5,7 @@ INDEX = ROOT / 'index.html'
 FEATURE_MARKER = 'data-machinepark-build-fix="composed-source-reports-v1"'
 MARKER = 'data-machinepark-build-fix="composed-device-selection-save-v1"'
 TODO_MARKER = 'data-machinepark-build-fix="composed-todos-v1"'
+HISTORY_CARD_MARKER = 'data-machinepark-build-fix="composed-history-cards-v1"'
 
 index = INDEX.read_text(encoding='utf-8')
 if FEATURE_MARKER not in index:
@@ -136,6 +137,38 @@ if TODO_MARKER not in index:
         raise SystemExit('Buildvalidatie mislukt: HTML-head ontbreekt voor ToDo-opname')
     index = index.replace('</head>', f'<meta {TODO_MARKER}>\n</head>', 1)
 
+if HISTORY_CARD_MARKER not in index:
+    history_marker = 'data-machinepark-build-fix="composed-history-photos-v1"'
+    if history_marker not in index:
+        raise SystemExit('Buildvalidatie mislukt: chronologische geschiedenis ontbreekt voor kaderweergave')
+    if '</head>' not in index:
+        raise SystemExit('Buildvalidatie mislukt: HTML-head ontbreekt voor kaderweergave')
+
+    card_style = r'''
+<style data-machinepark-build-fix="composed-history-cards-v1">
+.composed-history-list{display:grid;gap:10px;padding:10px;background:#f5f8f6}
+.composed-history-event{margin:0!important;padding:12px 13px!important;border:1px solid #d7e1dc!important;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(20,45,38,.05);break-inside:avoid;overflow:hidden}
+.composed-history-event:last-child{border-bottom:1px solid #d7e1dc!important}
+.composed-history-event-head{padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid #edf1ef}
+.composed-history-work{margin-top:8px!important;padding:9px 10px!important;border:1px solid #dce5e1!important;border-radius:10px!important;background:#f9fbfa!important;break-inside:avoid}
+.composed-history-work+.composed-history-work{margin-top:8px!important}
+@media(max-width:700px){.composed-history-list{gap:8px;padding:8px}.composed-history-event{padding:10px!important}}
+@media print{.composed-history-list{gap:3mm;padding:3mm;background:#f7f7f7}.composed-history-event{border:1px solid #bfc9c4!important;border-radius:2mm!important;padding:3mm!important;box-shadow:none!important}.composed-history-event-head{padding-bottom:2mm;margin-bottom:2mm;border-bottom:1px solid #dde3e0}.composed-history-work{border:1px solid #ccd5d1!important;border-radius:2mm!important;padding:2.5mm!important;margin-top:2.5mm!important;background:#fff!important}}
+</style>
+'''
+    index = index.replace('</head>', card_style + f'<meta {HISTORY_CARD_MARKER}>\n</head>', 1)
+
+    anchor = '  function openComposedPreview(doc)'
+    if index.count(anchor) != 1:
+        raise SystemExit(f'Buildvalidatie mislukt: verwacht 1x preview-anker voor kaderweergave, gevonden {index.count(anchor)}x')
+    card_script = r'''
+  const composedReadablePrintStylesBase=printStyles;
+  printStyles=function(){
+    return composedReadablePrintStylesBase()+`.composed-history-list{display:grid;gap:3mm;padding:3mm;background:#f7f7f7}.composed-history-event{border:1px solid #bfc9c4!important;border-radius:2mm;padding:3mm!important;margin:0!important;background:#fff;break-inside:avoid}.composed-history-event:last-child{border-bottom:1px solid #bfc9c4!important}.composed-history-event-head{padding-bottom:2mm;margin-bottom:2mm;border-bottom:1px solid #dde3e0}.composed-history-work{border:1px solid #ccd5d1!important;border-radius:2mm;padding:2.5mm!important;margin-top:2.5mm!important;background:#fff}.composed-history-work+.composed-history-work{margin-top:2.5mm!important}`;
+  };
+'''
+    index = index.replace(anchor, card_script + '\n' + anchor, 1)
+
 INDEX.write_text(index, encoding='utf-8')
 
 built = INDEX.read_text(encoding='utf-8')
@@ -160,9 +193,14 @@ required = [
     "composedHistoryPhotosHtml(event.rows,'ToDo')",
     'serviceverslagen, ToDo’s',
     'Foto’s staan bij het bijbehorende verslag.',
+    HISTORY_CARD_MARKER,
+    'composed-history-cards-v1',
+    '.composed-history-event{margin:0!important',
+    '.composed-history-work+.composed-history-work',
+    'const composedReadablePrintStylesBase=printStyles',
 ]
 for needle in required:
     if needle not in built:
-        raise SystemExit(f'Buildvalidatie mislukt: toestel/ToDo-opslagtoken ontbreekt: {needle}')
+        raise SystemExit(f'Buildvalidatie mislukt: toestel/ToDo/kadertoken ontbreekt: {needle}')
 
-print('[Machinepark] samengesteld document bewaart toestelkeuze en neemt gekoppelde ToDo’s chronologisch mee')
+print('[Machinepark] samengesteld document bewaart toestelkeuze, neemt gekoppelde ToDo’s mee en kadert elke geschiedenisgebeurtenis duidelijk af')
