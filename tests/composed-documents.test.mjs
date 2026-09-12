@@ -9,7 +9,7 @@ const builtUiSource = `${html}\n${buildJs}`;
 
 test('samengestelde documenten staan alleen via Beheer in een apart overzichtsvenster', () => {
   assert.match(builtUiSource, /id="openComposedDocuments"[^>]*>Samengesteld overzicht maken</);
-  assert.match(builtUiSource, /id=['"]composedDocumentsWindow['"]/);
+  assert.match(builtUiSource, /windowEl\.id=['"]composedDocumentsWindow['"]/);
   assert.match(builtUiSource, />Samengestelde documenten</);
   assert.match(builtUiSource, /Naam \/ firma van het document/);
   assert.match(builtUiSource, /Zoek firma, locatie of toestel/);
