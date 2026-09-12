@@ -35,8 +35,8 @@ test('Andere werken behoudt concept-, werkbon- en depannageveldenroute', () => {
   assert.match(patch, /header\?\.serviceKind === 'other'/);
 });
 
-test('build voert Andere werken exact eenmaal uit en versie blijft 1.68.9', () => {
+test('build voert Andere werken exact eenmaal uit en versie blijft 1.68.10', () => {
   const count = pkg.scripts.build.split('build-other-works.py').length - 1;
   assert.equal(count, 1);
-  assert.equal(pkg.version, '1.68.9');
+  assert.equal(pkg.version, '1.68.10');
 });
