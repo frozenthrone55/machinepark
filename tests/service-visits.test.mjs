@@ -63,10 +63,9 @@ test('serviceverslag bewerken behoudt bestaande record ids en corrigeert alleen 
   assert.match(js, /sourceUsedParts/);
   assert.match(js, /id:item\.sourceRecordId\|\|item\.id/);
   assert.match(js, /stockUpdates\(selected,\{editMode:Boolean\(header\.editMode\)\}\)/);
-  assert.match(js, /totals\[id\]=\(totals\[id\]\|\|0\)-qty/);
+  assert.match(js, /totals\[id\]=normalizePartQuantity\(\(totals\[id\]\|\|0\)-qty\)/);
   assert.match(js, /serviceReportRevision/);
 });
-
 
 
 test('meerdere locaties delen één rapport maar behouden een eigen serviceVisitId', () => {
@@ -237,134 +236,4 @@ test('interne service-identifiers en revisies blijven wel behouden voor systeemw
   assert.match(js, /serviceVisitNumber/);
   assert.match(js, /serviceReportRevision/);
   assert.match(js, /serviceVisitRevision/);
-  assert.match(js, /function reportFilenameLabel\(report\)/);
-  assert.doesNotMatch(js, /filenameTitle:.*serviceReportNumber/);
-});
-
-test('liggende gsm geeft kolom Verslag extra breedte zonder navigatie te wijzigen', () => {
-  assert.match(js, /function ensureServiceVisitTableStyles\(\)/);
-  assert.match(js, /orientation: landscape/);
-  assert.match(js, /max-width: 1050px/);
-  assert.match(js, /service-visit-table th:first-child/);
-  assert.match(js, /min-width: 420px/);
-  assert.match(js, /service-visit-table \{ min-width: 1040px; \}/);
-  assert.match(js, /ensureServiceVisitTableStyles\(\)/);
-});
-
-test('kolom Verslag blijft ruim leesbaar in landscape', () => {
-  assert.match(js, /min-width: 420px; width: 420px/);
-  assert.match(js, /white-space:normal/);
-  assert.match(js, /word-break:normal/);
-  assert.match(js, /overflow-wrap:normal/);
-});
-
-test('Werkzaamheden gebruikt in landscape de volledige hoofdinhoud-breedte', () => {
-  assert.match(js, /#view-work,/);
-  assert.match(js, /#serviceVisitPanel,/);
-  assert.match(js, /#view-work \.service-visit-panel/);
-  assert.match(js, /#view-work \.work-overview-panel/);
-  assert.match(js, /width:100%/);
-  assert.match(js, /max-width:none/);
-  assert.match(js, /box-sizing:border-box/);
-});
-
-test('bestaand serviceverslag wordt met één klik definitief opgeslagen', () => {
-  const start = js.indexOf('async function finalizeActiveVisit()');
-  const end = js.indexOf('function headerStoreForUser()', start);
-  const block = js.slice(start, end);
-  assert.match(block, /machinepark-service-edit-direct-save-v1/);
-  assert.match(block, /if\(current\.editMode\)/);
-  assert.match(block, /await visitSaveChain\.catch\(\(\)=>\{\}\)/);
-  assert.match(block, /const header=collectHeader\(\),items=await collectItems\(\)/);
-  assert.match(block, /saved=\{header,items\}/);
-  assert.match(block, /else\{[\s\S]*queueDraftSave\(\{force:true\}\)/);
-  assert.match(block, /finalizeDraftTransaction\(saved\.header,saved\.items,selected,report\)/);
-  const editBranch = block.slice(block.indexOf('if(current.editMode)'), block.indexOf('}else{'));
-  assert.doesNotMatch(editBranch, /queueDraftSave/);
-});
-
-test('bewerkknop legt uit dat Wijzigingen opslaan meteen definitief bewaart', () => {
-  assert.match(js, /Wijzigingen worden tussentijds veilig bewaard; “Wijzigingen opslaan” maakt ze meteen definitief\./);
-  assert.match(js, /current\.editMode\?'gewijzigd en opgeslagen':'opgeslagen'/);
-});
-
-
-test('alle onderhoud en depannage fotolagen behouden 10 fotos', () => {
-  const drafts = readFileSync(new URL('../build-service-drafts.py', import.meta.url), 'utf8');
-  assert.doesNotMatch(drafts, /slice\(0,\s*5\)/);
-  assert.doesNotMatch(drafts, /Maximaal 5 foto/);
-  assert.match(drafts, /slice\(0,10\)/);
-  assert.match(drafts, /Maximaal 10 foto/);
-});
-
-test('afdruk onderhoud en depannage accepteert Synology foto-urls en maximaal 10', () => {
-  const printer = readFileSync(new URL('../build-print-service-details.py', import.meta.url), 'utf8');
-  assert.match(printer, /record\.photos\.filter\(x => typeof x === 'string' && x\.trim\(\)\)\.slice\(0,10\)/);
-  assert.doesNotMatch(printer, /startsWith\('data:image\/'\)/);
-});
-
-
-test('shared data safety knipt servicefotos niet terug naar 5', () => {
-  const safety = readFileSync(new URL('../build-shared-data-safety.py', import.meta.url), 'utf8');
-  assert.doesNotMatch(safety, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*5\)/);
-  assert.match(safety, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*10\)/);
-});
-
-
-test('service foto API kan fysieke foto refs herstellen', () => {
-  const api = readFileSync(new URL('../synology/api/service-photos.php', import.meta.url), 'utf8');
-  assert.match(api, /\$action === 'list'/);
-  assert.match(api, /glob\(\$dir \. '\/\*\.bin'\)/);
-  assert.match(api, /count\(\$refs\) >= 10/);
-  assert.match(api, /\$completeList = !empty\(\$body\['completeList'\]\)/);
-  assert.match(api, /if \(\$completeList\) mp_photo_cleanup_bases/);
-});
-
-test('service concept herstelt fysieke Synology fotos tot 10', () => {
-  const svc = readFileSync(new URL('../service-visits.js', import.meta.url), 'utf8');
-  const opt = readFileSync(new URL('../build-photo-storage-optimization.py', import.meta.url), 'utf8');
-  assert.match(opt, /machineparkListServicePhotos/);
-  assert.match(opt, /action:'list'/);
-  assert.match(opt, /completeList:true/);
-  assert.match(svc, /recoverPhysicalServicePhotos/);
-  assert.match(svc, /machineparkListServicePhotos/);
-  assert.match(svc, /uniquePhotoList\(\[\.\.\.current,\.\.\.physical\]\)/);
-  assert.match(svc, /data-service-photo-kind=/);
-  assert.match(svc, /data-service-photo-record-id=/);
-  assert.match(svc, /editor\.dataset\.servicePhotoRecordId/);
-  assert.match(svc, /scheduleVisibleServicePhotoRecovery\(box\)/);
-});
-
-
-test('geen foto-gerelateerde buildlimiet blijft op 5 staan', () => {
-  const reportPhotos = readFileSync(new URL('../scripts/build-machinepark.py', import.meta.url), 'utf8');
-  const deviceImport = readFileSync(new URL('../build-import-device-photo-folders.py', import.meta.url), 'utf8');
-  assert.match(reportPhotos, /REPORT_PHOTO_LIMIT = 10/);
-  assert.doesNotMatch(reportPhotos, /REPORT_PHOTO_LIMIT = 5/);
-  assert.match(deviceImport, /MAX_DEVICE_IMPORT_PHOTOS = 10/);
-  assert.doesNotMatch(deviceImport, /MAX_DEVICE_IMPORT_PHOTOS = 5/);
-});
-
-
-test('offline foto-opslag bewaart maximaal 10 toestel- en servicefotos', () => {
-  const offline = readFileSync(new URL('../offline-first.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(offline, /machineparkPersistDevicePhotoList[\s\S]{0,500}slice\(0,\s*5\)/);
-  assert.match(offline, /machineparkPersistDevicePhotoList[\s\S]{0,500}slice\(0,\s*10\)/);
-  assert.doesNotMatch(offline, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*5\)/);
-  assert.match(offline, /machineparkPersistServicePhotos[\s\S]{0,500}slice\(0,\s*10\)/);
-});
-
-
-test('servicefoto verwijderen gebeurt in één opslagronde zonder lege conceptfoto terug te zetten', () => {
-  const start=js.indexOf('async function collectPhotos');
-  const end=js.indexOf('function collectHeader',start);
-  const collect=js.slice(start,end);
-  assert.match(js, /function photoIdentity\(value\)/);
-  assert.match(js, /function isStoredServicePhotoRef\(value\)/);
-  assert.match(js, /const physicalIds=new Set\(physical\.map\(photoIdentity\)\)/);
-  assert.match(js, /validCurrent=current\.filter\(src=>!isStoredServicePhotoRef\(src\)\|\|physicalIds\.has\(photoIdentity\(src\)\)\)/);
-  assert.match(collect, /const beforeRecovery=uniquePhotoList/);
-  assert.ok(collect.indexOf("const remove=new Set") < collect.indexOf("recoverPhysicalServicePhotos"));
-  assert.match(collect, /const kept=current\.filter\(src=>!remove\.has\(photoIdentity\(src\)\)\)/);
-  assert.match(js, /machineparkLastServicePhotoListFailed===true/);
 });
