@@ -36,7 +36,7 @@ test('gelijktijdige offline en online voorraadwijzigingen worden als delta samen
 });
 
 test('gebouwde app laadt de offline runtime met actuele inhoudshash om oude PWA-cache te breken', () => {
-  assert.equal(packageJson.version, '1.68.9');
+  assert.equal(packageJson.version, '1.68.10');
   assert.match(index, new RegExp(`\\.\\/offline-first\\.js\\?v=${offlineHash}`));
   assert.match(index, /data-machinepark-offline-first="1"/);
   assert.match(sw, new RegExp(`["']\\.\\/offline-first\\.js\\?v=${offlineHash}["']`));
