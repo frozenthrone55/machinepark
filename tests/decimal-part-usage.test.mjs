@@ -3,20 +3,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const buildJs = readFileSync(new URL('../assets/machinepark-build.js', import.meta.url), 'utf8');
+const builtUiSource = `${index}\n${buildJs}`;
 const service = readFileSync(new URL('../service-visits.js', import.meta.url), 'utf8');
 const builder = readFileSync(new URL('../build-decimal-part-usage.py', import.meta.url), 'utf8');
 
 test('onderhoud en depannage aanvaarden fractionele voorraadonderdelen', () => {
-  assert.match(index, /class="usage-qty" type="number" min="0\.001" step="0\.001" inputmode="decimal"/);
-  assert.match(index, /function normalizePartQuantity\(value,fallback=0\)/);
-  assert.match(index, /function formatPartQuantity\(value\)/);
-  assert.match(index, /formatPartQuantity\(i\.qty\)/);
-  assert.doesNotMatch(index, /class="usage-qty" type="number" min="1" step="1"/);
+  assert.match(builtUiSource, /class="usage-qty" type="number" min="0\.001" step="0\.001" inputmode="decimal"/);
+  assert.match(builtUiSource, /function normalizePartQuantity\(value,fallback=0\)/);
+  assert.match(builtUiSource, /function formatPartQuantity\(value\)/);
+  assert.match(builtUiSource, /formatPartQuantity\(i\.qty\)/);
+  assert.doesNotMatch(builtUiSource, /class="usage-qty" type="number" min="1" step="1"/);
 });
 
 test('eenmalige onderdelen zijn fractioneel in onderhoud en depannage', () => {
-  assert.match(index, /class="service-oneoff-qty" type="number" min="0\.001" step="0\.001" inputmode="decimal"/);
-  assert.doesNotMatch(index, /class="service-oneoff-qty" type="number" min="1" step="1" inputmode="numeric"/);
+  assert.match(builtUiSource, /class="service-oneoff-qty" type="number" min="0\.001" step="0\.001" inputmode="decimal"/);
+  assert.doesNotMatch(builtUiSource, /class="service-oneoff-qty" type="number" min="1" step="1" inputmode="numeric"/);
 });
 
 test('serviceverslag gebruikt dezelfde decimale hoeveelheden en voorraadprecisie', () => {
