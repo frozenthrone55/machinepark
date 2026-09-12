@@ -1,0 +1,91 @@
+name: Diagnose build-smoke
+
+on:
+  push:
+    branches:
+      - synology-selfhost
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-build-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Synology-bron
+        uses: actions/checkout@v5
+
+      - name: Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Dependencies installeren
+        run: npm install --ignore-scripts
+
+      - name: Machinepark bouwen
+        run: npm run build
+
+      - name: Build-smoke subtest exact diagnosticeren
+        id: diag
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          path = Path('tests/build-smoke.test.mjs')
+          source = path.read_text(encoding='utf-8')
+          titles = re.findall(r"test\('([^']+)'", source)
+          failed_title = ''
+          failed_output = ''
+
+          for title in titles:
+              pattern = '^' + re.escape(title) + '$'
+              result = subprocess.run(
+                  ['node', '--test', '--test-name-pattern', pattern, str(path)],
+                  text=True,
+                  capture_output=True,
+              )
+              if result.returncode != 0:
+                  failed_title = title
+                  failed_output = (result.stdout or '') + '\n' + (result.stderr or '')
+                  break
+
+          report = Path('/tmp/build-smoke-diagnostic.txt')
+          if failed_title:
+              slug = re.sub(r'[^A-Za-z0-9]+', '-', failed_title).strip('-').lower()[:100]
+              report.write_text(f'{failed_title}\n\n{failed_output}', encoding='utf-8')
+          else:
+              slug = ''
+              report.write_text('Alle build-smoke subtests slagen.\n', encoding='utf-8')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'slug={slug}\n')
+              output.write(f'title={failed_title}\n')
+
+          print('Falende build-smoke subtest:', failed_title or 'geen')
+          PY
+
+      - name: Build-smoke diagnose vastleggen
+        if: steps.diag.outputs.slug != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: failing-build-smoke-${{ steps.diag.outputs.slug }}
+          path: /tmp/build-smoke-diagnostic.txt
+          retention-days: 1
+
+      - name: Diagnose bewaken
+        if: steps.diag.outputs.slug != ''
+        run: |
+          echo "Falende build-smoke subtest: ${{ steps.diag.outputs.title }}"
+          exit 1
