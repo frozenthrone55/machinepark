@@ -57,6 +57,16 @@ test('ToDos staan chronologisch per locatie in het verslag en houden hun fotos',
   assert.match(saveFix, /serviceverslagen, ToDo’s/);
 });
 
+test('elke geschiedenisgebeurtenis en elk werkblok krijgt een duidelijk kader in scherm en print', () => {
+  assert.match(saveFix, /composed-history-cards-v1/);
+  assert.match(saveFix, /\.composed-history-list\{display:grid;gap:10px;padding:10px/);
+  assert.match(saveFix, /\.composed-history-event\{margin:0!important;padding:12px 13px!important;border:1px solid/);
+  assert.match(saveFix, /\.composed-history-work\{margin-top:8px!important;padding:9px 10px!important;border:1px solid/);
+  assert.match(saveFix, /\.composed-history-work\+\.composed-history-work/);
+  assert.match(saveFix, /const composedReadablePrintStylesBase=printStyles/);
+  assert.match(saveFix, /gap:3mm;padding:3mm/);
+});
+
 test('verslagtabel en toestel-opslagfix worden rechtstreeks door npm build uitgevoerd', () => {
   assert.ok(pkg.scripts.build.includes('python3 build-composed-source-reports.py'));
   assert.ok(pkg.scripts.build.indexOf('build-composed-source-reports.py') > pkg.scripts.build.indexOf('build-composed-history-device-photos.py'));
