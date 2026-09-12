@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const builder = readFileSync(new URL('../build-synology-runtime-paths.py', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const workflow = readFileSync(new URL('../.github/workflows/synology-deploy.yml', import.meta.url), 'utf8');
 
 test('Synology runtime path builder corrigeert alle belangrijke root-assets', () => {
   for (const name of [
@@ -65,17 +66,20 @@ test('Synology service worker laat PHP API en no-store altijd rechtstreeks naar 
   assert.match(builder, /e\.respondWith\(fetch\(e\.request\)\)/);
 });
 
-test('Synology dashboard toont automatisch datum en uur van laatste gepubliceerde build', () => {
+test('Synology dashboard toont automatisch appversie, datum en uur van laatste gepubliceerde build', () => {
   assert.match(builder, /dashboardVersionStamp/);
   assert.match(builder, /accountSummary/);
-  assert.match(builder, /Laatste versie: laden/);
+  assert.match(builder, /Versie laden/);
   assert.match(builder, /data-machinepark-synology-version="v3"/);
   assert.match(builder, /\.\/deploy-meta\.json\?ts=/);
   assert.match(builder, /cache: 'no-store'/);
+  assert.match(builder, /meta && meta\.app_version/);
+  assert.match(builder, /Versie ' \+ appVersion \+ ' · ' \+ formatted/);
   assert.match(builder, /timeZone: 'Europe\/Brussels'/);
   assert.match(builder, /new Intl\.DateTimeFormat\('nl-BE'/);
-  assert.match(builder, /Laatste versie: ' \+ formatted/);
   assert.match(builder, /visibilitychange/);
+  assert.match(workflow, /package\.json/);
+  assert.match(workflow, /"app_version": app_version/);
 });
 
 test('versiedatum staat direct boven de aangemelde gebruiker', () => {
