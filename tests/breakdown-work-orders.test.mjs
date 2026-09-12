@@ -42,7 +42,7 @@ test('depannageconcept bewaart herstelt en valideert werkbon', () => {
 
 test('depannagewerkbon bouwt na serviceconcepten en voor samengestelde werkzaamheden', () => {
   const chain = packageJson.scripts.build;
-  assert.equal(packageJson.version, '1.68.9');
+  assert.equal(packageJson.version, '1.68.10');
   assert.ok(chain.includes('build-breakdown-work-orders.py'));
   assert.ok(chain.indexOf('build-service-draft-cross-device.py') < chain.indexOf('build-breakdown-work-orders.py'));
   assert.ok(chain.indexOf('build-breakdown-work-orders.py') < chain.indexOf('build-work-activities.py'));
