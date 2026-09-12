@@ -1,8 +1,11 @@
 from pathlib import Path
+import json
 
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / "index.html"
 index = index_path.read_text(encoding="utf-8")
+package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+version = str(package.get("version") or "1")
 MARKER = 'data-machinepark-build-fix="synology-local-auth-v1"'
 
 def replace_once(old, new, label):
@@ -21,8 +24,8 @@ if MARKER not in index:
          '<small>Lokaal gehost op Synology • Eigen gebruikersbeheer</small>', 'auth footer'),
         ('<p>Gebruik je Machinepark-account.</p>\n      <div id="clerkSignIn"></div>\n      <div id="authLoading">Clerk wordt geladen…</div>',
          '<p>Gebruik je lokale Machinepark-account.</p>\n      <div id="localAuthForm"></div>\n      <div id="authLoading">Lokale sessie controleren…</div>', 'auth formulier'),
-        ('<div class="side-foot">Centrale synchronisatie • Netlify + Clerk<br><br>v1.64 • Export inclusief afbeeldingen</div>',
-         '<div class="side-foot">Lokale synchronisatie • Synology<br><br>Eigen beheer • lokale opslag</div>', 'sidebar footer'),
+        (f'<div class="side-foot">Centrale synchronisatie • Netlify + Clerk<br><br>v{version} • Export inclusief afbeeldingen</div>',
+         f'<div class="side-foot">Lokale synchronisatie • Synology<br><br>Eigen beheer • lokale opslag<br>v{version} • Export inclusief afbeeldingen</div>', 'sidebar footer'),
         ('<div id="clerkUserButton" class="clerk-user-slot clerk-user-single"></div>',
          '<button type="button" id="localLogoutBtn" class="btn small" style="white-space:nowrap">Afmelden</button>', 'afmeldknop'),
     ]
@@ -90,6 +93,7 @@ required = [
     'id="localLogoutBtn"',
     "async function centralHeaders(json=false){const h={};",
     'machinepark-auth',
+    f'v{version} • Export inclusief afbeeldingen',
 ]
 for needle in required:
     if needle not in built:
@@ -104,4 +108,4 @@ for forbidden in [
     if forbidden in built:
         raise SystemExit(f"Buildvalidatie mislukt: oude Clerk-opstart blijft aanwezig ({forbidden})")
 
-print("[Machinepark] lokale Synology login vervangt Clerk")
+print(f"[Machinepark] lokale Synology login vervangt Clerk; dashboard toont v{version}")
