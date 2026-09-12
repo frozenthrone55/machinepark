@@ -12,11 +12,14 @@ test('lange toestellenlijst bij nieuw samengesteld document is verticaal scrollb
   assert.match(layoutPatch, /@media\(max-width:760px\)\{\.composed-device-list-wrap\{max-height:55vh\}/);
 });
 
-test('zoekbalk voor toestellen staat direct vóór de juiste toestellentabel', () => {
-  const search = layoutPatch.indexOf('<label for="composedDeviceSearch">Zoek firma, locatie of toestel</label>');
+test('nieuw samengesteld document gebruikt één veld voor naam en toestelfilter', () => {
+  const search = layoutPatch.indexOf('<label>Naam toestel / firma voor nieuw document</label>');
   const table = layoutPatch.indexOf('<div class="table-wrap composed-device-list-wrap">', search);
-  assert.ok(search >= 0, 'toestelzoekbalk ontbreekt');
-  assert.ok(table > search, 'toestelzoekbalk staat niet vóór de toestellentabel');
+  assert.ok(search >= 0, 'veld voor naam toestel / firma ontbreekt');
+  assert.ok(table > search, 'veld staat niet vóór de toestellentabel');
+  assert.match(layoutPatch, /if 'id="composedDeviceSearch"' in built:/);
+  assert.match(searchPatch, /const composedDocumentName=document\.getElementById\('composedDocumentName'\)/);
+  assert.match(searchPatch, /composedDocumentName\?\.addEventListener\('input',syncComposedDocumentFilter\)/);
 });
 
 test('zoekbalk voor opgeslagen documenten staat boven de tabel met samengestelde documenten', () => {
