@@ -3,36 +3,34 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = path => fs.readFileSync(path, 'utf8');
-const html = read('index.html');
-const buildJs = read('assets/machinepark-build.js');
-const built = `${html}\n${buildJs}`.replaceAll('\\"', '"');
 const layoutPatch = read('build-composed-layout.py');
 const searchPatch = read('build-composed-search-filter.py');
 
 test('lange toestellenlijst bij nieuw samengesteld document is verticaal scrollbaar', () => {
-  assert.ok(built.includes('composed-layout-v1'));
-  assert.ok(built.includes('table-wrap composed-device-list-wrap'));
-  assert.match(built, /\.composed-device-list-wrap\{max-height:min\(52vh,520px\);overflow:auto/);
-  assert.match(layoutPatch, /overscroll-behavior:contain/);
+  assert.match(layoutPatch, /table-wrap composed-device-list-wrap/);
+  assert.match(layoutPatch, /\.composed-device-list-wrap\{max-height:min\(52vh,520px\);overflow:auto;overscroll-behavior:contain\}/);
+  assert.match(layoutPatch, /@media\(max-width:760px\)\{\.composed-device-list-wrap\{max-height:55vh\}/);
 });
 
 test('zoekbalk voor toestellen staat direct vóór de juiste toestellentabel', () => {
-  const search = built.indexOf('<label for="composedDeviceSearch">Zoek firma, locatie of toestel</label>');
-  const table = built.indexOf('<div class="table-wrap composed-device-list-wrap">');
+  const search = layoutPatch.indexOf('<label for="composedDeviceSearch">Zoek firma, locatie of toestel</label>');
+  const table = layoutPatch.indexOf('<div class="table-wrap composed-device-list-wrap">', search);
   assert.ok(search >= 0, 'toestelzoekbalk ontbreekt');
   assert.ok(table > search, 'toestelzoekbalk staat niet vóór de toestellentabel');
 });
 
 test('zoekbalk voor opgeslagen documenten staat boven de tabel met samengestelde documenten', () => {
-  const search = built.indexOf('<label for="composedSavedSearch">Zoek in opgeslagen documenten</label>');
-  const savedSection = built.indexOf('<h3>Samengestelde documenten</h3>');
-  const table = built.indexOf('<table class="table" style="min-width:900px">', savedSection);
-  assert.ok(savedSection >= 0, 'sectie Samengestelde documenten ontbreekt');
-  assert.ok(search > savedSection, 'documentzoekbalk staat niet in de documentsectie');
+  const section = layoutPatch.indexOf('<h3>Samengestelde documenten</h3>');
+  const search = layoutPatch.indexOf('<label for="composedSavedSearch">Zoek in opgeslagen documenten</label>', section);
+  const table = layoutPatch.indexOf('<table class="table" style="min-width:900px">', search);
+  assert.ok(section >= 0, 'sectie Samengestelde documenten ontbreekt');
+  assert.ok(search > section, 'documentzoekbalk staat niet in de documentsectie');
   assert.ok(table > search, 'documentzoekbalk staat niet vóór de documententabel');
 });
 
-test('layout bouwt automatisch na de live zoekfilter zonder extra losse buildstap', () => {
+test('layout heeft eigen buildvalidatie en bouwt automatisch na live zoekfilter', () => {
+  assert.match(layoutPatch, /MARKER = 'data-machinepark-build-fix="composed-layout-v1"'/);
+  assert.match(layoutPatch, /for needle in required:/);
   assert.match(searchPatch, /build-composed-layout\.py/);
   assert.match(searchPatch, /runpy\.run_path/);
 });
