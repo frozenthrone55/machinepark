@@ -12,10 +12,10 @@ if FEATURE_MARKER not in index:
 
 if MARKER not in index:
     old_device_handler = "    document.getElementById('composedDeviceSearch').oninput=e=>{composedDeviceQuery=e.target.value||'';renderComposedDevices();};"
-    new_device_handler = """    const composedDocumentName=document.getElementById('composedDocumentName');
-    const syncComposedDocumentFilter=()=>{composedDeviceQuery=String(composedDocumentName?.value||'');renderComposedDevices();};
-    composedDocumentName?.addEventListener('input',syncComposedDocumentFilter);
-    composedDocumentName?.addEventListener('search',syncComposedDocumentFilter);"""
+    new_device_handler = """    const composedDeviceSearch=document.getElementById('composedDeviceSearch');
+    const syncComposedDeviceSearch=()=>{composedDeviceQuery=String(composedDeviceSearch?.value||'');renderComposedDevices();};
+    composedDeviceSearch?.addEventListener('input',syncComposedDeviceSearch);
+    composedDeviceSearch?.addEventListener('search',syncComposedDeviceSearch);"""
 
     old_saved_handler = "    document.getElementById('composedSavedSearch').oninput=e=>{composedSavedQuery=e.target.value||'';renderComposedSavedTable();};"
     new_saved_handler = """    const composedSavedSearch=document.getElementById('composedSavedSearch');
@@ -26,7 +26,7 @@ if MARKER not in index:
     old_device_filter = """  function composedFilteredDevices(){
     const q=composedKey(composedDeviceQuery);"""
     new_device_filter = """  function composedFilteredDevices(){
-    const search=document.getElementById('composedDocumentName');
+    const search=document.getElementById('composedDeviceSearch');
     composedDeviceQuery=String(search?.value??composedDeviceQuery??'');
     const q=composedKey(composedDeviceQuery);"""
 
@@ -34,9 +34,9 @@ if MARKER not in index:
     new_saved_filter = "    const search=document.getElementById('composedSavedSearch');composedSavedQuery=String(search?.value??composedSavedQuery??'');const q=composedKey(composedSavedQuery),list=[...composedList()].filter(doc=>!q||"
 
     replacements = [
-        (old_device_handler, new_device_handler, 'documentnaam als zoekfilter toestellentabel'),
+        (old_device_handler, new_device_handler, 'zoeklistener toestellentabel'),
         (old_saved_handler, new_saved_handler, 'zoeklistener opgeslagen documenten'),
-        (old_device_filter, new_device_filter, 'actuele documentnaam als zoekwaarde toestellentabel'),
+        (old_device_filter, new_device_filter, 'actuele zoekwaarde toestellentabel'),
         (old_saved_filter, new_saved_filter, 'actuele zoekwaarde opgeslagen documenten'),
     ]
     for old, new, label in replacements:
@@ -53,12 +53,12 @@ if MARKER not in index:
 built = INDEX.read_text(encoding='utf-8')
 required = [
     MARKER,
-    "const composedDocumentName=document.getElementById('composedDocumentName')",
-    "composedDocumentName?.addEventListener('input',syncComposedDocumentFilter)",
-    "composedDocumentName?.addEventListener('search',syncComposedDocumentFilter)",
+    "const composedDeviceSearch=document.getElementById('composedDeviceSearch')",
+    "composedDeviceSearch?.addEventListener('input',syncComposedDeviceSearch)",
+    "composedDeviceSearch?.addEventListener('search',syncComposedDeviceSearch)",
     "composedSavedSearch?.addEventListener('input',syncComposedSavedSearch)",
     "composedSavedSearch?.addEventListener('search',syncComposedSavedSearch)",
-    "const search=document.getElementById('composedDocumentName')",
+    "const search=document.getElementById('composedDeviceSearch')",
     "composedDeviceQuery=String(search?.value??composedDeviceQuery??'')",
     "composedSavedQuery=String(search?.value??composedSavedQuery??'')",
 ]
@@ -66,5 +66,5 @@ for needle in required:
     if needle not in built:
         raise SystemExit(f'Buildvalidatie mislukt: zoekfilter-token ontbreekt: {needle}')
 
-print('[Machinepark] documentnaam filtert de toestellen live en opgeslagen documenten hebben een eigen zoekveld')
+print('[Machinepark] aparte toestelzoekbalk filtert live en opgeslagen documenten hebben hun eigen zoekveld')
 runpy.run_path(str(ROOT / 'build-composed-layout.py'), run_name='__main__')
