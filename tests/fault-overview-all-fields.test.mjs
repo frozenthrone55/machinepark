@@ -89,16 +89,16 @@ test('storingenoverzicht gebruikt alle actuele centrale detailwaarden correct en
 
   // De definitieve Storingen-JS/CSS krijgen na alle buildstappen een inhoudshash.
   // Hierdoor kan een oude service worker nooit meer de oude 6-koloms JS combineren met nieuwe HTML.
-  const faultJsUrl = /\/fault-library\.js\?v=1\.68\.9-[a-f0-9]{12}/;
-  const faultCssUrl = /\/fault-library\.css\?v=1\.68\.9-[a-f0-9]{12}/;
+  const faultJsUrl = /\.\/fault-library\.js\?v=1\.68\.9-[a-f0-9]{12}/;
+  const faultCssUrl = /\.\/fault-library\.css\?v=1\.68\.9-[a-f0-9]{12}/;
   assert.match(index, faultJsUrl);
   assert.match(index, faultCssUrl);
-  assert.doesNotMatch(index, /src="\/fault-library\.js"/);
-  assert.doesNotMatch(index, /href="\/fault-library\.css"/);
+  assert.doesNotMatch(index, /src="\.\/fault-library\.js"/);
+  assert.doesNotMatch(index, /href="\.\/fault-library\.css"/);
 
   assert.match(sw, /const CACHE='machinepark-v1\.68\.9-assets-[a-f0-9]{12}'/);
-  assert.match(sw, /'\/fault-library\.js\?v=1\.68\.9-[a-f0-9]{12}'/);
-  assert.match(sw, /'\/fault-library\.css\?v=1\.68\.9-[a-f0-9]{12}'/);
+  assert.match(sw, /["']\.\/fault-library\.js\?v=1\.68\.9-[a-f0-9]{12}["']/);
+  assert.match(sw, /["']\.\/fault-library\.css\?v=1\.68\.9-[a-f0-9]{12}["']/);
   assert.doesNotMatch(sw, /machinepark-v1\.65-offline-first/);
   assert.match(sw, /keys\.filter\(k=>k!==CACHE\).*caches\.delete\(k\)/);
 });
