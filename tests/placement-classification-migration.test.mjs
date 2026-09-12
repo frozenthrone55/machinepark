@@ -33,5 +33,5 @@ test('migratie is eenmalig centraal en wordt voor offline sync gebouwd', () => {
   const offline = build.indexOf('build-offline-first.py');
   assert.ok(otherWorks >= 0 && migration > otherWorks && offline > migration);
   assert.equal(build.split('build-placement-classification-migration.py').length - 1, 1);
-  assert.equal(pkg.version, '1.68.9');
+  assert.equal(pkg.version, '1.68.10');
 });
