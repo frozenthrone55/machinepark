@@ -34,5 +34,5 @@ test('samengevoegde patch draait direct na basis Andere werken en voor offline-f
   const offline = build.indexOf('build-offline-first.py');
   assert.ok(base >= 0 && merged > base && offline > merged);
   assert.equal(build.split('build-other-works-merged.py').length - 1, 1);
-  assert.equal(pkg.version, '1.68.9');
+  assert.equal(pkg.version, '1.68.10');
 });
