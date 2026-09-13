@@ -29,9 +29,10 @@ if MARKER not in text:
 
     script = '''\n<script data-machinepark-build-info-script="visible-build-info-v1">\n(() => {\n  const versionEl = document.getElementById('machineparkVersion');\n  const metaEl = document.getElementById('machineparkBuildMeta');\n  if (!versionEl || !metaEl) return;\n\n  const fallbackVersion = versionEl.textContent.replace(/^v/i, '').trim();\n  const shortSha = value => String(value || '').trim().slice(0, 8);\n  const formatBuiltAt = value => {\n    if (!value) return '';\n    const date = new Date(value);\n    if (Number.isNaN(date.getTime())) return '';\n    try {\n      return new Intl.DateTimeFormat('nl-BE', {\n        day: '2-digit', month: '2-digit', year: 'numeric',\n        hour: '2-digit', minute: '2-digit',\n      }).format(date);\n    } catch (_) {\n      return date.toLocaleString();\n    }\n  };\n\n  fetch('./deploy-meta.json?machineparkBuildInfo=' + Date.now(), { cache: 'no-store' })\n    .then(response => response.ok ? response.json() : null)\n    .then(meta => {\n      if (!meta) {\n        metaEl.textContent = 'Build: webversie';\n        return;\n      }\n      const appVersion = String(meta.app_version || fallbackVersion).trim();\n      versionEl.textContent = 'v' + appVersion;\n      const builtAt = formatBuiltAt(meta.built_at);\n      const sha = shortSha(meta.source_sha);\n      const parts = [];\n      if (builtAt) parts.push('Build ' + builtAt);\n      if (sha) parts.push(sha);\n      metaEl.textContent = parts.length ? parts.join(' • ') : 'Buildinformatie beschikbaar';\n    })\n    .catch(() => {\n      metaEl.textContent = 'Build: webversie';\n    });\n})();\n</script>\n'''
 
-    if '</body>' not in text:
-        raise SystemExit('Buildvalidatie mislukt: </body> ontbreekt')
-    text = text.replace('</body>', script + '</body>', 1)
+    body_end = text.rfind('</body>')
+    if body_end < 0:
+        raise SystemExit('Buildvalidatie mislukt: finale </body> ontbreekt')
+    text = text[:body_end] + script + text[body_end:]
 
 index_path.write_text(text, encoding='utf-8')
 
@@ -48,5 +49,10 @@ required = [
 for token in required:
     if token not in built:
         raise SystemExit('Buildvalidatie mislukt: ontbreekt: ' + token)
+
+script_at = built.find('data-machinepark-build-info-script="visible-build-info-v1"')
+final_body_at = built.rfind('</body>')
+if script_at < 0 or final_body_at < 0 or script_at > final_body_at:
+    raise SystemExit('Buildvalidatie mislukt: buildinfoscript staat niet vóór de finale body-tag')
 
 print(f'Zichtbare buildinformatie toegevoegd voor v{version}.')
