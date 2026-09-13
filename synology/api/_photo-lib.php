@@ -1,0 +1,260 @@
+<?php
+declare(strict_types=1);
+
+define('MP_PHOTO_ROOT', '/volume1/MachineparkData/photos');
+
+function mp_photo_json(array $body, int $status = 200): void {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('X-Content-Type-Options: nosniff');
+    http_response_code($status);
+    echo json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function mp_photo_safe_id($value, int $max = 100): string {
+    $id = preg_replace('/[^A-Za-z0-9_-]+/', '_', trim((string)$value));
+    return substr((string)$id, 0, $max);
+}
+
+function mp_photo_safe_token($value): string {
+    $token = preg_replace('/[^A-Za-z0-9_-]+/', '', trim((string)$value));
+    return substr((string)$token, 0, 100);
+}
+
+function mp_photo_ensure_dir(string $dir): void {
+    if (!is_dir($dir) && !@mkdir($dir, 0770, true) && !is_dir($dir)) {
+        throw new RuntimeException('Fotomap kon niet worden aangemaakt.');
+    }
+    if (!is_writable($dir)) throw new RuntimeException('Fotomap is niet schrijfbaar.');
+}
+
+function mp_photo_parse_data_media($value, int $maxImageBytes, int $maxVideoBytes = 20000000): array {
+    $raw = (string)$value;
+    if (!preg_match('#^data:((?:image|video)/[A-Za-z0-9.+-]+);base64,([A-Za-z0-9+/=\r\n]+)$#', $raw, $match)) {
+        throw new RuntimeException('Het mediabestand bevat ongeldige gegevens.');
+    }
+    $bytes = base64_decode(preg_replace('/\s+/', '', $match[2]), true);
+    if ($bytes === false || strlen($bytes) === 0) throw new RuntimeException('Het mediabestand bevat ongeldige gegevens.');
+    $type = strtolower((string)$match[1]);
+    $images = ['image/jpeg','image/png','image/webp','image/gif'];
+    $videos = ['video/mp4','video/webm','video/quicktime','video/x-m4v'];
+    if (in_array($type, $images, true)) {
+        if (strlen($bytes) > $maxImageBytes) throw new RuntimeException('De afbeelding is te groot.');
+        return ['bytes'=>$bytes,'contentType'=>$type,'kind'=>'image'];
+    }
+    if (in_array($type, $videos, true)) {
+        if (strlen($bytes) > $maxVideoBytes) throw new RuntimeException('De video is te groot (maximaal 20 MB).');
+        return ['bytes'=>$bytes,'contentType'=>$type,'kind'=>'video'];
+    }
+    throw new RuntimeException('Dit foto- of videoformaat wordt niet ondersteund.');
+}
+
+function mp_photo_parse_data_image($value, int $maxBytes): array {
+    $parsed = mp_photo_parse_data_media($value, $maxBytes, 0);
+    if (($parsed['kind'] ?? '') !== 'image') throw new RuntimeException('De thumbnail moet een afbeelding zijn.');
+    return $parsed;
+}
+
+function mp_photo_write_blob(string $basePath, array $parsed): void {
+    $tmp = $basePath . '.tmp-' . bin2hex(random_bytes(5));
+    if (@file_put_contents($tmp, $parsed['bytes'], LOCK_EX) === false) {
+        throw new RuntimeException('Foto kon niet worden geschreven.');
+    }
+    if (!@rename($tmp, $basePath . '.bin')) {
+        @unlink($tmp);
+        throw new RuntimeException('Foto kon niet atomair worden opgeslagen.');
+    }
+    $meta = json_encode(['contentType'=>$parsed['contentType'],'updatedAt'=>date(DATE_ATOM)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($meta === false || @file_put_contents($basePath . '.meta.json', $meta, LOCK_EX) === false) {
+        @unlink($basePath . '.bin');
+        throw new RuntimeException('Fotometadata kon niet worden opgeslagen.');
+    }
+}
+
+function mp_photo_exists(string $basePath): bool {
+    return is_file($basePath . '.bin');
+}
+
+function mp_photo_delete_blob(string $basePath): void {
+    @unlink($basePath . '.bin');
+    @unlink($basePath . '.meta.json');
+    @unlink($basePath . '.thumb.bin');
+    @unlink($basePath . '.thumb.meta.json');
+}
+
+function mp_photo_write_thumb(string $basePath, array $parsed): void {
+    $tmp = $basePath . '.thumb.tmp-' . bin2hex(random_bytes(5));
+    if (@file_put_contents($tmp, $parsed['bytes'], LOCK_EX) === false) throw new RuntimeException('Thumbnail kon niet worden geschreven.');
+    if (!@rename($tmp, $basePath . '.thumb.bin')) {
+        @unlink($tmp);
+        throw new RuntimeException('Thumbnail kon niet atomair worden opgeslagen.');
+    }
+    $meta = json_encode(['contentType'=>$parsed['contentType'],'updatedAt'=>date(DATE_ATOM)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($meta === false || @file_put_contents($basePath . '.thumb.meta.json', $meta, LOCK_EX) === false) {
+        @unlink($basePath . '.thumb.bin');
+        throw new RuntimeException('Thumbnailmetadata kon niet worden opgeslagen.');
+    }
+}
+
+function mp_photo_content_type(string $metaPath): string {
+    if (!is_file($metaPath)) return 'image/jpeg';
+    $raw = @file_get_contents($metaPath);
+    $data = $raw !== false ? json_decode($raw, true) : null;
+    $type = is_array($data) ? (string)($data['contentType'] ?? '') : '';
+    return (strpos($type, 'image/') === 0 || strpos($type, 'video/') === 0) ? $type : 'image/jpeg';
+}
+
+function mp_photo_is_video_base(string $basePath): bool {
+    return strpos(mp_photo_content_type($basePath . '.meta.json'), 'video/') === 0;
+}
+
+function mp_photo_serve(string $basePath, bool $thumb, bool $headOnly): void {
+    $thumbPath = $basePath . '.thumb.bin';
+    $useThumb = $thumb && is_file($thumbPath);
+    if ($thumb && $headOnly && !$useThumb) {
+        http_response_code(404);
+        header('Cache-Control: no-store');
+        header('X-Machinepark-Thumbnail: missing');
+        exit;
+    }
+
+    $file = $useThumb ? $thumbPath : $basePath . '.bin';
+    if (!is_file($file)) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'Media niet gevonden.';
+        exit;
+    }
+
+    $meta = $useThumb ? $basePath . '.thumb.meta.json' : $basePath . '.meta.json';
+    $contentType = mp_photo_content_type($meta);
+    $size = (int)filesize($file);
+    $isVideo = !$useThumb && strpos($contentType, 'video/') === 0;
+
+    header('Content-Type: ' . $contentType);
+    header('Cache-Control: private, max-age=' . ($useThumb ? '604800' : '86400'));
+    header('X-Content-Type-Options: nosniff');
+    header('X-Machinepark-Thumbnail: ' . ($useThumb ? 'exact' : ($thumb ? 'fallback' : 'full')));
+
+    if ($isVideo) {
+        // machinepark-video-byte-range-v1
+        // Mobiele browsers (o.a. Safari) verwachten byte ranges voor betrouwbaar
+        // afspelen en zoeken in MP4/MOV. Houd dit PHP 7.2-compatibel.
+        header('Accept-Ranges: bytes');
+        $range = trim((string)($_SERVER['HTTP_RANGE'] ?? ''));
+        if (!$headOnly && $range !== '' && preg_match('/^bytes=(\d*)-(\d*)$/', $range, $match)) {
+            $startText = (string)$match[1];
+            $endText = (string)$match[2];
+            if ($startText === '' && $endText !== '') {
+                $suffix = max(0, (int)$endText);
+                $start = max(0, $size - $suffix);
+                $end = max(0, $size - 1);
+            } else {
+                $start = $startText === '' ? 0 : (int)$startText;
+                $end = $endText === '' ? max(0, $size - 1) : min((int)$endText, max(0, $size - 1));
+            }
+            if ($size <= 0 || $start < 0 || $start >= $size || $end < $start) {
+                http_response_code(416);
+                header('Content-Range: bytes */' . $size);
+                header('Content-Length: 0');
+                exit;
+            }
+            $length = $end - $start + 1;
+            http_response_code(206);
+            header('Content-Range: bytes ' . $start . '-' . $end . '/' . $size);
+            header('Content-Length: ' . $length);
+            $handle = @fopen($file, 'rb');
+            if ($handle === false) {
+                http_response_code(500);
+                exit;
+            }
+            @fseek($handle, $start);
+            $remaining = $length;
+            while ($remaining > 0 && !feof($handle)) {
+                $chunk = fread($handle, min(1048576, $remaining));
+                if ($chunk === false || $chunk === '') break;
+                echo $chunk;
+                $remaining -= strlen($chunk);
+            }
+            fclose($handle);
+            exit;
+        }
+    }
+
+    header('Content-Length: ' . $size);
+    if ($headOnly) exit;
+    readfile($file);
+    exit;
+}
+
+function mp_photo_ref(string $endpoint, string $key, bool $thumb = false, string $mediaKind = ''): string {
+    // Canonieke ref werkt zowel op /machinepark als /machinepark/.
+    return '/machinepark/synology/api/' . $endpoint . '?key=' . rawurlencode($key)
+        . ($thumb ? '&variant=thumb' : '')
+        . ($mediaKind === 'video' ? '&media=video' : '');
+}
+
+function mp_photo_ref_for_base(string $endpoint, string $key, string $basePath, bool $thumb = false): string {
+    return mp_photo_ref($endpoint, $key, $thumb, mp_photo_is_video_base($basePath) ? 'video' : 'image');
+}
+
+function mp_photo_key_from_ref($value, string $endpoint, string $prefix): string {
+    $text = trim((string)$value);
+    if ($text === '') return '';
+    $query = parse_url($text, PHP_URL_QUERY);
+    $path = (string)(parse_url($text, PHP_URL_PATH) ?? '');
+    $accepted = [
+        './synology/api/' . $endpoint,
+        '/machinepark/synology/api/' . $endpoint,
+        'synology/api/' . $endpoint,
+    ];
+    $pathOk = false;
+    foreach ($accepted as $candidate) {
+        if ($path === $candidate || ltrim($path, '/') === ltrim($candidate, '/')) { $pathOk = true; break; }
+    }
+    if (!$pathOk || $query === null || $query === false) return '';
+    parse_str($query, $params);
+    $key = rawurldecode((string)($params['key'] ?? ''));
+    return strpos($key, $prefix) === 0 ? $key : '';
+}
+
+function mp_photo_is_legacy_ref($value, string $endpoint): bool {
+    return strpos((string)$value, '/.netlify/functions/' . preg_replace('/\.php$/', '', $endpoint) . '?') !== false;
+}
+
+function mp_photo_remove_directory(string $dir): int {
+    if (!is_dir($dir)) return 0;
+    $count = 0;
+    foreach ((array)glob($dir . '/*') as $path) {
+        if (is_dir($path)) $count += mp_photo_remove_directory($path);
+        elseif (is_file($path)) { if (@unlink($path)) $count++; }
+    }
+    @rmdir($dir);
+    return $count;
+}
+
+function mp_photo_cleanup_bases(string $dir, array $keepTokens): void {
+    if (!is_dir($dir)) return;
+    $keep = array_fill_keys($keepTokens, true);
+    foreach ((array)glob($dir . '/*.bin') as $path) {
+        if (substr($path, -10) === '.thumb.bin') continue;
+        $name = basename($path, '.bin');
+        if (isset($keep[$name])) continue;
+        mp_photo_delete_blob($dir . '/' . $name);
+    }
+}
+
+function mp_photo_require_local_user(): array {
+    try { mp_auth_require_request_access(); }
+    catch (Throwable $e) { mp_photo_json(mp_auth_access_error_payload($e),403); }
+    try { return mp_auth_require_user(); }
+    catch (Throwable $e) { mp_photo_json(['error'=>'Niet aangemeld.'],401); }
+}
+
+function mp_photo_can(array $user, array $permissions): bool {
+    if (!empty($user['isOwner'])) return true;
+    $granted = mp_role_permissions((string)($user['role'] ?? 'gebruiker'));
+    foreach ($permissions as $permission) if (!empty($granted[$permission])) return true;
+    return false;
+}
