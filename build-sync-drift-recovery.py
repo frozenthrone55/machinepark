@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parent
 path = ROOT / 'offline-first.js'
 text = path.read_text(encoding='utf-8')
 MARKER = '// machinepark-sync-drift-recovery-v1'
+RACE_MARKER = '// machinepark-new-entry-race-v1'
 
 
 def replace_once(old, new, label):
@@ -17,14 +18,23 @@ def replace_once(old, new, label):
 if MARKER not in text:
     replace_once(
         '  window.machineparkMergeOfflineSnapshots = mergeOfflineSnapshots;\n',
-        '''  window.machineparkMergeOfflineSnapshots = mergeOfflineSnapshots;\n\n  // machinepark-sync-drift-recovery-v1\n  const LOCAL_WRITE_HINT_KEY = 'machinepark-local-write-pending-v1';\n\n  function sortedSyncStore(list) {\n    return [...(Array.isArray(list) ? list : [])].sort((a, b) => String(a?.id || '').localeCompare(String(b?.id || '')));\n  }\n\n  function snapshotStoresEqual(a, b) {\n    if (!a || !b) return false;\n    return stores.every((storeName) => sameValue(sortedSyncStore(a?.[storeName]), sortedSyncStore(b?.[storeName])));\n  }\n\n  function markPendingLocalWriteHint() {\n    try { localStorage.setItem(LOCAL_WRITE_HINT_KEY, new Date().toISOString()); } catch (_) {}\n  }\n\n  function hasPendingLocalWriteHint() {\n    try { return Boolean(localStorage.getItem(LOCAL_WRITE_HINT_KEY)); } catch (_) { return false; }\n  }\n\n  function clearPendingLocalWriteHint() {\n    try { localStorage.removeItem(LOCAL_WRITE_HINT_KEY); } catch (_) {}\n  }\n''',
+        '''  window.machineparkMergeOfflineSnapshots = mergeOfflineSnapshots;\n\n  // machinepark-sync-drift-recovery-v1\n  // machinepark-new-entry-race-v1\n  const LOCAL_WRITE_HINT_KEY = 'machinepark-local-write-pending-v1';\n  let localWriteSequenceValue = 0;\n\n  function localWriteSequence() {\n    return localWriteSequenceValue;\n  }\n\n  function noteLocalWrite() {\n    localWriteSequenceValue += 1;\n    return localWriteSequenceValue;\n  }\n\n  function sortedSyncStore(list) {\n    return [...(Array.isArray(list) ? list : [])].sort((a, b) => String(a?.id || '').localeCompare(String(b?.id || '')));\n  }\n\n  function snapshotStoresEqual(a, b) {\n    if (!a || !b) return false;\n    return stores.every((storeName) => sameValue(sortedSyncStore(a?.[storeName]), sortedSyncStore(b?.[storeName])));\n  }\n\n  function markPendingLocalWriteHint() {\n    try { localStorage.setItem(LOCAL_WRITE_HINT_KEY, new Date().toISOString()); } catch (_) {}\n  }\n\n  function hasPendingLocalWriteHint() {\n    try { return Boolean(localStorage.getItem(LOCAL_WRITE_HINT_KEY)); } catch (_) { return false; }\n  }\n\n  function clearPendingLocalWriteHint() {\n    try { localStorage.removeItem(LOCAL_WRITE_HINT_KEY); } catch (_) {}\n  }\n''',
         'drift helpers',
     )
 
+    # Een push kan al bezig zijn wanneer de gebruiker een volgende invoer opslaat.
+    # Onthoud daarom welke lokale versie de push werkelijk bevatte. Alleen die versie
+    # mag na serverbevestiging als schoon worden gemarkeerd.
     replace_once(
-        "              await writeMeta({ etag: centralSync.etag || null, base: local, dirty: false });\n              if (reconciledRemote || migratedPhotos) {",
-        "              await writeMeta({ etag: centralSync.etag || null, base: local, dirty: false });\n              clearPendingLocalWriteHint();\n              if (reconciledRemote || migratedPhotos) {",
-        'pending hint wissen na push',
+        '''          const migratedPhotos = await flushOfflinePhotos();\n          let local = await localSnapshot();\n          let meta = await readMeta();''',
+        '''          const migratedPhotos = await flushOfflinePhotos();\n          const pushWriteSequence = localWriteSequence();\n          let local = await localSnapshot();\n          const pushStartedLocal = local;\n          let meta = await readMeta();''',
+        'push lokale beginsnapshot',
+    )
+
+    replace_once(
+        '''              centralSync.etag = result.body?.etag || expectedEtag || centralSync.etag;\n              centralSync.lastRemoteAt = local.updatedAt || '';\n              centralSync.offlineDirty = false;\n              centralSync.pending = false;\n              window.machineparkLastSyncError = null;\n              await writeMeta({ etag: centralSync.etag || null, base: local, dirty: false });\n              if (reconciledRemote || migratedPhotos) {\n                await replaceLocalSnapshot(local);\n                if (window.__koffieServiceStarted && document.getElementById('view-dashboard')) await refresh();\n              }\n              setCentralSyncStatus(conflicts ? `☁ Gesynchroniseerd · ${conflicts} conflict(en) veilig samengevoegd` : '☁ Alles centraal opgeslagen', 'ok');\n              return { ok: true, conflicts };''',
+        '''              const confirmedEtag = result.body?.etag || expectedEtag || centralSync.etag;\n              centralSync.etag = confirmedEtag;\n              centralSync.lastRemoteAt = local.updatedAt || '';\n              window.machineparkLastSyncError = null;\n\n              // Lees na de netwerk-PUT nogmaals de echte IndexedDB. Een invoer die\n              // tijdens de PUT werd opgeslagen mag niet als onderdeel van deze oudere\n              // push worden beschouwd en mag zeker niet door een merge worden overschreven.\n              const localAfterPush = await localSnapshot();\n              const newerLocalWrite = localWriteSequence() !== pushWriteSequence\n                || !snapshotStoresEqual(pushStartedLocal, localAfterPush);\n\n              if (newerLocalWrite) {\n                centralSync.offlineDirty = true;\n                centralSync.pending = true;\n                markPendingLocalWriteHint();\n\n                // Na een 409-merge bewaren we bewust de vorige ETag/basis. De volgende\n                // push krijgt dan opnieuw een 409 en kan de zojuist gemaakte invoer\n                // veilig met de reeds bevestigde servermerge samenvoegen.\n                const retryEtag = reconciledRemote ? (expectedEtag || meta.etag || null) : (confirmedEtag || null);\n                const retryBase = reconciledRemote ? pushStartedLocal : local;\n                await writeMeta({ etag: retryEtag, base: retryBase, dirty: true });\n                setCentralSyncStatus('☁ Nieuwe invoer lokaal bewaard · synchronisatie volgt…', 'busy');\n                return { ok: true, conflicts, pending: true };\n              }\n\n              if (reconciledRemote || migratedPhotos) {\n                await replaceLocalSnapshot(local);\n                if (window.__koffieServiceStarted && document.getElementById('view-dashboard')) await refresh();\n              }\n\n              await writeMeta({ etag: confirmedEtag || null, base: local, dirty: false });\n\n              // Ook tijdens de asynchrone meta-write kan nog een nieuwe lokale write\n              // binnenkomen. Controleer de teller daarom een laatste keer vóór we de\n              // dataset als volledig gesynchroniseerd markeren.\n              if (localWriteSequence() !== pushWriteSequence) {\n                centralSync.offlineDirty = true;\n                centralSync.pending = true;\n                markPendingLocalWriteHint();\n                await writeMeta({ etag: confirmedEtag || null, base: local, dirty: true });\n                setCentralSyncStatus('☁ Nieuwe invoer lokaal bewaard · synchronisatie volgt…', 'busy');\n                return { ok: true, conflicts, pending: true };\n              }\n\n              centralSync.offlineDirty = false;\n              centralSync.pending = false;\n              clearPendingLocalWriteHint();\n              setCentralSyncStatus(conflicts ? `☁ Gesynchroniseerd · ${conflicts} conflict(en) veilig samengevoegd` : '☁ Alles centraal opgeslagen', 'ok');\n              return { ok: true, conflicts };''',
+        'push-success racebeveiliging',
     )
 
     replace_once(
@@ -33,10 +43,26 @@ if MARKER not in text:
         'driftcontrole voor pull',
     )
 
+    # Leg vlak vóór de GET vast welke lokale gegevens werkelijk aanwezig zijn. Een
+    # IndexedDB getAll wacht vanzelf op reeds lopende write-transacties. Daardoor ziet
+    # de tweede snapshot hieronder ook serviceverslagen die rechtstreeks via een eigen
+    # transactie worden opgeslagen en niet alleen writes via put()/putMany().
+    replace_once(
+        '''        meta = await readMeta();\n        if (meta.dirty) return { exists: false, pending: true };\n      }\n\n      const headers = await centralHeaders(false);''',
+        '''        meta = await readMeta();\n        if (meta.dirty) return { exists: false, pending: true };\n      }\n\n      const pullWriteSequence = localWriteSequence();\n      const pullLocalBaseline = await localSnapshot();\n      const headers = await centralHeaders(false);''',
+        'pull beginsnapshot',
+    )
+
+    replace_once(
+        '''      if (typeof window.applyMachineparkServerAccess === 'function') window.applyMachineparkServerAccess(body);\n\n      if (!body.exists) {''',
+        '''      if (typeof window.applyMachineparkServerAccess === 'function') window.applyMachineparkServerAccess(body);\n\n      // CRUCIAAL: de GET kan gestart zijn vóór de gebruiker op Opslaan drukte. Lees\n      // vlak vóór het toepassen nogmaals IndexedDB. Is er intussen ook maar één store\n      // veranderd, dan mag deze oudere serverkopie de lokale invoer niet vervangen.\n      const localBeforeApply = await localSnapshot();\n      const localChangedDuringPull = localWriteSequence() !== pullWriteSequence\n        || !snapshotStoresEqual(pullLocalBaseline, localBeforeApply)\n        || centralSync.pending\n        || centralSync.offlineDirty\n        || hasPendingLocalWriteHint();\n\n      if (localChangedDuringPull) {\n        centralSync.offlineDirty = true;\n        centralSync.pending = true;\n        markPendingLocalWriteHint();\n        await writeMeta({\n          dirty: true,\n          etag: meta.etag || centralSync.etag || null,\n          base: meta.base || null,\n        });\n        setCentralSyncStatus('☁ Nieuwe invoer lokaal bewaard · synchronisatie volgt…', 'busy');\n        return {\n          exists: Boolean(body.exists),\n          pending: true,\n          skippedApply: true,\n          etag: body.etag || centralSync.etag || null,\n        };\n      }\n\n      if (!body.exists) {''',
+        'pull toepassen racebeveiliging',
+    )
+
     replace_once(
         '''      centralSync.pending = true;\n      markDirty().catch(() => {});''',
-        '''      centralSync.pending = true;\n      // Deze lokaleStorage-hint wordt synchroon gezet en overleeft het sneller sluiten\n      // of slapen van mobiele browsers. De IndexedDB dirty-marker blijft de hoofdbron.\n      markPendingLocalWriteHint();\n      markDirty().catch(() => {});''',
-        'duurzame pending hint',
+        '''      noteLocalWrite();\n      centralSync.pending = true;\n      // Deze lokaleStorage-hint wordt synchroon gezet en overleeft het sneller sluiten\n      // of slapen van mobiele browsers. De IndexedDB dirty-marker blijft de hoofdbron.\n      markPendingLocalWriteHint();\n      markDirty().catch(() => {});''',
+        'duurzame pending hint en write-teller',
     )
 
     replace_once(
@@ -50,9 +76,21 @@ path.write_text(text, encoding='utf-8')
 built = path.read_text(encoding='utf-8')
 required = [
     MARKER,
+    RACE_MARKER,
     'machinepark-local-write-pending-v1',
+    'function localWriteSequence()',
+    'function noteLocalWrite()',
     'function snapshotStoresEqual(a, b)',
     'Boolean(meta.base) && !snapshotStoresEqual(meta.base, localBeforePull)',
+    'const pushWriteSequence = localWriteSequence();',
+    'const pushStartedLocal = local;',
+    'const localAfterPush = await localSnapshot();',
+    'const newerLocalWrite = localWriteSequence() !== pushWriteSequence',
+    'const pullLocalBaseline = await localSnapshot();',
+    'const localBeforeApply = await localSnapshot();',
+    '!snapshotStoresEqual(pullLocalBaseline, localBeforeApply)',
+    'skippedApply: true',
+    "setCentralSyncStatus('☁ Nieuwe invoer lokaal bewaard · synchronisatie volgt…', 'busy')",
     'markPendingLocalWriteHint();',
     'clearPendingLocalWriteHint();',
     "storeName !== 'maintenance' && storeName !== 'breakdowns'",
@@ -62,6 +100,6 @@ required = [
 ]
 for needle in required:
     if needle not in built:
-        raise SystemExit(f'Buildvalidatie mislukt: drift-herstel ontbreekt ({needle})')
+        raise SystemExit(f'Buildvalidatie mislukt: drift/race-herstel ontbreekt ({needle})')
 
-print('[Machinepark] lokale service-drift wordt herkend en mobiele writes worden snel centraal bevestigd')
+print('[Machinepark] nieuwe invoer kan niet meer door een reeds lopende pull/push worden overschreven')
