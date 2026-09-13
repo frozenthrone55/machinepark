@@ -4,12 +4,14 @@ import { readFileSync } from 'node:fs';
 
 const index = readFileSync('index.html', 'utf8');
 const builder = readFileSync('build-visible-build-info.py', 'utf8');
+const workflow = readFileSync('.github/workflows/synology-deploy.yml', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
+const escapedVersion = packageJson.version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('zichtbare versie volgt package.json en toont Synology buildmetadata', () => {
-  assert.equal(packageJson.version, '1.68.11');
+  assert.match(packageJson.version, /^\d+\.\d+\.\d+$/);
   assert.match(index, /data-machinepark-build-info="visible-build-info-v1"/);
-  assert.match(index, /id="machineparkVersion">v1\.68\.11</);
+  assert.match(index, new RegExp(`id="machineparkVersion">v${escapedVersion}<`));
   assert.match(index, /id="machineparkBuildMeta"/);
   assert.match(index, /deploy-meta\.json\?machineparkBuildInfo=/);
   assert.match(index, /meta\.app_version/);
@@ -18,10 +20,19 @@ test('zichtbare versie volgt package.json en toont Synology buildmetadata', () =
   assert.doesNotMatch(index, /<br><br>v1\.64 • Export inclusief afbeeldingen/);
 });
 
+test('buildinformatie toont datum plus uur en minuten en ververst zonder versiebump', () => {
+  assert.match(builder, /new Intl\.DateTimeFormat\('nl-BE'/);
+  assert.match(builder, /hour: '2-digit', minute: '2-digit'/);
+  assert.match(builder, /fetch\('\.\/deploy-meta\.json\?machineparkBuildInfo=' \+ Date\.now\(\), \{ cache: 'no-store' \}\)/);
+  assert.match(workflow, /"built_at": datetime\.now\(timezone\.utc\)\.isoformat\(\)/);
+  assert.match(workflow, /"source_sha": os\.environ\["SOURCE_SHA"\]/);
+});
+
 test('build-info builder draait vóór inline scripts worden gecontroleerd en uitgepakt', () => {
   const chain = packageJson.scripts.build;
   assert.match(chain, /python3 build-visible-build-info\.py/);
   assert.ok(chain.indexOf('python3 build-visible-build-info.py') < chain.indexOf('python3 scripts/check-inline-scripts.py'));
-  assert.match(builder, /OLD_FOOTER/);
+  assert.match(builder, /LOCAL_FOOTER/);
+  assert.match(builder, /CENTRAL_FOOTER/);
   assert.match(builder, /deploy-meta\.json\?machineparkBuildInfo=/);
 });
