@@ -17,7 +17,19 @@ test('lokale writes krijgen een synchrone herstelhint en oplopende writeteller',
   assert.match(build, /machinepark-new-entry-race-v1/);
   assert.match(build, /function localWriteSequence\(\)/);
   assert.match(build, /function noteLocalWrite\(\)/);
-  assert.match(build, /noteLocalWrite\(\);[\s\S]{0,220}markPendingLocalWriteHint\(\)/);
+
+  const writePatchStart = build.indexOf('noteLocalWrite();');
+  const writePatchEnd = build.indexOf("'duurzame pending hint en write-teller'", writePatchStart);
+  assert.ok(writePatchStart >= 0, 'lokale write-patch moet noteLocalWrite bevatten');
+  assert.ok(writePatchEnd > writePatchStart, 'lokale write-patch moet afgebakend blijven');
+  const writePatch = build.slice(writePatchStart, writePatchEnd);
+
+  assert.equal((writePatch.match(/noteLocalWrite\(\);/g) || []).length, 1);
+  assert.equal((writePatch.match(/markPendingLocalWriteHint\(\);/g) || []).length, 1);
+  assert.equal((writePatch.match(/markDirty\(\)\.catch/g) || []).length, 1);
+  assert.ok(writePatch.indexOf('noteLocalWrite();') < writePatch.indexOf('markPendingLocalWriteHint();'));
+  assert.ok(writePatch.indexOf('markPendingLocalWriteHint();') < writePatch.indexOf('markDirty().catch'));
+
   assert.match(build, /hasPendingLocalWriteHint\(\)/);
   assert.match(build, /clearPendingLocalWriteHint\(\)/);
 });
