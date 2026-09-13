@@ -2,18 +2,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 INDEX = ROOT / 'index.html'
+SERVICE_JS = ROOT / 'service-visits.js'
 MARKER = 'data-machinepark-build-fix="work-table-scroll-v1"'
 
 index = INDEX.read_text(encoding='utf-8')
+service_js = SERVICE_JS.read_text(encoding='utf-8')
 
-required_source = [
-    'id=\"serviceVisitPanel\"',
+required_index_source = [
     'work-overview-table-wrap',
     'id=\"workHistoryBody\"',
 ]
-for needle in required_source:
+for needle in required_index_source:
     if needle not in index:
         raise SystemExit(f'Buildvalidatie mislukt: Werkzaamheden-tabel ontbreekt voor scrollfix ({needle})')
+
+required_service_source = [
+    "panel.id='serviceVisitPanel'",
+    'class=\"table service-visit-table\"',
+]
+for needle in required_service_source:
+    if needle not in service_js:
+        raise SystemExit(f'Buildvalidatie mislukt: Serviceverslagen-tabel ontbreekt voor scrollfix ({needle})')
 
 if MARKER not in index:
     style = r'''
