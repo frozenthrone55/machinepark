@@ -35,6 +35,11 @@ self.addEventListener('fetch',e=>{
   const url=new URL(e.request.url);
   if(url.hostname!==self.location.hostname)return;
 
+  if(url.pathname==='/deploy-meta.json'||url.pathname.endsWith('/deploy-meta.json')){
+    e.respondWith(fetch(e.request,{cache:'no-store'}));
+    return;
+  }
+
   if(url.pathname.startsWith('/.netlify/functions/')){
     if(!CACHEABLE_API.has(url.pathname))return;
     const key=apiCacheKey(url);
