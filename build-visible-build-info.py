@@ -49,11 +49,12 @@ script = '''
     if (Number.isNaN(date.getTime())) return '';
     try {
       return new Intl.DateTimeFormat('nl-BE', {
+        timeZone: 'Europe/Brussels',
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit', second: '2-digit',
       }).format(date);
     } catch (_) {
-      return date.toLocaleString();
+      return date.toLocaleString('nl-BE', { timeZone: 'Europe/Brussels' });
     }
   };
 
@@ -100,6 +101,7 @@ required = [
     f'id="machineparkVersion">v{version}<',
     'id="machineparkBuildMeta"',
     'deploy-meta.json?machineparkBuildInfo=',
+    "timeZone: 'Europe/Brussels'",
     "second: '2-digit'",
     'meta.app_version',
     'meta.built_at',
