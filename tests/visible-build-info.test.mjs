@@ -21,9 +21,11 @@ test('zichtbare versie volgt package.json en toont Synology buildmetadata', () =
   assert.doesNotMatch(index, /<br><br>v1\.64 • Export inclusief afbeeldingen/);
 });
 
-test('buildinformatie toont datum plus uur, minuten en seconden en ververst zonder versiebump', () => {
+test('buildinformatie toont Belgische lokale datum en tijd tot op de seconde en ververst zonder versiebump', () => {
   assert.match(builder, /new Intl\.DateTimeFormat\('nl-BE'/);
+  assert.match(builder, /timeZone: 'Europe\/Brussels'/);
   assert.match(builder, /hour: '2-digit', minute: '2-digit', second: '2-digit'/);
+  assert.match(builder, /toLocaleString\('nl-BE', \{ timeZone: 'Europe\/Brussels' \}\)/);
   assert.match(builder, /fetch\('\.\/deploy-meta\.json\?machineparkBuildInfo=' \+ Date\.now\(\), \{ cache: 'no-store' \}\)/);
   assert.match(builder, /SCRIPT_MARKER/);
   assert.match(builder, /script_pattern\.subn\(script, text, count=1\)/);
