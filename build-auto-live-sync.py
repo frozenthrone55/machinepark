@@ -2,8 +2,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 index_path = ROOT / 'index.html'
+offline_path = ROOT / 'offline-first.js'
 index = index_path.read_text(encoding='utf-8')
 MARKER = 'data-machinepark-build-fix="auto-live-sync-v1"'
+DEVICE_SYNC_MARKER = '// machinepark-device-write-fast-sync-v1'
 
 if MARKER not in index:
     feature = r'''
@@ -65,6 +67,24 @@ if MARKER not in index:
     index = index[:body_pos] + feature + '\n' + index[body_pos:]
     index_path.write_text(index, encoding='utf-8')
 
+# Toestelwijzigingen bevatten operationeel belangrijke planningvelden zoals nextHalf
+# en nextAnnual. Geef daarom ook writes naar devices dezelfde snelle centrale
+# bevestiging als onderhoud en depannages. Zo kan een live pull geen oudere
+# toestelversie terugzetten tussen de eerste lokale opslag en de normale debounce.
+offline = offline_path.read_text(encoding='utf-8')
+if DEVICE_SYNC_MARKER not in offline:
+    old = """    function queueServiceWriteSync(storeName) {
+      if (storeName !== 'maintenance' && storeName !== 'breakdowns') return;
+      markPendingLocalWriteHint();"""
+    new = """    function queueServiceWriteSync(storeName) {
+      // machinepark-device-write-fast-sync-v1
+      if (storeName !== 'maintenance' && storeName !== 'breakdowns' && storeName !== 'devices') return;
+      markPendingLocalWriteHint();"""
+    if offline.count(old) != 1:
+        raise SystemExit('Buildvalidatie mislukt: snelle write-sync voor onderhoud/depannage niet uniek gevonden')
+    offline = offline.replace(old, new, 1)
+    offline_path.write_text(offline, encoding='utf-8')
+
 required = [
     MARKER,
     'LIVE_SYNC_INTERVAL_MS = 3000',
@@ -82,4 +102,13 @@ for needle in required:
     if needle not in index and needle != "rfind('</body>')":
         raise SystemExit(f'Buildvalidatie mislukt: automatische live sync ontbreekt ({needle})')
 
-print('[Machinepark] depannages, onderhoud, storingen en handleidingen verversen automatisch tussen toestellen')
+built_offline = offline_path.read_text(encoding='utf-8')
+for needle in [
+    DEVICE_SYNC_MARKER,
+    "storeName !== 'maintenance' && storeName !== 'breakdowns' && storeName !== 'devices'",
+    'queueServiceWriteSync(storeName)',
+]:
+    if needle not in built_offline:
+        raise SystemExit(f'Buildvalidatie mislukt: snelle toestel-sync ontbreekt ({needle})')
+
+print('[Machinepark] depannages, onderhoud, toestelwijzigingen, storingen en handleidingen verversen automatisch tussen toestellen')
