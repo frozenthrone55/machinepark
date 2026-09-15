@@ -1,0 +1,30 @@
+.manual-library-status{margin:0 0 12px;font-size:12px}
+.manual-table{min-width:940px}
+.manual-title{font-weight:800;display:block}
+.manual-file-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.manual-scope{font-size:12px;line-height:1.45}
+.manual-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.manual-offline-badge{font-size:10px;white-space:nowrap}
+.manual-detail-grid{display:grid;gap:15px}
+.manual-detail-card{border:1px solid var(--line);border-radius:12px;padding:13px;background:#fafcfb}
+.manual-detail-card h4{margin:0 0 6px;font-size:13px}
+.manual-detail-card p{margin:0;white-space:pre-wrap;line-height:1.55;font-size:13px}
+.manual-device-section{margin-top:18px;padding-top:15px;border-top:1px solid var(--line)}
+.manual-device-list{display:grid;gap:8px;margin-top:9px}
+.manual-device-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fbfcfb}
+.manual-device-item strong{font-size:12px;display:block}
+.manual-device-item small{display:block;color:var(--muted);margin-top:2px}
+.manual-inline-tools{margin:8px 0}
+.manual-inline-panel{display:none;margin-top:7px;border:1px solid var(--line);border-radius:11px;background:#fbfcfb;padding:8px;gap:6px}
+.manual-inline-panel.show{display:grid}
+.manual-inline-result{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px;border-radius:9px;background:white;border:1px solid #e6ece9}
+.manual-inline-result strong{font-size:12px}
+.manual-inline-result small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.manual-settings-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:700px){
+  .manual-toolbar .toolbar-left,.manual-toolbar .toolbar-right{width:100%}
+  .manual-toolbar .filter{flex:1;min-width:0}
+  .manual-toolbar .btn{flex:1}
+  .manual-device-item,.manual-inline-result{align-items:flex-start;flex-direction:column}
+  .manual-device-item .btn,.manual-inline-result .btn{width:100%}
+}
