@@ -9,7 +9,9 @@ const syncBuilder = readFileSync(new URL('../build-sync-drift-recovery.py', impo
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('alle centrale Machinepark-stores krijgen snelle write-bevestiging', () => {
-  assert.match(index, /const stores=\['parts','devices','maintenance','breakdowns'\]/);
+  // De regressietests draaien na npm run build. Op dat moment heeft build-actions.py
+  // de uiteindelijke centrale storelijst al uitgebreid met actions.
+  assert.match(index, /const stores=\['parts','devices','maintenance','breakdowns','actions'\]/);
   assert.match(actionsBuilder, /const stores=\['parts','devices','maintenance','breakdowns','actions'\]/);
   assert.match(autoLiveBuilder, /machinepark-core-store-fast-sync-v1/);
 
