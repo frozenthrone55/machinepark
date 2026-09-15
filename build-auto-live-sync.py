@@ -6,6 +6,7 @@ offline_path = ROOT / 'offline-first.js'
 index = index_path.read_text(encoding='utf-8')
 MARKER = 'data-machinepark-build-fix="auto-live-sync-v1"'
 DEVICE_SYNC_MARKER = '// machinepark-device-write-fast-sync-v1'
+CORE_SYNC_MARKER = '// machinepark-core-store-fast-sync-v1'
 
 if MARKER not in index:
     feature = r'''
@@ -67,21 +68,23 @@ if MARKER not in index:
     index = index[:body_pos] + feature + '\n' + index[body_pos:]
     index_path.write_text(index, encoding='utf-8')
 
-# Toestelwijzigingen bevatten operationeel belangrijke planningvelden zoals nextHalf
-# en nextAnnual. Geef daarom ook writes naar devices dezelfde snelle centrale
-# bevestiging als onderhoud en depannages. Zo kan een live pull geen oudere
-# toestelversie terugzetten tussen de eerste lokale opslag en de normale debounce.
+# Alle centrale stores bevatten wijzigingen die na één opslag onmiddellijk betrouwbaar
+# op de server moeten staan. Onderhoud en depannages hadden deze route al; toestellen,
+# onderdelen en acties krijgen dezelfde snelle bevestiging. Daardoor kan een live pull
+# geen oudere centrale kopie terugzetten tussen de eerste lokale opslag en de normale
+# 650ms debounce.
 offline = offline_path.read_text(encoding='utf-8')
-if DEVICE_SYNC_MARKER not in offline:
+if CORE_SYNC_MARKER not in offline:
     old = """    function queueServiceWriteSync(storeName) {
       if (storeName !== 'maintenance' && storeName !== 'breakdowns') return;
       markPendingLocalWriteHint();"""
     new = """    function queueServiceWriteSync(storeName) {
       // machinepark-device-write-fast-sync-v1
-      if (storeName !== 'maintenance' && storeName !== 'breakdowns' && storeName !== 'devices') return;
+      // machinepark-core-store-fast-sync-v1
+      if (storeName !== 'maintenance' && storeName !== 'breakdowns' && storeName !== 'devices' && storeName !== 'parts' && storeName !== 'actions') return;
       markPendingLocalWriteHint();"""
     if offline.count(old) != 1:
-        raise SystemExit('Buildvalidatie mislukt: snelle write-sync voor onderhoud/depannage niet uniek gevonden')
+        raise SystemExit('Buildvalidatie mislukt: snelle write-sync voor centrale stores niet uniek gevonden')
     offline = offline.replace(old, new, 1)
     offline_path.write_text(offline, encoding='utf-8')
 
@@ -105,10 +108,11 @@ for needle in required:
 built_offline = offline_path.read_text(encoding='utf-8')
 for needle in [
     DEVICE_SYNC_MARKER,
-    "storeName !== 'maintenance' && storeName !== 'breakdowns' && storeName !== 'devices'",
+    CORE_SYNC_MARKER,
+    "storeName !== 'maintenance' && storeName !== 'breakdowns' && storeName !== 'devices' && storeName !== 'parts' && storeName !== 'actions'",
     'queueServiceWriteSync(storeName)',
 ]:
     if needle not in built_offline:
-        raise SystemExit(f'Buildvalidatie mislukt: snelle toestel-sync ontbreekt ({needle})')
+        raise SystemExit(f'Buildvalidatie mislukt: snelle centrale store-sync ontbreekt ({needle})')
 
-print('[Machinepark] depannages, onderhoud, toestelwijzigingen, storingen en handleidingen verversen automatisch tussen toestellen')
+print('[Machinepark] onderdelen, toestellen, onderhoud, depannages en acties krijgen snelle centrale write-bevestiging')
