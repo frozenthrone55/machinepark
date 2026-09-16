@@ -27,7 +27,7 @@ test('handleidingen kunnen algemeen merk model of toestelgebonden zijn', () => {
 
 test('PDF-bestanden staan apart centraal en worden gevalideerd', () => {
   assert.match(endpoint, /FILE_PREFIX = 'manual-files\/'/);
-  assert.match(endpoint, /MAX_FILE_BYTES = 12_000_000/);
+  assert.match(endpoint, /MAX_FILE_BYTES = 20_000_000/);
   assert.match(endpoint, /application\/pdf/);
   assert.match(endpoint, /%PDF-/);
   assert.match(endpoint, /action === 'save-manual'/);
