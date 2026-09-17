@@ -198,10 +198,13 @@ if MARKER not in index:
 })();
 </script>
 '''
-    if '</head>' not in index or '</body>' not in index:
+    head_end = index.find('</head>')
+    body_end = index.rfind('</body>')
+    if head_end < 0 or body_end < 0:
         raise SystemExit('Buildvalidatie mislukt: HTML-afsluiters ontbreken voor universele tabelsortering')
-    index = index.replace('</head>', style + '</head>', 1)
-    index = index.replace('</body>', script + '</body>', 1)
+    index = index[:head_end] + style + index[head_end:]
+    body_end = index.rfind('</body>')
+    index = index[:body_end] + script + index[body_end:]
     INDEX.write_text(index, encoding='utf-8')
 
 built = INDEX.read_text(encoding='utf-8')
@@ -228,8 +231,9 @@ for needle in required:
 
 start = built.find('<script ' + MARKER + '>')
 end = built.find('</script>', start)
-if start < 0 or end < 0:
-    raise SystemExit('Buildvalidatie mislukt: los universeel sorteerscript ontbreekt')
+final_body = built.rfind('</body>')
+if start < 0 or end < 0 or final_body < 0 or start > final_body:
+    raise SystemExit('Buildvalidatie mislukt: los universeel sorteerscript staat niet voor de finale body-tag')
 block = built[start:end]
 for forbidden in ["text==='details'", "text==='bewerk'", "classList.contains('no-sort')", '.table:not(.device-table)']:
     if forbidden in block:
