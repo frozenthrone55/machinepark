@@ -30,6 +30,31 @@ new_helpers = '''  // machinepark-manual-library-sorting-v1
     return manualNorm(a) === manualNorm(b);
   }
 
+  function isManualSortControl(select) {
+    if (!select || select.tagName !== 'SELECT') return false;
+    const probe = [...select.options].map((option) => `${option.value || ''} ${option.textContent || ''}`).join(' ');
+    return /handleiding/i.test(probe) && /a\\s*[-–]?\\s*z/i.test(probe) && /z\\s*[-–]?\\s*a/i.test(probe);
+  }
+
+  function manualSortControl() {
+    const view = document.getElementById('view-manuals');
+    if (!view) return null;
+    return [...view.querySelectorAll('select')].find(isManualSortControl) || null;
+  }
+
+  function manualSortDirection() {
+    const select = manualSortControl();
+    if (select) {
+      const selected = select.options[select.selectedIndex];
+      const probe = manualNorm(`${select.value || ''} ${selected?.textContent || ''}`);
+      if (/\\b(?:desc|aflopend)\\b/.test(probe) || /\\bz a\\b/.test(probe)) return -1;
+      return 1;
+    }
+    const table = document.querySelector('#view-manuals .manual-table');
+    if (table?.dataset?.sortIndex === '1' && table.dataset.sortDir === 'desc') return -1;
+    return 1;
+  }
+
   function optionValues(values) {
     const unique = new Map();
     values.map((item) => String(item || '').trim()).filter(Boolean).forEach((value) => {
@@ -72,11 +97,29 @@ elif new_filter_block not in source:
     raise SystemExit('Buildvalidatie mislukt: actieve handleidingfilters niet gevonden')
 
 old_sort = ".sort((a, b) => manualSpecificity(a) - manualSpecificity(b) || String(a.brand || '').localeCompare(String(b.brand || ''), 'nl-BE') || String(a.model || '').localeCompare(String(b.model || ''), 'nl-BE') || String(a.title || '').localeCompare(String(b.title || ''), 'nl-BE'));"
-new_sort = ".sort((a, b) => manualCompareText(a.title, b.title) || manualCompareText(a.brand, b.brand) || manualCompareText(a.model, b.model) || manualCompareText(a.type, b.type) || manualCompareText(manualScopeText(a), manualScopeText(b)) || manualCompareText(a.id, b.id));"
+new_sort = ".sort((a, b) => manualSortDirection() * (manualCompareText(a.title, b.title) || manualCompareText(a.brand, b.brand) || manualCompareText(a.model, b.model) || manualCompareText(a.type, b.type) || manualCompareText(manualScopeText(a), manualScopeText(b)) || manualCompareText(a.id, b.id)));"
 if old_sort in source:
     source = source.replace(old_sort, new_sort, 1)
 elif new_sort not in source:
     raise SystemExit('Buildvalidatie mislukt: tabelsortering van handleidingen niet gevonden')
+
+old_bind = '''    if (brand) brand.onchange = () => { if (model) model.value = ''; renderManualLibrary(); };
+    if (model) model.onchange = renderManualLibrary;
+    if (type) type.onchange = renderManualLibrary;
+    document.body.addEventListener('click', async (event) => {'''
+new_bind = '''    if (brand) brand.onchange = () => { if (model) model.value = ''; renderManualLibrary(); };
+    if (model) model.onchange = renderManualLibrary;
+    if (type) type.onchange = renderManualLibrary;
+    document.body.addEventListener('change', (event) => {
+      const select = event.target?.closest?.('#view-manuals select');
+      if (!isManualSortControl(select)) return;
+      setTimeout(() => renderManualLibrary(), 0);
+    });
+    document.body.addEventListener('click', async (event) => {'''
+if old_bind in source:
+    source = source.replace(old_bind, new_bind, 1)
+elif new_bind not in source:
+    raise SystemExit('Buildvalidatie mislukt: eventbinding voor handleiding-sortering niet gevonden')
 
 CLIENT.write_text(source, encoding='utf-8')
 
@@ -85,6 +128,12 @@ required = [
     MARKER,
     'function manualCompareText(a, b)',
     'function manualValueEquals(a, b)',
+    'function isManualSortControl(select)',
+    'function manualSortDirection()',
+    "table?.dataset?.sortIndex === '1'",
+    'manualSortDirection() * (manualCompareText(a.title, b.title)',
+    "event.target?.closest?.('#view-manuals select')",
+    'setTimeout(() => renderManualLibrary(), 0)',
     'const unique = new Map()',
     'manualValueEquals(manual.brand, selectedBrand)',
     'manualCompareText(a.title, b.title)',
@@ -96,4 +145,4 @@ missing = [needle for needle in required if needle not in built]
 if missing:
     raise SystemExit('Buildvalidatie handleiding-sortering mislukt: ' + ', '.join(missing))
 
-print('[Machinepark] handleidingen alfabetisch op titel gesorteerd; merk, model en type zijn stabiele vervolgsleutels')
+print('[Machinepark] handleidingen sorteren op titel in beide richtingen A-Z en Z-A; filters blijven genormaliseerd')
