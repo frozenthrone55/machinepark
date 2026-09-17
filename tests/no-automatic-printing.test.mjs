@@ -8,6 +8,8 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('afdrukken vereist altijd een expliciete gebruikersklik', () => {
   const html = read('index.html');
+  const bundle = read('assets/machinepark-build.js');
+  const runtime = `${html}\n${bundle}`;
   const service = read('service-visits.js');
 
   assert.match(html, /data-machinepark-build-fix="safe-explicit-print-v1"/);
@@ -16,15 +18,15 @@ test('afdrukken vereist altijd een expliciete gebruikersklik', () => {
   assert.match(html, /window\.machineparkGrantPrintIntent/);
   assert.match(html, /automatische printopdracht geblokkeerd/);
 
-  assert.doesNotMatch(html, /window\.onload\s*=\s*\(\)\s*=>\s*setTimeout\(\(\)\s*=>\s*window\.print\(\)/);
-  assert.doesNotMatch(html, /setTimeout\(triggerPrint\s*,\s*80\)/);
-  assert.doesNotMatch(html, /setTimeout\(triggerPrint\s*,\s*1500\)/);
-  assert.doesNotMatch(html, /const finish=\(\)=>setTimeout\(\(\)=>\{try\{printWindow\.focus\(\);printWindow\.print\(\)/);
+  assert.doesNotMatch(runtime, /window\.onload\s*=\s*\(\)\s*=>\s*setTimeout\(\(\)\s*=>\s*window\.print\(\)/);
+  assert.doesNotMatch(runtime, /setTimeout\(triggerPrint\s*,\s*80\)/);
+  assert.doesNotMatch(runtime, /setTimeout\(triggerPrint\s*,\s*1500\)/);
+  assert.doesNotMatch(runtime, /const finish=\(\)=>setTimeout\(\(\)=>\{try\{printWindow\.focus\(\);printWindow\.print\(\)/);
 
-  const serviceRecordStart = html.indexOf('function printServiceRecordIsolated(kind, record)');
-  const serviceRecordEnd = html.indexOf('function printServiceRecord(kind, id)', serviceRecordStart);
+  const serviceRecordStart = runtime.indexOf('function printServiceRecordIsolated(kind, record)');
+  const serviceRecordEnd = runtime.indexOf('function printServiceRecord(kind, id)', serviceRecordStart);
   assert.ok(serviceRecordStart >= 0 && serviceRecordEnd > serviceRecordStart, 'veilige service-afdrukfunctie ontbreekt');
-  const serviceRecordBlock = html.slice(serviceRecordStart, serviceRecordEnd);
+  const serviceRecordBlock = runtime.slice(serviceRecordStart, serviceRecordEnd);
   assert.doesNotMatch(serviceRecordBlock, /triggerPrint/);
   assert.doesNotMatch(serviceRecordBlock, /setTimeout\([^)]*print/i);
   assert.match(serviceRecordBlock, /servicePrintNow/);
@@ -39,19 +41,19 @@ test('afdrukken vereist altijd een expliciete gebruikersklik', () => {
   assert.match(reportBlock, /serviceReportPrintNow/);
   assert.match(reportBlock, /addEventListener\('click'/);
 
-  const actionStart = html.indexOf('function printAction(id)');
-  const actionEnd = html.indexOf('function openActionDetails(id)', actionStart);
+  const actionStart = runtime.indexOf('function printAction(id)');
+  const actionEnd = runtime.indexOf('function openActionDetails(id)', actionStart);
   assert.ok(actionStart >= 0 && actionEnd > actionStart, 'veilige ToDo-afdrukfunctie ontbreekt');
-  const actionBlock = html.slice(actionStart, actionEnd);
+  const actionBlock = runtime.slice(actionStart, actionEnd);
   assert.match(actionBlock, /machineparkActionPrintNow/);
   assert.match(actionBlock, /addEventListener\('click'/);
   assert.doesNotMatch(actionBlock, /const finish=/);
   assert.doesNotMatch(actionBlock, /setTimeout\([^)]*print/i);
 
-  const composedStart = html.indexOf('function printComposedDocument(doc)');
-  const composedEnd = html.indexOf('function loadJsPdf()', composedStart);
+  const composedStart = runtime.indexOf('function printComposedDocument(doc)');
+  const composedEnd = runtime.indexOf('function loadJsPdf()', composedStart);
   assert.ok(composedStart >= 0 && composedEnd > composedStart, 'veilige samengestelde afdrukfunctie ontbreekt');
-  const composedBlock = html.slice(composedStart, composedEnd);
+  const composedBlock = runtime.slice(composedStart, composedEnd);
   assert.match(composedBlock, /machineparkComposedPrintNow/);
   assert.doesNotMatch(composedBlock, /window\.onload[^\n]*print/);
   assert.doesNotMatch(composedBlock, /<script>.*print/s);
