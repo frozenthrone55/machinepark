@@ -4,18 +4,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
-const html = () => fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('elke kolom van elke Machinepark-tabel is sorteerbaar in beide richtingen', () => {
-  const source = html();
+  const source = read('index.html');
+  const bundle = read('assets/machinepark-build.js');
   const marker = 'data-machinepark-build-fix="all-table-columns-sortable-v1"';
   assert.match(source, new RegExp(marker));
   assert.match(source, /data-machinepark-table-sort-style="v1"/);
 
-  const start = source.indexOf(`<script ${marker}>`);
-  const end = source.indexOf('</script>', start);
-  assert.ok(start >= 0 && end > start, 'los universeel sorteerscript ontbreekt');
-  const block = source.slice(start, end);
+  // De finale build extraheert build-fix scripts bewust naar de runtimebundle.
+  const runtimeMarker = '/* all-table-columns-sortable-v1 */';
+  const start = bundle.indexOf(runtimeMarker);
+  const next = bundle.indexOf('\n/* ', start + runtimeMarker.length);
+  const end = next >= 0 ? next : bundle.length;
+  assert.ok(start >= 0 && end > start, 'universele sorteerruntime ontbreekt in machinepark-build.js');
+  const block = bundle.slice(start, end);
 
   // Alle .table-tabellen en letterlijk iedere th worden geregistreerd.
   assert.match(block, /root\?\.matches\?\.\('\.table'\)/);
