@@ -70,19 +70,20 @@ service, report_count = report_pattern.subn(lambda _match: report_replacement, s
 if report_count != 1:
     raise SystemExit(f'Buildvalidatie mislukt: veilige serviceverslag-afdruk kon niet eenduidig worden geplaatst ({report_count}x)')
 
-# 3. ToDo: de oude functie printte na foto-load/timer automatisch. Vervang die
-# door een voorbeeldvenster met een expliciete Afdrukken/PDF-knop.
-action_pattern = re.compile(
-    r"  function printAction\(id\) \{.*?\n  \}\n\n  function openActionDetails\(id\) \{",
+# 3. ToDo: wijzig uitsluitend het automatische foto-wacht/printdeel binnen de
+# bestaande functie. Zo blijven alle latere ToDo-aanpassingen onaangeraakt.
+action_start_match = re.search(r"function printAction\(id\)\s*\{", index)
+action_end_match = re.search(r"\n\s*function openActionDetails\(id\)\s*\{", index[action_start_match.end():] if action_start_match else '')
+if not action_start_match or not action_end_match:
+    raise SystemExit('Buildvalidatie mislukt: grenzen van ToDo-afdrukfunctie niet gevonden')
+action_start = action_start_match.start()
+action_end = action_start_match.end() + action_end_match.start()
+action_block = index[action_start:action_end]
+auto_pattern = re.compile(
+    r"\s*const images=\[\.\.\.printWindow\.document\.images\];.*?setTimeout\(\(\)=>\{if\(pending>0\)finish\(\);\},1800\);",
     re.S,
 )
-action_replacement = '''  function printAction(id) {
-    const item=(state.actions||[]).find(a=>a.id===id);if(!item)return;
-    const printWindow=window.open('','_blank');
-    if(!printWindow){alert('Sta pop-ups toe om de ToDo af te drukken.');return;}
-    printWindow.document.open();
-    printWindow.document.write(actionPrintHtml(item));
-    printWindow.document.close();
+manual_action = '''
     const manual=printWindow.document.createElement('button');
     manual.id='machineparkActionPrintNow';
     manual.type='button';
@@ -92,13 +93,11 @@ action_replacement = '''  function printAction(id) {
     hide.textContent='@media print{#machineparkActionPrintNow{display:none!important}}';
     printWindow.document.head.appendChild(hide);
     printWindow.document.body.insertBefore(manual,printWindow.document.body.firstChild);
-    manual.addEventListener('click',()=>{try{printWindow.focus();printWindow.print();}catch(_){}});
-  }
-
-  function openActionDetails(id) {'''
-index, action_count = action_pattern.subn(lambda _match: action_replacement, index, count=1)
+    manual.addEventListener('click',()=>{try{printWindow.focus();printWindow.print();}catch(_){}});'''
+action_block, action_count = auto_pattern.subn(lambda _match: manual_action, action_block, count=1)
 if action_count != 1:
-    raise SystemExit(f'Buildvalidatie mislukt: veilige ToDo-afdruk kon niet eenduidig worden geplaatst ({action_count}x)')
+    raise SystemExit(f'Buildvalidatie mislukt: automatische ToDo-printtimer niet eenduidig gevonden ({action_count}x)')
+index = index[:action_start] + action_block + index[action_end:]
 
 # 4. Samengestelde documenten: geen script-in-script en geen print op load.
 # De parent koppelt de zichtbare knop pas na document.close() aan print().
