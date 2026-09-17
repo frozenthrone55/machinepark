@@ -1,8 +1,16 @@
 from pathlib import Path
 import json
 import re
+import runpy
 
 ROOT = Path(__file__).resolve().parent
+
+# Finale runtime-hardening moet na alle functionele builders draaien en vóór de
+# inline-scriptcontrole / asset-extractie. Zo kan geen latere featurebuilder de
+# printbeveiliging of universele tabelsortering opnieuw overschrijven.
+runpy.run_path(str(ROOT / 'build-safe-printing.py'), run_name='__main__')
+runpy.run_path(str(ROOT / 'build-all-table-sorting.py'), run_name='__main__')
+
 index_path = ROOT / 'index.html'
 package_path = ROOT / 'package.json'
 
@@ -106,6 +114,8 @@ required = [
     'meta.app_version',
     'meta.built_at',
     'meta.source_sha',
+    'safe-explicit-print-v1',
+    'all-table-columns-sortable-v1',
 ]
 for token in required:
     if token not in built:
