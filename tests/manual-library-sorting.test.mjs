@@ -5,15 +5,45 @@ import { readFileSync } from 'node:fs';
 const client = readFileSync(new URL('../manual-library.js', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-test('handleidingen sorteren stabiel op merk model type en titel', () => {
+test('handleidingen sorteren alfabetisch op titel en pas daarna op merk model en type', () => {
   assert.match(client, /machinepark-manual-library-sorting-v1/);
-  assert.match(client, /manualCompareText\(a\.brand, b\.brand\)/);
-  assert.match(client, /manualCompareText\(a\.model, b\.model\)/);
-  assert.match(client, /manualCompareText\(a\.type, b\.type\)/);
-  assert.match(client, /manualCompareText\(a\.title, b\.title\)/);
   const visibleSort = client.match(/const visible = manualLibrary[\s\S]*?status\.textContent/);
   assert.ok(visibleSort, 'zichtbare handleidingen-sortering ontbreekt');
-  assert.doesNotMatch(visibleSort[0], /manualSpecificity\(a\) - manualSpecificity\(b\)/);
+  const source = visibleSort[0];
+  const titlePos = source.indexOf('manualCompareText(a.title, b.title)');
+  const brandPos = source.indexOf('manualCompareText(a.brand, b.brand)');
+  const modelPos = source.indexOf('manualCompareText(a.model, b.model)');
+  const typePos = source.indexOf('manualCompareText(a.type, b.type)');
+  assert.ok(titlePos >= 0, 'titel ontbreekt als sorteersleutel');
+  assert.ok(brandPos > titlePos, 'merk mag pas na titel sorteren');
+  assert.ok(modelPos > brandPos, 'model moet na merk sorteren');
+  assert.ok(typePos > modelPos, 'type moet na model sorteren');
+  assert.doesNotMatch(source, /manualSpecificity\(a\) - manualSpecificity\(b\)/);
+});
+
+test('titel-sortering behandelt lege merkvelden correct', () => {
+  const rows = [
+    { title: 'Yunio X95 exploded view', brand: '' },
+    { title: 'Yunio X95 spare parts', brand: '' },
+    { title: 'Yunio X95 waterzijdig', brand: '' },
+    { title: 'Acaia weegschaal', brand: 'Acaia' },
+    { title: 'LNE anniversario handleiding ENG', brand: 'LNE' },
+    { title: 'LNE onderhoud', brand: 'LNE' },
+    { title: 'Quality Espresso Q9', brand: 'Quality Espresso' },
+    { title: 'Yunio x50 exploded view', brand: 'Yunio' },
+  ];
+  const compare = (a, b) => String(a || '').localeCompare(String(b || ''), 'nl-BE', { numeric: true, sensitivity: 'base' });
+  const titles = rows.sort((a, b) => compare(a.title, b.title) || compare(a.brand, b.brand)).map((row) => row.title);
+  assert.deepEqual(titles, [
+    'Acaia weegschaal',
+    'LNE anniversario handleiding ENG',
+    'LNE onderhoud',
+    'Quality Espresso Q9',
+    'Yunio x50 exploded view',
+    'Yunio X95 exploded view',
+    'Yunio X95 spare parts',
+    'Yunio X95 waterzijdig',
+  ]);
 });
 
 test('handleidingfilters vergelijken genormaliseerd en tonen geen bijna-dubbele waarden', () => {
