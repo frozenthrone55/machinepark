@@ -19,6 +19,7 @@ test('afdrukken vereist altijd een expliciete gebruikersklik', () => {
   assert.doesNotMatch(html, /window\.onload\s*=\s*\(\)\s*=>\s*setTimeout\(\(\)\s*=>\s*window\.print\(\)/);
   assert.doesNotMatch(html, /setTimeout\(triggerPrint\s*,\s*80\)/);
   assert.doesNotMatch(html, /setTimeout\(triggerPrint\s*,\s*1500\)/);
+  assert.doesNotMatch(html, /const finish=\(\)=>setTimeout\(\(\)=>\{try\{printWindow\.focus\(\);printWindow\.print\(\)/);
 
   const serviceRecordStart = html.indexOf('function printServiceRecordIsolated(kind, record)');
   const serviceRecordEnd = html.indexOf('function printServiceRecord(kind, id)', serviceRecordStart);
@@ -38,11 +39,21 @@ test('afdrukken vereist altijd een expliciete gebruikersklik', () => {
   assert.match(reportBlock, /serviceReportPrintNow/);
   assert.match(reportBlock, /addEventListener\('click'/);
 
+  const actionStart = html.indexOf('function printAction(id)');
+  const actionEnd = html.indexOf('function openActionDetails(id)', actionStart);
+  assert.ok(actionStart >= 0 && actionEnd > actionStart, 'veilige ToDo-afdrukfunctie ontbreekt');
+  const actionBlock = html.slice(actionStart, actionEnd);
+  assert.match(actionBlock, /machineparkActionPrintNow/);
+  assert.match(actionBlock, /addEventListener\('click'/);
+  assert.doesNotMatch(actionBlock, /const finish=/);
+  assert.doesNotMatch(actionBlock, /setTimeout\([^)]*print/i);
+
   const composedStart = html.indexOf('function printComposedDocument(doc)');
   const composedEnd = html.indexOf('function loadJsPdf()', composedStart);
   assert.ok(composedStart >= 0 && composedEnd > composedStart, 'veilige samengestelde afdrukfunctie ontbreekt');
   const composedBlock = html.slice(composedStart, composedEnd);
   assert.match(composedBlock, /machineparkComposedPrintNow/);
-  assert.doesNotMatch(composedBlock, /window\.onload[^\n]*window\.print/);
-  assert.match(composedBlock, /addEventListener\('click'.*window\.print/s);
+  assert.doesNotMatch(composedBlock, /window\.onload[^\n]*print/);
+  assert.doesNotMatch(composedBlock, /<script>.*print/s);
+  assert.match(composedBlock, /manual\.addEventListener\('click'.*win\.print/s);
 });
