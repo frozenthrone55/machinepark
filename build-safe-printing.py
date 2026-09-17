@@ -10,14 +10,13 @@ GUARD_MARKER = 'data-machinepark-explicit-print-guard="v1"'
 index = INDEX.read_text(encoding='utf-8')
 service = SERVICE.read_text(encoding='utf-8')
 
-# 1. Service/depannage/onderhoud: het losse mobiele printdocument mag nooit
-# zelfstandig de printer/printpreview starten. Alleen de zichtbare knop in dat
-# document mag printWindow.print() aanroepen.
+# 1. Service/depannage/onderhoud: los printdocument openen mag nooit zelf
+# printen. Alleen de zichtbare knop in dat document mag printWindow.print().
 record_pattern = re.compile(
     r"  function printServiceRecordIsolated\(kind, record\) \{.*?\n  \}\n\n  function printServiceRecord\(kind, id\) \{",
     re.S,
 )
-record_replacement = r'''  function printServiceRecordIsolated(kind, record) {
+record_replacement = '''  function printServiceRecordIsolated(kind, record) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return false;
     try {
@@ -36,17 +35,16 @@ record_replacement = r'''  function printServiceRecordIsolated(kind, record) {
   }
 
   function printServiceRecord(kind, id) {'''
-index, record_count = record_pattern.subn(record_replacement, index, count=1)
+index, record_count = record_pattern.subn(lambda _match: record_replacement, index, count=1)
 if record_count != 1:
     raise SystemExit(f'Buildvalidatie mislukt: veilige service-afdruk kon niet eenduidig worden geplaatst ({record_count}x)')
 
-# 2. Serviceverslagen: idem, maar behoud de mobiele fotogroepering wanneer die
-# door de print-parity builder beschikbaar is.
+# 2. Serviceverslagen: idem, met behoud van mobiele fotogroepering.
 report_pattern = re.compile(
     r"  function printServiceReportIsolated\(report\) \{.*?\n  \}\n\n  async function printServiceReport\(id\)\{",
     re.S,
 )
-report_replacement = r'''  function printServiceReportIsolated(report) {
+report_replacement = '''  function printServiceReportIsolated(report) {
     // machinepark-safe-explicit-print-v1
     const printWindow=window.open('','_blank');
     if(!printWindow)return false;
@@ -68,32 +66,64 @@ report_replacement = r'''  function printServiceReportIsolated(report) {
   }
 
   async function printServiceReport(id){'''
-service, report_count = report_pattern.subn(report_replacement, service, count=1)
+service, report_count = report_pattern.subn(lambda _match: report_replacement, service, count=1)
 if report_count != 1:
     raise SystemExit(f'Buildvalidatie mislukt: veilige serviceverslag-afdruk kon niet eenduidig worden geplaatst ({report_count}x)')
 
-# 3. Samengestelde documenten: open het printdocument met een zichtbare knop,
-# maar voer nooit print() automatisch uit tijdens window.onload.
+# 3. ToDo: de oude functie printte na foto-load/timer automatisch. Vervang die
+# door een voorbeeldvenster met een expliciete Afdrukken/PDF-knop.
+action_pattern = re.compile(
+    r"  function printAction\(id\) \{.*?\n  \}\n\n  function openActionDetails\(id\) \{",
+    re.S,
+)
+action_replacement = '''  function printAction(id) {
+    const item=(state.actions||[]).find(a=>a.id===id);if(!item)return;
+    const printWindow=window.open('','_blank');
+    if(!printWindow){alert('Sta pop-ups toe om de ToDo af te drukken.');return;}
+    printWindow.document.open();
+    printWindow.document.write(actionPrintHtml(item));
+    printWindow.document.close();
+    const manual=printWindow.document.createElement('button');
+    manual.id='machineparkActionPrintNow';
+    manual.type='button';
+    manual.textContent='Afdrukken / PDF';
+    manual.style.cssText='font:inherit;padding:10px 16px;border:1px solid #777;border-radius:8px;background:#fff;color:#111;margin:0 0 14px';
+    const hide=printWindow.document.createElement('style');
+    hide.textContent='@media print{#machineparkActionPrintNow{display:none!important}}';
+    printWindow.document.head.appendChild(hide);
+    printWindow.document.body.insertBefore(manual,printWindow.document.body.firstChild);
+    manual.addEventListener('click',()=>{try{printWindow.focus();printWindow.print();}catch(_){}});
+  }
+
+  function openActionDetails(id) {'''
+index, action_count = action_pattern.subn(lambda _match: action_replacement, index, count=1)
+if action_count != 1:
+    raise SystemExit(f'Buildvalidatie mislukt: veilige ToDo-afdruk kon niet eenduidig worden geplaatst ({action_count}x)')
+
+# 4. Samengestelde documenten: geen script-in-script en geen print op load.
+# De parent koppelt de zichtbare knop pas na document.close() aan print().
 composed_pattern = re.compile(
     r"  function printComposedDocument\(doc\)\{.*?\n\n  function loadJsPdf\(\)",
     re.S,
 )
-composed_replacement = r'''  function printComposedDocument(doc){
+composed_replacement = '''  function printComposedDocument(doc){
     const win=window.open('','_blank');
     if(!win){alert('Het afdrukvenster kon niet worden geopend. Sta pop-ups toe en probeer opnieuw.');return;}
     win.document.open();
-    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${composedEsc(doc.name||'Samengesteld document')}</title><style>${printStyles()}.machinepark-explicit-print-actions{display:flex;justify-content:flex-end;margin:0 0 12px}.machinepark-explicit-print-actions button{font:inherit;padding:10px 16px;border:1px solid #777;border-radius:8px;background:#fff;color:#111}@media print{.machinepark-explicit-print-actions{display:none!important}}</style></head><body><div class="machinepark-explicit-print-actions"><button type="button" id="machineparkComposedPrintNow">Afdrukken / PDF</button></div><main class="composed-document">${documentHtml(doc)}</main><script>window.addEventListener('load',()=>{const button=document.getElementById('machineparkComposedPrintNow');if(button)button.addEventListener('click',()=>{window.focus();window.print();});});<\/script></body></html>`);
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${composedEsc(doc.name||'Samengesteld document')}</title><style>${printStyles()}.machinepark-explicit-print-actions{display:flex;justify-content:flex-end;margin:0 0 12px}.machinepark-explicit-print-actions button{font:inherit;padding:10px 16px;border:1px solid #777;border-radius:8px;background:#fff;color:#111}@media print{.machinepark-explicit-print-actions{display:none!important}}</style></head><body><div class="machinepark-explicit-print-actions"><button type="button" id="machineparkComposedPrintNow">Afdrukken / PDF</button></div><main class="composed-document">${documentHtml(doc)}</main></body></html>`);
     win.document.close();
+    const manual=win.document.getElementById('machineparkComposedPrintNow');
+    if(manual)manual.addEventListener('click',()=>{try{win.focus();win.print();}catch(_){}});
   }
 
   function loadJsPdf()'''
-index, composed_count = composed_pattern.subn(composed_replacement, index, count=1)
+index, composed_count = composed_pattern.subn(lambda _match: composed_replacement, index, count=1)
 if composed_count != 1:
     raise SystemExit(f'Buildvalidatie mislukt: veilige samengestelde afdruk kon niet eenduidig worden geplaatst ({composed_count}x)')
 
-# 4. Hoofdvenster: blokkeer ieder programmatisch window.print() tenzij een
-# echte gebruiker kort voordien expliciet op een afdruk/PDF-bediening klikte.
-# Ctrl+P van de browser wordt hierdoor niet geraakt.
+# 5. Hoofdvenster: programmatisch window.print() werkt alleen kort na een echte
+# gebruikersklik op een zichtbare print/PDF-bediening. Browser Ctrl+P blijft
+# volledig buiten deze JavaScript-guard.
 if GUARD_MARKER not in index:
     guard = r'''
 <script data-machinepark-explicit-print-guard="v1">
@@ -139,14 +169,15 @@ if MARKER not in index:
 INDEX.write_text(index, encoding='utf-8')
 SERVICE.write_text(service, encoding='utf-8')
 
-# Eindvalidatie: in de gegenereerde actieve printpaden mag geen automatische
-# print-na-load/timer meer aanwezig zijn.
+# Eindvalidatie: bekende automatische print-na-load/timerconstructies mogen in
+# de finale runtime niet meer voorkomen.
 built_index = INDEX.read_text(encoding='utf-8')
 built_service = SERVICE.read_text(encoding='utf-8')
 forbidden_index = [
     "window.onload=()=>setTimeout(()=>window.print(),120)",
     'setTimeout(triggerPrint, 80)',
     'setTimeout(triggerPrint, 1500)',
+    "const finish=()=>setTimeout(()=>{try{printWindow.focus();printWindow.print();}catch(_){}},120)",
 ]
 for needle in forbidden_index:
     if needle in built_index:
@@ -161,19 +192,20 @@ for needle in ['triggerPrint', 'setTimeout(triggerPrint']:
     if needle in report_block:
         raise SystemExit(f'Buildvalidatie mislukt: automatische serviceverslag-print bleef actief ({needle})')
 
-required = [
+required_index = [
     MARKER,
     GUARD_MARKER,
     'event.isTrusted',
     'window.machineparkGrantPrintIntent',
     'automatische printopdracht geblokkeerd',
     'machineparkComposedPrintNow',
+    'machineparkActionPrintNow',
     'servicePrintNow',
 ]
-for needle in required:
+for needle in required_index:
     if needle not in built_index:
         raise SystemExit(f'Buildvalidatie mislukt: printbeveiliging ontbreekt ({needle})')
 if 'serviceReportPrintNow' not in built_service or 'machinepark-safe-explicit-print-v1' not in built_service:
     raise SystemExit('Buildvalidatie mislukt: serviceverslag vereist nog geen expliciete printklik')
 
-print('[Machinepark] automatische printertriggers verwijderd; afdrukken vereist expliciete gebruikersklik')
+print('[Machinepark] automatische printertriggers verwijderd; printen vereist expliciete gebruikersklik')
