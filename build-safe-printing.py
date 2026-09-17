@@ -156,14 +156,16 @@ if GUARD_MARKER not in index:
 })();
 </script>
 '''
-    if '</body>' not in index:
-        raise SystemExit('Buildvalidatie mislukt: </body> ontbreekt voor printbeveiliging')
-    index = index.replace('</body>', guard + '</body>', 1)
+    body_end = index.rfind('</body>')
+    if body_end < 0:
+        raise SystemExit('Buildvalidatie mislukt: finale </body> ontbreekt voor printbeveiliging')
+    index = index[:body_end] + guard + index[body_end:]
 
 if MARKER not in index:
-    if '</head>' not in index:
+    head_end = index.find('</head>')
+    if head_end < 0:
         raise SystemExit('Buildvalidatie mislukt: </head> ontbreekt voor printbeveiligingsmarker')
-    index = index.replace('</head>', f'<meta {MARKER}>\n</head>', 1)
+    index = index[:head_end] + f'<meta {MARKER}>\n' + index[head_end:]
 
 INDEX.write_text(index, encoding='utf-8')
 SERVICE.write_text(service, encoding='utf-8')
@@ -204,6 +206,11 @@ required_index = [
 for needle in required_index:
     if needle not in built_index:
         raise SystemExit(f'Buildvalidatie mislukt: printbeveiliging ontbreekt ({needle})')
+
+script_at = built_index.rfind(GUARD_MARKER)
+final_body_at = built_index.rfind('</body>')
+if script_at < 0 or final_body_at < 0 or script_at > final_body_at:
+    raise SystemExit('Buildvalidatie mislukt: printbeveiliging staat niet voor de finale body-tag')
 if 'serviceReportPrintNow' not in built_service or 'machinepark-safe-explicit-print-v1' not in built_service:
     raise SystemExit('Buildvalidatie mislukt: serviceverslag vereist nog geen expliciete printklik')
 
