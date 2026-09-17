@@ -72,7 +72,7 @@ elif new_filter_block not in source:
     raise SystemExit('Buildvalidatie mislukt: actieve handleidingfilters niet gevonden')
 
 old_sort = ".sort((a, b) => manualSpecificity(a) - manualSpecificity(b) || String(a.brand || '').localeCompare(String(b.brand || ''), 'nl-BE') || String(a.model || '').localeCompare(String(b.model || ''), 'nl-BE') || String(a.title || '').localeCompare(String(b.title || ''), 'nl-BE'));"
-new_sort = ".sort((a, b) => manualCompareText(a.brand, b.brand) || manualCompareText(a.model, b.model) || manualCompareText(a.type, b.type) || manualCompareText(a.title, b.title) || manualCompareText(manualScopeText(a), manualScopeText(b)) || manualCompareText(a.id, b.id));"
+new_sort = ".sort((a, b) => manualCompareText(a.title, b.title) || manualCompareText(a.brand, b.brand) || manualCompareText(a.model, b.model) || manualCompareText(a.type, b.type) || manualCompareText(manualScopeText(a), manualScopeText(b)) || manualCompareText(a.id, b.id));"
 if old_sort in source:
     source = source.replace(old_sort, new_sort, 1)
 elif new_sort not in source:
@@ -87,13 +87,13 @@ required = [
     'function manualValueEquals(a, b)',
     'const unique = new Map()',
     'manualValueEquals(manual.brand, selectedBrand)',
+    'manualCompareText(a.title, b.title)',
     'manualCompareText(a.brand, b.brand)',
     'manualCompareText(a.model, b.model)',
     'manualCompareText(a.type, b.type)',
-    'manualCompareText(a.title, b.title)',
 ]
 missing = [needle for needle in required if needle not in built]
 if missing:
     raise SystemExit('Buildvalidatie handleiding-sortering mislukt: ' + ', '.join(missing))
 
-print('[Machinepark] handleidingen stabiel gesorteerd op merk, model, type en titel; filters hoofdletterongevoelig')
+print('[Machinepark] handleidingen alfabetisch op titel gesorteerd; merk, model en type zijn stabiele vervolgsleutels')
