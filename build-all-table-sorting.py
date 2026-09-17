@@ -115,7 +115,7 @@ function reapplyGenericTableSorts(root=document){
   });
 }
 function partName'''
-index, count = pattern.subn(replacement, index, count=1)
+index, count = pattern.subn(lambda _match: replacement, index, count=1)
 if count != 1:
     raise SystemExit(f'Buildvalidatie mislukt: centrale tabelsortering kon niet eenduidig worden vervangen ({count}x)')
 
