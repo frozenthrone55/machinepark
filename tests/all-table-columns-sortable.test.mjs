@@ -8,36 +8,50 @@ const html = () => fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 test('elke kolom van elke Machinepark-tabel is sorteerbaar in beide richtingen', () => {
   const source = html();
+  const marker = 'data-machinepark-build-fix="all-table-columns-sortable-v1"';
+  assert.match(source, new RegExp(marker));
+  assert.match(source, /data-machinepark-table-sort-style="v1"/);
 
-  assert.match(source, /data-machinepark-build-fix="all-table-columns-sortable-v1"/);
-  assert.match(source, /function allMachineparkTables\(root=document\)/);
-  assert.match(source, /root\?\.matches\?\.\('\.table'\)/);
-  assert.match(source, /root\.querySelectorAll\('\.table'\)/);
-  assert.match(source, /th\.classList\.add\('table-sortable'\)/);
-  assert.match(source, /th\.removeAttribute\('data-device-sort'\)/);
-  assert.match(source, /th\.dataset\.tableSortIndex=String\(column\)/);
+  const start = source.indexOf(`<script ${marker}>`);
+  const end = source.indexOf('</script>', start);
+  assert.ok(start >= 0 && end > start, 'los universeel sorteerscript ontbreekt');
+  const block = source.slice(start, end);
 
-  // Ook interactieve/lege/action-kolommen moeten een echte sorteerwaarde krijgen.
-  assert.match(source, /input\[type="checkbox"\]/);
-  assert.match(source, /cell\.querySelector\('select'\)/);
-  assert.match(source, /input:not\(\[type="hidden"\]\),textarea/);
-  assert.match(source, /image\?\.alt\|\|image\?\.title/);
+  // Alle .table-tabellen en letterlijk iedere th worden geregistreerd.
+  assert.match(block, /root\?\.matches\?\.\('\.table'\)/);
+  assert.match(block, /root\.querySelectorAll\('\.table'\)/);
+  assert.match(block, /table\.querySelectorAll\('thead th'\)/);
+  assert.match(block, /th\.classList\.add\('machinepark-universal-sortable'\)/);
+  assert.match(block, /th\.removeAttribute\('data-device-sort'\)/);
+  assert.match(block, /th\.dataset\.machineparkSortIndex = String\(column\)/);
 
-  // Richting moet bij iedere volgende klik omkeren en numeriek/datum-bewust blijven.
-  assert.match(source, /previous==='asc'\?'desc':'asc'/);
-  assert.match(source, /return dir==='desc'\?-cmp:cmp/);
-  assert.match(source, /dateTime=raw\.match/);
-  assert.match(source, /if\(\/\^-\?\\d\+/);
+  // Interactieve en visuele cellen krijgen een echte sorteerwaarde.
+  assert.match(block, /input\[type="checkbox"\],input\[type="radio"\]/);
+  assert.match(block, /cell\.querySelector\('select'\)/);
+  assert.match(block, /input:not\(\[type="hidden"\]\),textarea/);
+  assert.match(block, /image\?\.alt \|\| image\?\.title/);
 
-  // Dynamische tabellen en her-renders moeten dezelfde gekozen sortering behouden.
-  assert.match(source, /new MutationObserver\(refreshSortableTables\)/);
-  assert.match(source, /reapplyGenericTableSorts\(document\)/);
-  assert.match(source, /const genericSortHead=e\.target\.closest\('\.table th\.table-sortable'\)/);
+  // Datum, getal en beide sorteerrichtingen worden ondersteund.
+  assert.match(block, /const dateTime = raw\.match/);
+  assert.match(block, /const iso = raw\.match/);
+  assert.match(block, /dir === 'desc' \? -result : result/);
+  assert.match(block, /machineparkSortDir === 'asc' \? 'desc' : 'asc'/);
 
-  // Oude uitzonderingen zijn niet meer toegestaan.
-  assert.doesNotMatch(source, /root\.querySelectorAll\('\.table:not\(\.device-table\)'\)/);
-  assert.doesNotMatch(source, /text==='details'/);
-  assert.doesNotMatch(source, /text==='bewerk'/);
-  assert.doesNotMatch(source, /th\.classList\.contains\('no-sort'\)/);
-  assert.doesNotMatch(source, /const genericSortHead=e\.target\.closest\('\.table:not\(\.device-table\) th\.table-sortable'\)/);
+  // De losse laag onderschept de oude tabelhandlers zonder bestaande modules te herschrijven.
+  assert.match(block, /document\.addEventListener\('click'/);
+  assert.match(block, /event\.stopImmediatePropagation\(\)/);
+  assert.match(block, /}, true\);/);
+
+  // Dynamische tabellen en her-renders worden automatisch opnieuw verwerkt,
+  // terwijl de observer tijdens het fysiek hersorteren gepauzeerd wordt.
+  assert.match(block, /new MutationObserver\(queueRefresh\)/);
+  assert.match(block, /observer\.disconnect\(\)/);
+  assert.match(block, /tables\(document\)\.forEach\(applyCurrent\)/);
+  assert.match(block, /window\.machineparkUniversalTableSorting/);
+
+  // Geen uitzonderingslijst voor lege/action/device-kolommen in de nieuwe laag.
+  assert.doesNotMatch(block, /details/i);
+  assert.doesNotMatch(block, /bewerk/i);
+  assert.doesNotMatch(block, /no-sort/);
+  assert.doesNotMatch(block, /table:not\(\.device-table\)/);
 });
