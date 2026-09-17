@@ -18,10 +18,11 @@ test('handleidingen sorteren alfabetisch op titel en pas daarna op merk model en
   assert.ok(brandPos > titlePos, 'merk mag pas na titel sorteren');
   assert.ok(modelPos > brandPos, 'model moet na merk sorteren');
   assert.ok(typePos > modelPos, 'type moet na model sorteren');
+  assert.match(source, /manualSortDirection\(\) \* \(manualCompareText\(a\.title, b\.title\)/);
   assert.doesNotMatch(source, /manualSpecificity\(a\) - manualSpecificity\(b\)/);
 });
 
-test('titel-sortering behandelt lege merkvelden correct', () => {
+test('titel-sortering werkt zowel A-Z als Z-A met lege merkvelden', () => {
   const rows = [
     { title: 'Yunio X95 exploded view', brand: '' },
     { title: 'Yunio X95 spare parts', brand: '' },
@@ -33,8 +34,8 @@ test('titel-sortering behandelt lege merkvelden correct', () => {
     { title: 'Yunio x50 exploded view', brand: 'Yunio' },
   ];
   const compare = (a, b) => String(a || '').localeCompare(String(b || ''), 'nl-BE', { numeric: true, sensitivity: 'base' });
-  const titles = rows.sort((a, b) => compare(a.title, b.title) || compare(a.brand, b.brand)).map((row) => row.title);
-  assert.deepEqual(titles, [
+  const sortRows = (direction) => [...rows].sort((a, b) => direction * (compare(a.title, b.title) || compare(a.brand, b.brand))).map((row) => row.title);
+  const ascending = [
     'Acaia weegschaal',
     'LNE anniversario handleiding ENG',
     'LNE onderhoud',
@@ -43,7 +44,20 @@ test('titel-sortering behandelt lege merkvelden correct', () => {
     'Yunio X95 exploded view',
     'Yunio X95 spare parts',
     'Yunio X95 waterzijdig',
-  ]);
+  ];
+  assert.deepEqual(sortRows(1), ascending);
+  assert.deepEqual(sortRows(-1), [...ascending].reverse());
+});
+
+test('sorteerdropdown herkent A-Z en Z-A en rendert opnieuw', () => {
+  assert.match(client, /function isManualSortControl\(select\)/);
+  assert.match(client, /a\\s\*\[-–\]\?\\s\*z/);
+  assert.match(client, /z\\s\*\[-–\]\?\\s\*a/);
+  assert.match(client, /function manualSortDirection\(\)/);
+  assert.match(client, /(?:desc\|aflopend)/);
+  assert.match(client, /\\bz a\\b/);
+  assert.match(client, /event\.target\?\.closest\?\.\('#view-manuals select'\)/);
+  assert.match(client, /setTimeout\(\(\) => renderManualLibrary\(\), 0\)/);
 });
 
 test('handleidingfilters vergelijken genormaliseerd en tonen geen bijna-dubbele waarden', () => {
