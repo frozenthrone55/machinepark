@@ -21,7 +21,7 @@ test('PDF-handleidingen laten maximaal 40 MB toe op alle actieve lagen', () => {
 
 test('40 MB limiet wordt na de handleidingen- en Synology-buildlagen toegepast', () => {
   const chain = packageJson.scripts.build;
-  assert.match(chain, /build-manual-pdf-20mb\.py/);
+  assert.match(chain, /build-manual-pdf-40mb\.py/);
   assert.ok(chain.indexOf('build-manual-chunk-upload.py') < chain.indexOf('build-manual-pdf-40mb.py'));
   assert.ok(chain.indexOf('build-synology-local-content.py') < chain.indexOf('build-manual-pdf-40mb.py'));
 });

@@ -69,9 +69,9 @@ test('handleidingfilters vergelijken genormaliseerd en tonen geen bijna-dubbele 
   assert.match(client, /manualValueEquals\(manual\.type, selectedType\)/);
 });
 
-test('sorteerfix draait voor de 20 MB hash zodat browsers de gewijzigde module ophalen', () => {
+test('sorteerfix draait voor de 40 MB hash zodat browsers de gewijzigde module ophalen', () => {
   const chain = packageJson.scripts.build;
   assert.match(chain, /build-manual-library-sorting\.py/);
   assert.ok(chain.indexOf('build-manual-native-sync.py') < chain.indexOf('build-manual-library-sorting.py'));
-  assert.ok(chain.indexOf('build-manual-library-sorting.py') < chain.indexOf('build-manual-pdf-20mb.py'));
+  assert.ok(chain.indexOf('build-manual-library-sorting.py') < chain.indexOf('build-manual-pdf-40mb.py'));
 });

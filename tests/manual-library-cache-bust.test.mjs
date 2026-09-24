@@ -9,10 +9,10 @@ const index = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 const expectedHash = createHash('sha256').update(client).digest('hex').slice(0, 12);
 
-test('handleidingenlimiet is 20 MB in de gebouwde client', () => {
-  assert.match(clientText, /file\.size > 20_000_000/);
-  assert.match(clientText, /De PDF is groter dan 20 MB\./);
-  assert.match(clientText, /Maximaal 20 MB\./);
+test('handleidingenlimiet is 40 MB in de gebouwde client', () => {
+  assert.match(clientText, /file\.size > 40_000_000/);
+  assert.match(clientText, /De PDF is groter dan 40 MB\./);
+  assert.match(clientText, /Maximaal 40 MB\./);
   assert.doesNotMatch(clientText, /12 MB/);
 });
 
