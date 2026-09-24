@@ -89,7 +89,7 @@ if SERVER_MARKER not in endpoint:
         raise SystemExit('Buildvalidatie mislukt: MAX_FILE_BYTES niet uniek gevonden')
     endpoint = endpoint.replace(
         const_anchor,
-        const_anchor + "const UPLOAD_CHUNK_PREFIX = 'manual-upload-chunks/';\nconst MAX_CHUNK_BYTES = 3_750_000;\nconst MAX_UPLOAD_CHUNKS = 8;\n",
+        const_anchor + "const UPLOAD_CHUNK_PREFIX = 'manual-upload-chunks/';\nconst MAX_CHUNK_BYTES = 3_750_000;\nconst MAX_UPLOAD_CHUNKS = 12;\n",
         1,
     )
 
@@ -220,6 +220,7 @@ required = [
     (endpoint, SERVER_MARKER),
     (endpoint, "UPLOAD_CHUNK_PREFIX = 'manual-upload-chunks/'"),
     (endpoint, 'MAX_CHUNK_BYTES = 3_750_000'),
+    (endpoint, 'MAX_UPLOAD_CHUNKS = 12'),
     (endpoint, "action === 'upload-chunk'"),
     (endpoint, "action === 'finalize-upload'"),
     (endpoint, 'Buffer.concat(buffers, receivedBytes)'),
@@ -228,4 +229,4 @@ missing = [needle for haystack, needle in required if needle not in haystack]
 if missing:
     raise SystemExit('Buildvalidatie chunk-upload handleidingen mislukt: ' + ', '.join(missing))
 
-print('[Machinepark] PDF-handleidingen uploaden in 3.5 MB blokken onder Netlify requestlimiet')
+print('[Machinepark] PDF-handleidingen uploaden in 3.5 MB blokken, maximaal 12 blokken, onder Netlify requestlimiet')

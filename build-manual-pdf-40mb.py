@@ -11,13 +11,13 @@ SW = ROOT / 'sw.js'
 
 for path in (CLIENT, ENDPOINT, SYNOLOGY, INDEX, SW):
     if not path.exists():
-        raise SystemExit(f'Buildvalidatie mislukt: {path} ontbreekt voor 20 MB handleidingenlimiet')
+        raise SystemExit(f'Buildvalidatie mislukt: {path} ontbreekt voor 40 MB handleidingenlimiet')
 
 client = CLIENT.read_text(encoding='utf-8')
 client_replacements = {
     "if (file.size > 12_000_000) throw new Error('De PDF is groter dan 12 MB.');":
-        "if (file.size > 20_000_000) throw new Error('De PDF is groter dan 20 MB.');",
-    'Maximaal 12 MB.': 'Maximaal 20 MB.',
+        "if (file.size > 40_000_000) throw new Error('De PDF is groter dan 40 MB.');",
+    'Maximaal 12 MB.': 'Maximaal 40 MB.',
 }
 for old, new in client_replacements.items():
     if old in client:
@@ -28,22 +28,43 @@ CLIENT.write_text(client, encoding='utf-8')
 
 endpoint = ENDPOINT.read_text(encoding='utf-8')
 old_endpoint_limit = 'const MAX_FILE_BYTES = 12_000_000;'
-new_endpoint_limit = 'const MAX_FILE_BYTES = 20_000_000;'
+new_endpoint_limit = 'const MAX_FILE_BYTES = 40_000_000;'
 if old_endpoint_limit in endpoint:
     endpoint = endpoint.replace(old_endpoint_limit, new_endpoint_limit, 1)
 elif new_endpoint_limit not in endpoint:
     raise SystemExit('Buildvalidatie mislukt: Netlify MAX_FILE_BYTES niet gevonden')
-endpoint = endpoint.replace('12 MB', '20 MB')
+endpoint = endpoint.replace('12 MB', '40 MB')
 ENDPOINT.write_text(endpoint, encoding='utf-8')
 
 synology = SYNOLOGY.read_text(encoding='utf-8')
 old_synology_limit = "define('MP_MANUAL_MAX_BYTES', 12000000);"
-new_synology_limit = "define('MP_MANUAL_MAX_BYTES', 20000000);"
+new_synology_limit = "define('MP_MANUAL_MAX_BYTES', 40000000);"
 if old_synology_limit in synology:
     synology = synology.replace(old_synology_limit, new_synology_limit, 1)
 elif new_synology_limit not in synology:
     raise SystemExit('Buildvalidatie mislukt: Synology MP_MANUAL_MAX_BYTES niet gevonden')
-synology = synology.replace('12 MB', '20 MB')
+synology = synology.replace('12 MB', '40 MB')
+SYNOLOGY.write_text(synology, encoding='utf-8')
+
+# 40 MB met blokken van 3,5 MB vereist maximaal 12 uploadblokken.
+# Netlify krijgt de limiet uit de chunk-buildlaag; Synology heeft dezelfde
+# begrenzing rechtstreeks in de PHP-runtime.
+endpoint = ENDPOINT.read_text(encoding='utf-8')
+old_chunk_limit = 'const MAX_UPLOAD_CHUNKS = 8;'
+new_chunk_limit = 'const MAX_UPLOAD_CHUNKS = 12;'
+if old_chunk_limit in endpoint:
+    endpoint = endpoint.replace(old_chunk_limit, new_chunk_limit, 1)
+elif new_chunk_limit not in endpoint:
+    raise SystemExit('Buildvalidatie mislukt: Netlify MAX_UPLOAD_CHUNKS niet gevonden')
+ENDPOINT.write_text(endpoint, encoding='utf-8')
+
+synology = SYNOLOGY.read_text(encoding='utf-8')
+old_synology_chunks = '$total<1||$total>8)'
+new_synology_chunks = '$total<1||$total>12)'
+if old_synology_chunks in synology:
+    synology = synology.replace(old_synology_chunks, new_synology_chunks, 1)
+elif new_synology_chunks not in synology:
+    raise SystemExit('Buildvalidatie mislukt: Synology uploadbloklimiet niet gevonden')
 SYNOLOGY.write_text(synology, encoding='utf-8')
 
 # Externe handleidingenassets mogen niet op een oude PWA-cache blijven hangen.
@@ -77,20 +98,22 @@ built_synology = SYNOLOGY.read_text(encoding='utf-8')
 built_index = INDEX.read_text(encoding='utf-8')
 built_sw = SW.read_text(encoding='utf-8')
 required = [
-    (built_client, 'file.size > 20_000_000'),
-    (built_client, 'Maximaal 20 MB.'),
-    (built_endpoint, 'const MAX_FILE_BYTES = 20_000_000;'),
-    (built_synology, "define('MP_MANUAL_MAX_BYTES', 20000000);"),
+    (built_client, 'file.size > 40_000_000'),
+    (built_client, 'Maximaal 40 MB.'),
+    (built_endpoint, 'const MAX_FILE_BYTES = 40_000_000;'),
+    (built_synology, "define('MP_MANUAL_MAX_BYTES', 40000000);"),
+    (built_endpoint, 'const MAX_UPLOAD_CHUNKS = 12;'),
+    (built_synology, '$total<1||$total>12)'),
     (built_index, f'manual-library.js?v={client_hash}'),
     (built_sw, SW_MARKER),
     (built_sw, "url.pathname.endsWith('/manual-library.js')"),
 ]
 missing = [needle for haystack, needle in required if needle not in haystack]
 if missing:
-    raise SystemExit('Buildvalidatie 20 MB handleidingenlimiet/cachefix mislukt: ' + ', '.join(missing))
+    raise SystemExit('Buildvalidatie 40 MB handleidingenlimiet/cachefix mislukt: ' + ', '.join(missing))
 
 for label, source in [('frontend', built_client), ('Netlify', built_endpoint), ('Synology', built_synology)]:
-    if '12 MB' in source:
-        raise SystemExit(f'Buildvalidatie mislukt: oude 12 MB melding blijft aanwezig in {label}')
+    if '12 MB' in source or '20 MB' in source:
+        raise SystemExit(f'Buildvalidatie mislukt: oude 12/20 MB melding blijft aanwezig in {label}')
 
-print(f'[Machinepark] PDF-handleidingen tot 20 MB + cache-busting actief ({client_hash})')
+print(f'[Machinepark] PDF-handleidingen tot 40 MB in max. 12 blokken + cache-busting actief ({client_hash})')

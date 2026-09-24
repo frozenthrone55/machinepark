@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const client = readFileSync(new URL('../manual-library.js', import.meta.url), 'utf8');
 const endpoint = readFileSync(new URL('../netlify/functions/manual-library.mjs', import.meta.url), 'utf8');
+const synology = readFileSync(new URL('../synology/api/manual-library.php', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('PDF uploadt in blokken ruim onder de Netlify functionlimiet', () => {
@@ -19,7 +20,8 @@ test('server valideert en voegt alle PDF-blokken veilig samen', () => {
   assert.match(endpoint, /machinepark-manual-chunk-upload-server-v1/);
   assert.match(endpoint, /UPLOAD_CHUNK_PREFIX = 'manual-upload-chunks\/'/);
   assert.match(endpoint, /MAX_CHUNK_BYTES = 3_750_000/);
-  assert.match(endpoint, /MAX_UPLOAD_CHUNKS = 8/);
+  assert.match(endpoint, /MAX_UPLOAD_CHUNKS = 12/);
+  assert.match(synology, /\$total<1\|\|\$total>12/);
   assert.match(endpoint, /entry\.metadata\?\.uploadedBy !== access\.sub/);
   assert.match(endpoint, /receivedBytes !== fileSize/);
   assert.match(endpoint, /Buffer\.concat\(buffers, receivedBytes\)/);
