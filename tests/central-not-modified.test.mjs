@@ -22,7 +22,10 @@ test('HTTP 304 wordt als geldige ongewijzigde synchronisatie behandeld', () => {
 
 test('304 behoudt lokale data en bestaande ETag', () => {
   assert.match(offline, /centralSync\.etag = etag \|\| centralSync\.etag \|\| null/);
-  assert.match(offline, /writeMeta\(\{ etag: centralSync\.etag \|\| null, dirty: false \}\)/);
+  const start = offline.indexOf('if (res.status === 304)');
+  const section = offline.slice(start, offline.indexOf('const text = await res.text();', start));
+  assert.doesNotMatch(section, /dirty: false/);
+  assert.match(section, /return keepPullPending\(meta\)/);
   assert.match(offline, /data: null/);
 });
 

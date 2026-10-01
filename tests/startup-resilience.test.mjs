@@ -10,7 +10,7 @@ test('centrale fout tijdens eerste ophaling blokkeert lokale Machinepark-data ni
   assert.match(offline, /remote = \{ exists: false, offline: true/);
 
   const start = offline.indexOf("setCentralSyncStatus('☁ Centrale gegevens ophalen…', 'busy');");
-  const end = offline.indexOf('if (remote?.exists && remote.data)', start);
+  const end = offline.indexOf('if (remote?.exists === false && !remote?.offline && !remote?.pending)', start);
   assert.ok(start >= 0 && end > start, 'centrale opstartsectie ontbreekt');
   const section = offline.slice(start, end);
   assert.doesNotMatch(section, /if \(!isNetworkFailure\(error\)\) throw error/);
