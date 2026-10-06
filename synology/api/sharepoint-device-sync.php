@@ -21,7 +21,7 @@ try {
         $body=json_decode(file_get_contents('php://input'),true);
         if(($body['action']??'')==='enable'){
             if(!is_bool($body['enabled']??null))mp_json(['error'=>'Ongeldige instelling.'],400);
-            if($body['enabled'] && mp_sync_setup(mp_sync_config())!=='')mp_json(['error'=>'Stel eerst de Microsoft-koppeling en NAS-verwerker in.'],409);
+            if($body['enabled'] && mp_sync_setup(mp_sync_config())!=='')mp_json(['error'=>'Stel eerst de Excelbron en NAS-verwerker in.'],409);
             mp_sync_locked(function()use($body){$state=mp_sync_state();$state['deviceSync']['enabled']=$body['enabled'];mp_backup_current();mp_write_state($state);});
             mp_json(['ok'=>true]);
         }

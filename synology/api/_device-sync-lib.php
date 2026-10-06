@@ -3,18 +3,37 @@ declare(strict_types=1);
 if (!defined('MP_DATA_LIBRARY_ONLY')) define('MP_DATA_LIBRARY_ONLY', true);
 require_once __DIR__ . '/machinepark-data.php';
 
+function mp_sync_node_path(): string {
+    foreach (['/var/packages/Node.js_v22/target/usr/local/bin/node','/var/packages/Node.js_v20/target/usr/local/bin/node','/var/packages/Node.js_v18/target/usr/local/bin/node','/var/packages/Node.js_v16/target/usr/local/bin/node','/usr/local/bin/node','/usr/bin/node'] as $path) if (is_executable($path)) return $path;
+    return '';
+}
+function mp_sync_local(array $c): bool { return ($c['source_mode'] ?? '') === 'local'; }
+function mp_sync_local_bytes(array $c): string {
+    $path = $c['local_path'] ?? '';
+    if (!is_file($path) || !is_readable($path)) throw new RuntimeException('De lokale Excelkopie is niet leesbaar op de NAS.');
+    if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'xlsx') throw new RuntimeException('De lokale bron moet een .xlsx-bestand zijn.');
+    $handle = fopen($path, 'rb');
+    if (!$handle) throw new RuntimeException('De lokale Excelkopie kon niet worden geopend.');
+    try { $bytes = stream_get_contents($handle, 32*1024*1024+1); }
+    finally { fclose($handle); }
+    if ($bytes === false || strlen($bytes) > 32*1024*1024 || strlen($bytes) === 0) throw new RuntimeException('De lokale Excelkopie is leeg of te groot.');
+    return $bytes;
+}
 function mp_sync_config(): array {
-    $path = '/volume1/MachineparkData/config/sharepoint-sync.php';
-    if (!is_file($path)) return [];
+    $path = defined('MP_SYNC_CONFIG_FILE') ? MP_SYNC_CONFIG_FILE : '/volume1/MachineparkData/config/sharepoint-sync.php';
+    if (!is_file($path)) return ['source_mode'=>'local','local_path'=>'/volume1/MachineparkData/toestelsynchronisatie/koffiemachines inventaris 2025.xlsx','node_path'=>mp_sync_node_path()];
     $config = require $path;
     return is_array($config) ? $config : [];
 }
 function mp_sync_setup(array $c): string {
-    foreach (['tenant_id','client_id','client_secret','drive_id','item_id','node_path'] as $key) {
-        if (empty($c[$key])) return 'Microsoft-koppeling en NAS-taak moeten nog worden ingesteld.';
+    if (mp_sync_local($c)) {
+        if (empty($c['local_path']) || !is_readable($c['local_path'])) return 'Plaats de Excelkopie in de map toestelsynchronisatie op de NAS.';
+    } else {
+        foreach (['tenant_id','client_id','client_secret','drive_id','item_id'] as $key) if (empty($c[$key])) return 'Microsoft-koppeling moet nog worden ingesteld.';
+        if (!function_exists('curl_init')) return 'PHP-extensie curl is vereist voor Microsoft.';
     }
-    if (!is_executable($c['node_path']) || !function_exists('proc_open')) return 'Node.js of proc_open is niet beschikbaar op de NAS.';
-    if (!class_exists('ZipArchive') || !class_exists('DOMDocument') || !function_exists('curl_init')) return 'PHP-extensies curl, zip en dom zijn vereist.';
+    if (empty($c['node_path']) || !is_executable($c['node_path']) || !function_exists('proc_open')) return 'Installeer Node.js (16 of hoger) op de NAS; proc_open moet beschikbaar zijn.';
+    if (!class_exists('ZipArchive') || !class_exists('DOMDocument')) return 'PHP-extensies zip en dom zijn vereist.';
     return '';
 }
 function mp_sync_locked(callable $fn) {
@@ -139,20 +158,32 @@ function mp_sync_run(bool $manual=false): array {
         if(!$manual && empty($sync['enabled']))return ['status'=>'disabled'];
         if(!$manual && !empty($sync['lastCheckAt']) && time()-strtotime($sync['lastCheckAt'])<14*60)return ['status'=>'not_due'];
         $at=date(DATE_ATOM);$config=mp_sync_config();$setup=mp_sync_setup($config);
-        $run=['id'=>bin2hex(random_bytes(12)),'at'=>$at,'status'=>'error','message'=>'','changes'=>[],'source'=>'SharePoint','trigger'=>$manual?'manual':'scheduled'];
+        $run=['id'=>bin2hex(random_bytes(12)),'at'=>$at,'status'=>'error','message'=>'','changes'=>[],'source'=>mp_sync_local($config)?'Lokale OneDrive-kopie':'SharePoint','trigger'=>$manual?'manual':'scheduled'];
         try {
             if($setup!=='')throw new RuntimeException($setup);
+            if (mp_sync_local($config)) {
+                $bytes=mp_sync_local_bytes($config);
+                $hash=hash('sha256',$bytes);$version='local/'.$config['local_path'].'/'.$hash;
+                $meta=['name'=>basename($config['local_path']),'eTag'=>$hash,'lastModifiedDateTime'=>date(DATE_ATOM,filemtime($config['local_path']))];
+            } else {
             $tokenData=json_decode(mp_sync_http('https://login.microsoftonline.com/'.rawurlencode($config['tenant_id']).'/oauth2/v2.0/token',['Content-Type: application/x-www-form-urlencoded'],http_build_query(['client_id'=>$config['client_id'],'client_secret'=>$config['client_secret'],'scope'=>'https://graph.microsoft.com/.default','grant_type'=>'client_credentials'])),true);
             if(empty($tokenData['access_token']))throw new RuntimeException('Microsoft gaf geen toegangstoken terug.');
             $token=$tokenData['access_token'];$meta=mp_sync_metadata($config,$token);
-            $version=$config['drive_id'].'/'.$config['item_id'].'/'.$meta['eTag'];$run['version']=$meta['eTag'];$run['fileName']=$meta['name'];$run['fileModifiedAt']=$meta['lastModifiedDateTime']??'';
+            $version=$config['drive_id'].'/'.$config['item_id'].'/'.$meta['eTag'];
+            }
+            $run['version']=$meta['eTag'];$run['fileName']=$meta['name'];$run['fileModifiedAt']=$meta['lastModifiedDateTime']??'';
             if(($sync['appliedVersion']??'')===$version){
                 return mp_sync_locked(function()use($at,$meta){$state=mp_sync_state();$state['deviceSync']['lastCheckAt']=$at;$state['deviceSync']['lastCheckStatus']='unchanged';$state['deviceSync']['fileModifiedAt']=$meta['lastModifiedDateTime']??'';mp_write_state($state);return ['status'=>'unchanged','message'=>'Bestand ongewijzigd.'];});
             }
+            if (mp_sync_local($config)) {
+                $matrix=mp_sync_matrix($bytes);
+                if (hash('sha256',mp_sync_local_bytes($config)) !== $hash) throw new RuntimeException('De Excelkopie veranderde tijdens het lezen. Volgende controle probeert opnieuw.');
+            } else {
             $download=$meta['@microsoft.graph.downloadUrl']??'';if(!$download)throw new RuntimeException('Geen downloadadres beschikbaar.');
             // No authorization header is sent to the preauthenticated download URL.
             $matrix=mp_sync_matrix(mp_sync_http($download));
             $after=mp_sync_metadata($config,$token);if($after['eTag']!==$meta['eTag'])throw new RuntimeException('Het Excelbestand veranderde tijdens het lezen. Volgende controle probeert opnieuw.');
+            }
             return mp_sync_locked(function()use($config,$matrix,$run,$version,$meta,$at,$manual){
                 $state=mp_sync_state();if(!$manual && empty($state['deviceSync']['enabled']))return ['status'=>'disabled'];date_default_timezone_set('Europe/Brussels');
                 $result=mp_sync_worker($config,array_merge($matrix,['devices'=>$state['devices'],'fileName'=>$meta['name'],'syncMoment'=>date('Y-m-d\TH:i'),'loggedAt'=>$at]));

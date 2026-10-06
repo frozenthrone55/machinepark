@@ -2,6 +2,7 @@
 declare(strict_types=1);
 $dir=sys_get_temp_dir().'/mp-sync-test-'.bin2hex(random_bytes(5));mkdir($dir);mkdir($dir.'/backups');
 define('MP_DATA_DIR',$dir);define('MP_BACKUP_DIR',$dir.'/backups');define('MP_STATE_FILE',$dir.'/state-v1.json');define('MP_LOCK_FILE',$dir.'/state-v1.lock');
+define('MP_SYNC_CONFIG_FILE',$dir.'/config.php');
 require_once __DIR__.'/../synology/api/_device-sync-lib.php';
 function check($ok,$why){if(!$ok)throw new RuntimeException($why);}
 try {
@@ -25,6 +26,17 @@ try {
     $bad=[['WCL NR.','ZAAKNAAM'],['WCL0001','A'],['wcl0001','B']];
     try {mp_sync_worker(['node_path'=>$node],['matrix'=>$bad,'devices'=>[],'redRows'=>[]]);throw new RuntimeException('Duplicate accepted');}catch(RuntimeException $e){check(strpos($e->getMessage(),'Dubbele WCL')!==false,'duplicate rejected');}
     check(mp_sync_state()===$saved,'failed worker never writes');
+    file_put_contents($dir.'/config.php','<?php return '.var_export(['source_mode'=>'local','local_path'=>$file,'node_path'=>$node],true).';');
+    check(mp_sync_setup(mp_sync_config())==='','local needs no Microsoft keys or curl');
+    $run=mp_sync_run(true);check($run['status']==='success','local run succeeds');
+    check($run['source']==='Lokale OneDrive-kopie','local source labelled');
+    $saved=mp_sync_state();$history=count($saved['deviceSync']['history']);
+    check(mp_sync_run(true)['status']==='unchanged','same bytes are not imported twice');
+    check(count(mp_sync_state()['deviceSync']['history'])===$history,'unchanged keeps history compact');
+    file_put_contents($file,'broken');$run=mp_sync_run(true);
+    check($run['status']==='error','invalid local copy logged');
+    check(mp_sync_state()['deviceSync']['appliedVersion']===$saved['deviceSync']['appliedVersion'],'failed local source never advances version');
+    check(mp_sync_state()['devices']===$saved['devices'],'failed local source preserves devices');
     echo "sharepoint sync PHP checks passed\n";
 } finally {
     foreach(glob($dir.'/backups/*') as $f)unlink($f);rmdir($dir.'/backups');foreach(glob($dir.'/*') as $f)if(is_file($f))unlink($f);rmdir($dir);

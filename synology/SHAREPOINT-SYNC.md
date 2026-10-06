@@ -1,3 +1,27 @@
+## Lokale OneDrive-kopie (zonder Microsoft-appregistratie)
+
+Als `/volume1/MachineparkData/config/sharepoint-sync.php` ontbreekt, gebruikt de module standaard `/volume1/MachineparkData/toestelsynchronisatie/koffiemachines inventaris 2025.xlsx`. Node.js wordt gezocht in de gebruikelijke Synology pakketpaden (16/18/20/22) en `/usr/local/bin/node`. PHP zip en dom en proc_open zijn nodig; curl en Microsoft-sleutels zijn bij deze route niet nodig.
+
+1. Houd het bestaande SharePointbestand via OneDrive lokaal beschikbaar op de Windows-pc.
+2. Maak de map `toestelsynchronisatie` in MachineparkData en plaats de eerste Excelkopie.
+3. De scripts in `synology/windows` zijn afgestemd op Kris' bronpad en `\\192.168.0.200\MachineparkData`. Voer `install-device-excel-task.ps1` uit als de gewone Windows-gebruiker. De taak gebruikt de huidige aanmelding, draait elke 15 minuten en bij aanmelden. Geen wachtwoorden in scripts. Het log staat in `%LOCALAPPDATA%\MachineparkToestelsynchronisatie\copy.log`. De pc moet aanstaan, aangemeld zijn, OneDrive actueel en de NAS bereikbaar. Een slapende/afgemelde pc levert geen nieuwe bestanden.
+4. Installeer Node.js 16 of hoger op de NAS en schakel PHP zip en dom in.
+5. Maak in DSM Taakplanner een gebruikersscript dat elke 15 minuten draait met `php /volume1/web/machinepark/synology/sync-sharepoint-devices.php`. Kies de geïnstalleerde PHP 7.2 CLI als `php` niet in PATH zit. Het taakaccount moet de kopie kunnen lezen en MachineparkData kunnen schrijven.
+6. Gebruik in Beheer eerst **Nu controleren** en controleer de historiek. Schakel daarna automatisch controleren in.
+
+De Windows-taak schrijft een tijdelijk bestand en publiceert de complete kopie met een atomische vervanging. Machinepark gebruikt SHA-256 voor versiecontrole en controleert opnieuw na lezen. Alleen gewijzigde bytes worden geïmporteerd. De wijzigingshistoriek en laatste controle blijven in de bestaande serveropslag. Een mislukte import behoudt de vorige versie en toestellen. De getoonde bestandsdatum is de datum van de NAS-kopie, niet noodzakelijk de SharePoint-wijzigingsdatum.
+
+Voor een afwijkend pad of Node-installatie kan het externe configuratiebestand dit bevatten:
+
+```php
+<?php
+return [
+    'source_mode' => 'local',
+    'local_path' => '/volume1/MachineparkData/toestelsynchronisatie/koffiemachines inventaris 2025.xlsx',
+    'node_path' => '/usr/local/bin/node',
+];
+```
+
 # Automatische toestelsynchronisatie
 
 Deze module leest het bestaande SharePoint-Excelbestand uitsluitend. Er zijn geen
