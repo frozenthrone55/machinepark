@@ -31,7 +31,7 @@ test('runtime package includes both UI and shared worker and offline cache inclu
  const pkg=readFileSync('scripts/package-synology-runtime.py','utf8');
  assert.match(pkg,/"sharepoint-device-sync.js"/);assert.match(pkg,/"synology\/device-sync-worker.cjs"/);
  assert.match(readFileSync('sw.js','utf8'),/\.\/sharepoint-device-sync.js/);
- assert.match(readFileSync('index.html','utf8'),/<script src="\.\/sharepoint-device-sync.js"><\/script>/);
+ assert.match(readFileSync('index.html','utf8'),/<script src="\.\/sharepoint-device-sync.js\?v=[a-f0-9]{16}"><\/script>/);
 });
 test('PHP parser, atomic persistence and errors are verified in isolated storage',()=>{
  const output=execFileSync('php',['tests/sharepoint-device-sync.php'],{encoding:'utf8'});
