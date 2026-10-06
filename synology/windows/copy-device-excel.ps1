@@ -22,7 +22,7 @@ try {
     $temp = Join-Path $directory ([Guid]::NewGuid().ToString() + '.tmp')
     [IO.File]::WriteAllBytes($temp, $bytes)
     # Publish a complete file in one rename, so Machinepark cannot read half a copy.
-    if (Test-Path -LiteralPath $target) { [IO.File]::Replace($temp, $target, $null) }
+    if (Test-Path -LiteralPath $target) { [IO.File]::Replace($temp, $target, ($temp + '.bak')); Remove-Item -LiteralPath ($temp + '.bak') }
     else { [IO.File]::Move($temp, $target) }
     $temp = $null
     Add-Content -LiteralPath $log -Value "$(Get-Date -Format o) Kopie bijgewerkt."
