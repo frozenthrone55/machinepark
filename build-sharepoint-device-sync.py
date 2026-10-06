@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import hashlib
 ROOT = Path(__file__).resolve().parent
 p = ROOT / 'index.html'
 s = p.read_text()
@@ -16,6 +17,10 @@ if marker not in s:
     pos = s.rfind('</body>')
     s = s[:pos] + '<script src="./sharepoint-device-sync.js"></script>\n' + s[pos:]
     p.write_text(s)
+# Version the separate admin UI so cached clients fetch changed synchronization text.
+ui_version = hashlib.sha256((ROOT / 'sharepoint-device-sync.js').read_bytes()).hexdigest()[:16]
+s = re.sub(r'(<script src="\./sharepoint-device-sync\.js)(?:\?v=[^"]*)?("[^>]*></script>)', lambda m: m.group(1) + '?v=' + ui_version + m.group(2), s)
+p.write_text(s)
 # The NAS worker uses the actual manual planner and writer, not a second implementation.
 names = ['normalizeMoment','locationEvents','deviceLocationAt','normalizeHeader','cleanCell','findHeaderIndex','validYmd','parseInventoryDate','syncTextSame','installSourceDisplay','currentInstallDisplay','deviceSyncPlan']
 functions = []
