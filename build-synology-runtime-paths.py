@@ -79,6 +79,7 @@ offline_asset = f"./offline-first.js?v={offline_hash}"
 # geen foto's, centrale data of PHP-API-responses.
 critical_assets = {
     "./index.html",
+    "./sharepoint-device-sync.js",
     "./manifest.webmanifest",
     "./machinepark-logo.svg",
     "./machinepark-coffee-device-icon.png",
@@ -242,3 +243,4 @@ for icon in manifest.get("icons", []):
 MANIFEST.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 print(f"[Machinepark] Synology runtimepaden relatief gemaakt ({count} HTML-assets), login v={auth_hash}, offline v={offline_hash} en service worker v={sw_hash}")
+

@@ -9,10 +9,10 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('X-Content-Type-Options: nosniff');
 
-define('MP_DATA_DIR', '/volume1/MachineparkData/data');
-define('MP_BACKUP_DIR', '/volume1/MachineparkData/backups');
-define('MP_STATE_FILE', MP_DATA_DIR . '/state-v1.json');
-define('MP_LOCK_FILE', MP_DATA_DIR . '/state-v1.lock');
+if (!defined('MP_DATA_DIR')) define('MP_DATA_DIR', '/volume1/MachineparkData/data');
+if (!defined('MP_BACKUP_DIR')) define('MP_BACKUP_DIR', '/volume1/MachineparkData/backups');
+if (!defined('MP_STATE_FILE')) define('MP_STATE_FILE', MP_DATA_DIR . '/state-v1.json');
+if (!defined('MP_LOCK_FILE')) define('MP_LOCK_FILE', MP_DATA_DIR . '/state-v1.lock');
 
 function mp_json(array $body, int $status = 200, array $headers = []): void {
     http_response_code($status);
@@ -283,6 +283,9 @@ function mp_write_state(array $data): string {
     return $etag;
 }
 
+// Shared storage helpers for the authenticated sync endpoint and CLI scheduler.
+if (defined('MP_DATA_LIBRARY_ONLY') && MP_DATA_LIBRARY_ONLY) return;
+
 try {
     mp_auth_require_request_access();
 } catch (Throwable $e) {
@@ -408,6 +411,10 @@ if ($method === 'PUT') {
         $data['actions'] = isset($before['actions']) && is_array($before['actions']) ? $before['actions'] : [];
     }
 
+    // Synchronisation metadata is server-owned, including for older/offline clients.
+    if (isset($before['deviceSync'])) $data['deviceSync'] = $before['deviceSync'];
+    else unset($data['deviceSync']);
+
     mp_validate_write_permissions($before, $data, $authUser);
     $changes = mp_audit_snapshot_changes($before, $data);
 
@@ -432,3 +439,4 @@ if ($method === 'PUT') {
 }
 
 mp_json(['error' => 'Methode niet toegestaan.'], 405, ['Allow' => 'GET, PUT, OPTIONS']);
+

@@ -16,6 +16,8 @@ RUNTIME_FILES = [
     "offline-first.js",
     "sw.js",
     "synology-local-auth.js",
+    "sharepoint-device-sync.js",
+    "synology/device-sync-worker.cjs",
     "manifest.webmanifest",
     "machinepark-logo.svg",
     "machinepark-coffee-device-icon.png",
@@ -72,3 +74,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
