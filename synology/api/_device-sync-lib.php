@@ -156,7 +156,7 @@ function mp_sync_run(bool $manual=false): array {
     try {
         $state=mp_sync_locked(function(){return mp_sync_state();});$sync=$state['deviceSync']??[];
         if(!$manual && empty($sync['enabled']))return ['status'=>'disabled'];
-        if(!$manual && !empty($sync['lastCheckAt']) && time()-strtotime($sync['lastCheckAt'])<14*60)return ['status'=>'not_due'];
+        if(!$manual && !empty($sync['lastCheckAt']) && time()-strtotime($sync['lastCheckAt'])<4*60)return ['status'=>'not_due'];
         $at=date(DATE_ATOM);$config=mp_sync_config();$setup=mp_sync_setup($config);
         $run=['id'=>bin2hex(random_bytes(12)),'at'=>$at,'status'=>'error','message'=>'','changes'=>[],'source'=>mp_sync_local($config)?'Lokale OneDrive-kopie':'SharePoint','trigger'=>$manual?'manual':'scheduled'];
         try {

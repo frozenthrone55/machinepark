@@ -4,9 +4,9 @@ Als `/volume1/MachineparkData/config/sharepoint-sync.php` ontbreekt, gebruikt de
 
 1. Houd het bestaande SharePointbestand via OneDrive lokaal beschikbaar op de Windows-pc.
 2. Maak de map `toestelsynchronisatie` in MachineparkData en plaats de eerste Excelkopie.
-3. De scripts in `synology/windows` zijn afgestemd op Kris' bronpad en `\\192.168.0.200\MachineparkData`. Voer `install-device-excel-task.ps1` uit als de gewone Windows-gebruiker. De taak gebruikt de huidige aanmelding, draait elke 15 minuten en bij aanmelden. Geen wachtwoorden in scripts. Het log staat in `%LOCALAPPDATA%\MachineparkToestelsynchronisatie\copy.log`. De pc moet aanstaan, aangemeld zijn, OneDrive actueel en de NAS bereikbaar. Een slapende/afgemelde pc levert geen nieuwe bestanden.
+3. De scripts in `synology/windows` zijn afgestemd op Kris' bronpad en `\\192.168.0.200\MachineparkData`. Voer `install-device-excel-task.ps1` uit als de gewone Windows-gebruiker. De taak gebruikt de huidige aanmelding, draait elke 5 minuten en bij aanmelden. Geen wachtwoorden in scripts. Het log staat in `%LOCALAPPDATA%\MachineparkToestelsynchronisatie\copy.log`. De pc moet aanstaan, aangemeld zijn, OneDrive actueel en de NAS bereikbaar. Een slapende/afgemelde pc levert geen nieuwe bestanden.
 4. Installeer Node.js 16 of hoger op de NAS en schakel PHP zip en dom in.
-5. Maak in DSM Taakplanner een gebruikersscript dat elke 15 minuten draait met `php /volume1/web/machinepark/synology/sync-sharepoint-devices.php`. Kies de geïnstalleerde PHP 7.2 CLI als `php` niet in PATH zit. Het taakaccount moet de kopie kunnen lezen en MachineparkData kunnen schrijven.
+5. Maak in DSM Taakplanner een gebruikersscript dat elke 5 minuten draait met `php /volume1/web/machinepark/synology/sync-sharepoint-devices.php`. Kies de geïnstalleerde PHP 7.2 CLI als `php` niet in PATH zit. Het taakaccount moet de kopie kunnen lezen en MachineparkData kunnen schrijven.
 6. Gebruik in Beheer eerst **Nu controleren** en controleer de historiek. Schakel daarna automatisch controleren in.
 
 De Windows-taak schrijft een tijdelijk bestand en publiceert de complete kopie met een atomische vervanging. Machinepark gebruikt SHA-256 voor versiecontrole en controleert opnieuw na lezen. Alleen gewijzigde bytes worden geïmporteerd. De wijzigingshistoriek en laatste controle blijven in de bestaande serveropslag. Een mislukte import behoudt de vorige versie en toestellen. De getoonde bestandsdatum is de datum van de NAS-kopie, niet noodzakelijk de SharePoint-wijzigingsdatum.
@@ -45,7 +45,7 @@ synchronisatie; de build genereert daarvan de Node-worker.
    lokaal in. Maak de map zo nodig aan, en beperk lezen tot de PHP-gebruiker en
    het account van de geplande taak. Deze configuratie ligt buiten de webroot
    en blijft behouden bij updates. Zet echte sleutels nooit in GitHub of chat.
-4. Maak in DSM Taakplanner een gebruikersgedefinieerde taak, elke 15 minuten,
+4. Maak in DSM Taakplanner een gebruikersgedefinieerde taak, elke 5 minuten,
    met een account dat de Machinepark-data kan lezen en schrijven. Gebruik het
    **bevestigde** PHP 7.2 CLI-pad op jouw NAS, gevolgd door:
    `/volume1/web/machinepark/synology/sync-sharepoint-devices.php`.
