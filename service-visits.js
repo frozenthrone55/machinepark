@@ -572,7 +572,17 @@
   }
 
   function findGroup(locationKey,locationLabel='') {
-    return locationGroups().find(g=>g.key===locationKey) || locationGroups().find(g=>svKey(g.label)===svKey(locationLabel)) || null;
+    const current=locationGroups().find(g=>g.key===locationKey) || locationGroups().find(g=>svKey(g.label)===svKey(locationLabel));
+    const savedLocation=(activeVisitDraft?.locations||[]).find(loc=>String(loc.key)===String(locationKey));
+    const visit=visitForLocation(activeVisitDraft?.report,locationKey);
+    const items=locationItems(activeVisitDraft?.items,locationKey,activeVisitDraft?.header?.locationKey||'');
+    if(!savedLocation&&!visit&&!items.length)return current||null;
+    const devices=new Map((current?.devices||[]).map(device=>[device.id,device]));
+    for(const record of [...items,...(visit?.records||[]).map(row=>row.item)]){
+      const device=(state.devices||[]).find(device=>device.id===record?.deviceId);
+      if(device)devices.set(device.id,device);
+    }
+    return {key:locationKey,label:savedLocation?.label||visit?.location||locationLabel||current?.label||'',devices:[...devices.values()]};
   }
 
   function renderDevices(group,visit=null,draftItems=[]) {
@@ -655,7 +665,7 @@
     activeVisitDraft.activeLocationKey=activeVisitDraft.activeLocationKey||header?.activeLocationKey||activeVisitDraft.locations[0]?.key||hidden.value||'';
     renderLocationChips();
     const initial=activeVisitDraft.locations.find(loc=>loc.key===activeVisitDraft.activeLocationKey);
-    if(initial){const group=findGroup(initial.key,initial.label);if(group)void switchDraftLocation(group,{capture:false});}
+    if(initial){const group=findGroup(initial.key,initial.label);if(group)void switchDraftLocation(group,{capture:false});else renderDevices(null);}
     else renderDevices(null);
 
     const hide=()=>suggestions.classList.remove('show');
@@ -989,7 +999,7 @@
     let header=draftId?visitDraftHeader(draftId):null,items=header?visitDraftItems(header.id):[];
     const requestedReport=id?(serviceReportById(id)||serviceReportForVisit(id)):null;
     const report=requestedReport||(header?.appendToReportId?serviceReportById(header.appendToReportId):null)||(header?.appendToVisitId?serviceReportForVisit(header.appendToVisitId):null);
-    if(id&&!report){toast('Serviceverslag niet meer gevonden.');return;}if(!locationGroups().length){toast('Geen actieve toestellen met een locatie gevonden.');return;}
+    if(id&&!report){toast('Serviceverslag niet meer gevonden.');return;}if(!locationGroups().length&&!report&&!items.length){toast('Geen actieve toestellen met een locatie gevonden.');return;}
     const editMode=Boolean(options.edit||header?.editMode);
     if(editMode&&!svCanEdit()){toast('Deze rol mag dit serviceverslag niet wijzigen.');return;}
     if(!editMode&&!svCanCreate()){toast('Deze rol mag geen nieuwe onderhouds-, depannage- of Andere-werkenregistraties toevoegen.');return;}
@@ -1257,3 +1267,4 @@
   window.renderMachineparkServiceVisits=renderServiceVisits;
   renderServiceVisits();
 })();
+
