@@ -344,7 +344,7 @@ if report_status_new not in service:
     service = service.replace(report_status_old, report_status_new, 1)
 
 table_old = '<td><span class="service-visit-status">Afgesloten</span></td>'
-table_new = '<td><span class="service-visit-status">${svEsc(typeof window.machineparkServiceReportStatus===`function`?window.machineparkServiceReportStatus(r):`Afgesloten`)}</span></td>'
+table_new = '<td><span class="service-visit-status" data-status="${svEsc(typeof window.machineparkServiceReportStatus===`function`?window.machineparkServiceReportStatus(r):`Afgesloten`)}">${svEsc(typeof window.machineparkServiceReportStatus===`function`?window.machineparkServiceReportStatus(r):`Afgesloten`)}</span></td>'
 if table_new not in service:
     if table_old not in service:
         raise SystemExit("Buildvalidatie mislukt: servicetabel-status ontbreekt")

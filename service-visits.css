@@ -104,3 +104,7 @@ body.service-visit-printing{background:#fff!important;color:#111!important}
 .service-report-device-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
 .service-report-device-highlight{box-shadow:0 0 0 3px rgba(44,106,88,.18);transition:box-shadow .2s ease}
 @media(max-width:700px){.service-report-device-head .btn{width:100%}}
+
+/* Serviceverslagen krijgen alleen groen wanneer alle werkzaamheden en ToDo's klaar zijn. */
+.service-visit-status[data-status="In behandeling"],.service-visit-status[data-status="Open"]{background:#fff3d6;color:#805500}
+.service-visit-status[data-status="Afgesloten"]{background:#eaf5ef;color:#216343}
