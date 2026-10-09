@@ -9,6 +9,10 @@ try {
     if($method==='GET'){
         $state=mp_sync_locked(function(){return mp_sync_state();});
         $sync=$state['deviceSync']??[];$history=array_reverse($sync['history']??[]);unset($sync['history']);
+        // Filter before pagination so pages contain only actual device changes.
+        $history=array_values(array_filter($history,function($run){
+            return !empty($run['changes']) || (int)($run['added']??0)>0 || (int)($run['updated']??0)>0;
+        }));
         $offset=max(0,(int)($_GET['offset']??0));$page=array_slice($history,$offset,25);
         $setup=mp_sync_setup(mp_sync_config());
         mp_json(['ready'=>$setup==='','setupMessage'=>$setup,'sync'=>$sync,'history'=>$page,'nextOffset'=>count($history)>$offset+25?$offset+25:null]);
